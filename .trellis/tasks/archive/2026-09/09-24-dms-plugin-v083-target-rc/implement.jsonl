@@ -1,3 +1,3 @@
 {"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/environment.md","reason":"Provides the original target environment and source/runtime evidence boundaries."}
 {"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/dms-api.md","reason":"Provides verified DMS composite, lifecycle, permissions, and compatibility API facts."}
-{"file":".trellis/tasks/09-24-dms-plugin-v08/research/v08-baseline.md","reason":"Records current host version mismatch, missing live process, and available tooling."}
+{"file":".trellis/tasks/archive/2026-09/09-24-dms-plugin-v08/research/v08-baseline.md","reason":"Records current host version mismatch, missing live process, and available tooling."}
