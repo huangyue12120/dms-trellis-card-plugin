@@ -1011,12 +1011,36 @@ const matrixDegraded = {
   }]
 };
 
+function sourceSection(source, start, end) {
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end, startIndex + start.length);
+  assert.ok(startIndex >= 0 && endIndex > startIndex,
+    `expected source section from ${start} to ${end}`);
+  return source.slice(startIndex, endIndex);
+}
+
+const detailObserverSource = sourceSection(widgetSource,
+  "function observeDetailResponse()", "function _archiveProject()");
+const archiveResponseHandler = detailObserverSource.slice(
+  detailObserverSource.indexOf("if (!root.archiveMode"));
+const markdownRequestSource = sourceSection(daemonSource,
+  "function _readMarkdownRequest(", "function _archiveWarning(");
+const archiveIndexSource = sourceSection(daemonSource,
+  "function _loadArchiveIndex(", "function _readArchiveTaskRequest(");
+const archivePageFinishSource = sourceSection(daemonSource,
+  "function _finishArchivePageRow(", "function _loadArchivePageRow(");
+const detailErrorPublisherSource = sourceSection(daemonSource,
+  "function _publishDetailError(", "function _findLiveTaskRecord(");
+const currentDetailGuardSource = sourceSection(daemonSource,
+  "function _isCurrentDetail(", "function _cloneValue(");
+
 const stateMatrixFixtures = [
   {
     state: "Startup before first Snapshot",
     pill: "icon with no fabricated counts",
     popout: "Loading Trellis status...",
     recovery: "wait without moving focus",
+    evidenceTypes: ["fixture"],
     verify() {
       assert.equal(projection.makePillProjection({}, "auto").ready, false);
       assert.equal(projection.makePopoutProjection({}).ready, false);
@@ -1027,6 +1051,7 @@ const stateMatrixFixtures = [
     pill: "No project in project mode",
     popout: "unconfigured guidance with settings action",
     recovery: "open DMS plugin settings",
+    evidenceTypes: ["fixture"],
     verify() {
       const value = { schemaVersion: 1, projects: [], warnings: [{ code: "root_empty", message: "no root" }] };
       assert.equal(projection.makePillProjection(value, "project").label, "No project");
@@ -1038,6 +1063,7 @@ const stateMatrixFixtures = [
     pill: "zero counts",
     popout: "empty discovery message",
     recovery: "manual refresh or settings inspection",
+    evidenceTypes: ["fixture"],
     verify() {
       const value = { schemaVersion: 1, projects: [], warnings: [] };
       assert.equal(projection.makePillProjection(value, "counts").projectCount, 0);
@@ -1049,6 +1075,7 @@ const stateMatrixFixtures = [
     pill: "project summary",
     popout: "project header and no-live-task copy",
     recovery: "read-only inspection",
+    evidenceTypes: ["fixture"],
     verify() {
       assert.equal(projection.makePillProjection(matrixProjectNoTasks, "project").label, "Matrix project");
       assert.equal(projection.makePopoutProjection(matrixProjectNoTasks).projects[0].groups.length, 0);
@@ -1059,6 +1086,7 @@ const stateMatrixFixtures = [
     pill: "No active task unless explicitly pinned",
     popout: "truthful Planning/In progress group",
     recovery: "read-only inspection",
+    evidenceTypes: ["fixture"],
     verify() {
       assert.equal(projection.makePillProjection(matrixPlanning, "task").label, "No active task");
       assert.equal(projection.makePopoutProjection(matrixPlanning).projects[0].groups[0].key, "planning");
@@ -1069,6 +1097,7 @@ const stateMatrixFixtures = [
     pill: "one active task title",
     popout: "one row with the real session count",
     recovery: "read-only inspection",
+    evidenceTypes: ["fixture"],
     verify() {
       assert.equal(projection.makePillProjection(projectionSnapshot, "auto").label, "Build");
       assert.equal(projection.makePopoutProjection(projectionSnapshot).projects[0].tasks[0].activeSessionCount, 2);
@@ -1079,6 +1108,7 @@ const stateMatrixFixtures = [
     pill: "counts in auto and title plus additional-task count in task mode",
     popout: "all bounded task rows",
     recovery: "inspect the live list",
+    evidenceTypes: ["fixture"],
     verify() {
       assert.equal(projection.makePillProjection(twoActiveSnapshot, "auto").kind, "counts");
       assert.equal(projection.makePillProjection(twoActiveSnapshot, "task").extraCount, 1);
@@ -1089,6 +1119,7 @@ const stateMatrixFixtures = [
     pill: "project-qualified deterministic primary fallback",
     popout: "all healthy rows plus invalid-State guidance",
     recovery: "select a current filter or pin",
+    evidenceTypes: ["fixture"],
     verify() {
       assert.equal(pinnedPlanPill.label, "Plan");
       assert.equal(staleFilteredPopout.invalidSelectedProject, true);
@@ -1101,6 +1132,7 @@ const stateMatrixFixtures = [
     pill: "normal global primary",
     popout: "bounded All view or the selected project before caps",
     recovery: "choose All or a project filter",
+    evidenceTypes: ["fixture"],
     verify() {
       assert.equal(projection.makePillProjection(projectionSnapshot, "project").extraCount, 1);
       assert.equal(filteredBeyondCap.projects[0].id, "project-9");
@@ -1111,6 +1143,7 @@ const stateMatrixFixtures = [
     pill: "normal primary with warning signal when present",
     popout: "flat relation summary and Other group",
     recovery: "repair or archive outside the plugin",
+    evidenceTypes: ["fixture"],
     verify() {
       assert.equal(groupedPopout.projects[0].groups[2].tasks[1].relationText, "Parent: Cycle B · 1 child");
       assert.deepEqual(Array.from(groupedPopout.projects[0].groups[4].tasks, task => task.state), ["custom", "completed"]);
@@ -1121,6 +1154,7 @@ const stateMatrixFixtures = [
     pill: "local choice remains usable",
     popout: "bounded persistence warning and convergent values",
     recovery: "retry after repairing the DMS State backend",
+    evidenceTypes: ["static"],
     verify() {
       assert.match(widgetSource, /Preference changed locally, but DMS State could not save it\./);
       assert.match(widgetSource, /function onPluginStateChanged\(changedPluginId\)/);
@@ -1131,6 +1165,7 @@ const stateMatrixFixtures = [
     pill: "single-line 180px-bound label or icon-only vertical projection",
     popout: "screen-clamped one-column vertical scroll with wrapping controls",
     recovery: "scroll and use visible controls",
+    evidenceTypes: ["fixture", "static"],
     verify() {
       assert.equal(longFilterProjection.projectOptions[0].label.endsWith("…"), true);
       const vertical = widgetSource.match(/verticalBarPill:\s*Component\s*\{[\s\S]*?\n\s*popoutContent:/)?.[0] || "";
@@ -1144,6 +1179,7 @@ const stateMatrixFixtures = [
     pill: "healthy task plus warning glyph/count",
     popout: "healthy and error rows remain visible together",
     recovery: "fix the source outside the plugin and refresh",
+    evidenceTypes: ["fixture"],
     verify() {
       const pill = projection.makePillProjection(matrixReadError, "auto");
       const popout = projection.makePopoutProjection(matrixReadError);
@@ -1157,6 +1193,7 @@ const stateMatrixFixtures = [
     pill: "warning signal without fabricated activity",
     popout: "bounded warning plus retained task/version facts",
     recovery: "repair outside the plugin and refresh",
+    evidenceTypes: ["fixture"],
     verify() {
       assert.equal(projection.makePillProjection(matrixStaleSession, "auto").activeTaskCount, 0);
       assert.equal(projection.makePopoutProjection(matrixStaleSession).taskCount, 1);
@@ -1168,6 +1205,7 @@ const stateMatrixFixtures = [
     pill: "last-good summary plus warning",
     popout: "retained coherent data while refresh remains pending",
     recovery: "manual refresh without claiming completion early",
+    evidenceTypes: ["fixture", "static"],
     verify() {
       const popout = projection.makePopoutProjection(matrixDegraded);
       assert.equal(popout.degraded, true);
@@ -1181,20 +1219,139 @@ const stateMatrixFixtures = [
     pill: "unknown mode normalizes to auto and removed data disappears",
     popout: "successful replacement Snapshot contains only current projects",
     recovery: "re-add a trusted root only when intended",
+    evidenceTypes: ["fixture", "static"],
     verify() {
       assert.equal(projection.makePillProjection(projectionSnapshot, "unknown").mode, "auto");
       assert.equal(projection.makePopoutProjection({ schemaVersion: 1, projects: [], warnings: [] }).projectCount, 0);
       assert.doesNotMatch(daemonSource, /loadPluginState\([^)]*discoveredProjects/);
     }
+  },
+  {
+    state: "Archive index or page is empty",
+    pill: "live pill remains independent of archive contents",
+    popout: "empty month list or empty-page recovery copy",
+    recovery: "reload archive or return to live tasks",
+    evidenceTypes: ["static"],
+    verify() {
+      assert.match(archiveIndexSource,
+        /indexContext\.hadEntries\s*\?\s*"unknown-layout"\s*:\s*"empty"/);
+      assert.match(archivePageFinishSource,
+        /tasks\.length\s*\?\s*"ready"\s*:\s*"empty"/);
+      assert.match(widgetSource,
+        /visible:\s*root\.archiveStatus === "empty"[\s\S]*?No archived tasks are available on this page\.[\s\S]*?This project has no archived task months\./);
+    }
+  },
+  {
+    state: "Archive index or page is loaded",
+    pill: "live pill continues to use the live Snapshot only",
+    popout: "bounded archive month and task rows are rendered separately",
+    recovery: "open a selected archive task or return to live tasks",
+    evidenceTypes: ["static"],
+    verify() {
+      assert.match(archivePageFinishSource,
+        /_archiveResponse\(context\.request,[\s\S]*?"ready"/);
+      assert.match(archiveResponseHandler,
+        /root\.archiveTasks = response\.tasks/);
+      assert.match(widgetSource, /model:\s*root\.archiveTasks/);
+      assert.match(widgetSource,
+        /Archived tasks are loaded on demand and never enter the live task list\./);
+    }
+  },
+  {
+    state: "Archive read or permission error",
+    pill: "live pill remains available while archive fails",
+    popout: "bounded archive error copy with no fabricated rows",
+    recovery: "reload or return to live tasks",
+    evidenceTypes: ["static"],
+    verify() {
+      assert.match(archiveErrorFunction,
+        /_isCurrentDetail\(generation, request\.requestId\)/);
+      assert.match(archiveErrorFunction,
+        /_archiveResponse\(request,\s*"error"/);
+      assert.match(archiveResponseHandler,
+        /response\.status === "error"[\s\S]*?root\.archiveError/);
+      assert.match(archiveIndexSource, /archive_permission/);
+      assert.match(archiveErrorFunction, /\)\.toString\(\)\.slice\(0, 160\)/);
+      assert.match(widgetSource,
+        /visible:\s*root\.archiveStatus === "error"[\s\S]*?text:\s*root\.archiveError/);
+    }
+  },
+  {
+    state: "Markdown document is empty",
+    pill: "live task projection remains unchanged",
+    popout: "local empty-document message with no Snapshot content",
+    recovery: "switch document or return to the task list",
+    evidenceTypes: ["static"],
+    verify() {
+      assert.match(markdownRequestSource,
+        /text\.length === 0[\s\S]*?_detailResponse\(request,\s*"empty"/);
+      assert.match(detailObserverSource,
+        /root\.detailContent = response\.status === "ready"\s*\?\s*response\.content\s*:\s*""/);
+      assert.match(widgetSource,
+        /visible:\s*root\.detailStatus === "empty"[\s\S]*?This task document is empty\./);
+    }
+  },
+  {
+    state: "Markdown read or validation error",
+    pill: "live task projection remains available",
+    popout: "bounded local error message without publishing a Snapshot",
+    recovery: "switch document or retry after repairing the source",
+    evidenceTypes: ["static"],
+    verify() {
+      assert.match(detailErrorPublisherSource,
+        /_isCurrentDetail\(generation, request\.requestId\)/);
+      assert.match(detailErrorPublisherSource,
+        /_detailResponse\(request,\s*"error"/);
+      assert.match(detailObserverSource,
+        /response\.status === "error"[\s\S]*?root\.detailError = message/);
+      assert.match(widgetSource,
+        /visible:\s*root\.detailStatus === "error"[\s\S]*?text:\s*root\.detailError/);
+    }
+  },
+  {
+    state: "Stale Markdown response or superseded request",
+    pill: "live task projection remains independent",
+    popout: "ignore old request IDs and reject mismatched task/document identity",
+    recovery: "keep the current detail selection or close it",
+    evidenceTypes: ["static"],
+    verify() {
+      assert.match(currentDetailGuardSource,
+        /generation === root\.detailGeneration[\s\S]*?requestId === root\.currentDetailRequestId/);
+      assert.match(detailObserverSource,
+        /root\.detailMode && response\.requestId === root\.detailRequestId/);
+      assert.match(detailObserverSource,
+        /response\.projectId !== root\.detailProjectId/);
+      assert.match(detailObserverSource,
+        /response\.taskId !== root\.detailTaskId/);
+      assert.match(detailObserverSource,
+        /response\.document !== root\.detailDocument/);
+    }
   }
 ];
 
+const stateMatrixResults = [];
+const allowedEvidenceTypes = ["fixture", "static", "offscreen", "live"];
 for (const fixtureCase of stateMatrixFixtures) {
   assert.ok(fixtureCase.state && fixtureCase.pill
-    && fixtureCase.popout && fixtureCase.recovery,
-  "every state-matrix fixture must document pill, popout, and recovery expectations");
-  fixtureCase.verify();
+    && fixtureCase.popout && fixtureCase.recovery
+    && Array.isArray(fixtureCase.evidenceTypes)
+    && fixtureCase.evidenceTypes.length > 0
+    && fixtureCase.evidenceTypes.every(type => allowedEvidenceTypes.includes(type)),
+  "every state-matrix fixture must document expectations and evidence types");
+  try {
+    fixtureCase.verify();
+    stateMatrixResults.push({ fixtureCase, result: "pass" });
+  } catch (error) {
+    stateMatrixResults.push({ fixtureCase, result: "fail", error });
+  }
 }
+for (const record of stateMatrixResults) {
+  const evidence = record.fixtureCase.evidenceTypes.join(", ");
+  const detail = record.error ? `: ${record.error.message}` : "";
+  console.log(`state matrix: ${record.fixtureCase.state} [${evidence}] ${record.result}${detail}`);
+}
+assert.equal(stateMatrixResults.some(record => record.result === "fail"), false,
+  "one or more state-matrix fixtures failed");
 
 const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "TrellisDms/plugin.json"), "utf8"));
 assert.equal(manifest.version, "0.7.0");
@@ -1346,7 +1503,7 @@ if (fs.existsSync(path.join(taskDir, "escape.md"))) {
     fs.realpathSync(path.join(taskDir, "escape.md"))).reason, "markdown_location");
 }
 
-const project = parser.makeProjectSnapshot({
+const projectInput = {
   id: projectRoot,
   name: "project",
   root: projectRoot,
@@ -1370,6 +1527,12 @@ const project = parser.makeProjectSnapshot({
       taskDir: path.join(tasksRoot, "child"),
       taskJson: path.join(tasksRoot, "child", "task.json"),
       value: { name: "Child task", parent: "live" }
+    },
+    {
+      dirName: "planning-task",
+      taskDir: path.join(tasksRoot, "planning-task"),
+      taskJson: path.join(tasksRoot, "planning-task", "task.json"),
+      value: { id: "planning-task", title: "Planning task", status: "planning" }
     },
     {
       dirName: "broken",
@@ -1414,15 +1577,21 @@ const project = parser.makeProjectSnapshot({
       value: { current_task: 42 }
     }
   ]
-}).project;
+};
+const project = parser.makeProjectSnapshot(projectInput).project;
+const liveTaskSnapshot = project.tasks.find(task => task.id === "live");
+const childTaskSnapshot = project.tasks.find(task => task.id === "child");
+const planningTaskSnapshot = project.tasks.find(task => task.id === "planning-task");
 
 assert.equal(project.trellisVersion, "0.6.17");
-assert.equal(project.tasks.length, 3);
-assert.equal(project.tasks[0].storedStatus, "future_custom_status");
-assert.equal(project.tasks[0].priority, "P1");
-assert.equal(project.tasks[0].progress, null);
-assert.equal(project.tasks[0].activeSessionCount, 3);
-assert.equal(project.tasks[1].parentId, "live");
+assert.equal(project.tasks.length, 4);
+assert.equal(liveTaskSnapshot.storedStatus, "future_custom_status");
+assert.equal(liveTaskSnapshot.priority, "P1");
+assert.equal(liveTaskSnapshot.progress, null);
+assert.equal(liveTaskSnapshot.activeSessionCount, 3);
+assert.equal(childTaskSnapshot.parentId, "live");
+assert.equal(childTaskSnapshot.storedStatus, "unknown");
+assert.equal(planningTaskSnapshot.displayState, "planning");
 assert.equal(project.sessions.length, 5);
 assert.equal(project.sessions[0].taskId, "live");
 assert.equal(project.sessions[0].lastSeenAt, "2026-09-23T01:02:03Z");
@@ -1434,7 +1603,7 @@ assert.equal(project.sessions[3].taskId, "live");
 assert.equal(project.sessions[3].lastSeenAt, null);
 assert.equal(project.sessions[4].error, "malformed_pointer");
 assert.equal(project.sessions[4].lastSeenAt, null);
-assert.equal(Array.from(project.tasks[0].childIds).join(","), "child");
+assert.equal(Array.from(liveTaskSnapshot.childIds).join(","), "child");
 assert.equal(JSON.stringify(project).includes("not exposed"), false);
 
 const brokenActiveProject = parser.makeProjectSnapshot({
@@ -1459,19 +1628,26 @@ const oversizedJson = parser.parseJson("{" + "\"x\":\"" + "a".repeat(1024 * 1024
 assert.equal(oversizedJson.ok, false);
 assert.equal(oversizedJson.error, "size_limit");
 
-const snapshot = parser.makeSnapshot([{
-  id: project.id,
-  name: project.name,
-  root: project.root,
-  trellisVersion: project.trellisVersion,
-  taskRecords: [],
-  sessionRecords: []
-}], [{ code: "fixture", message: "ok" }], "2026-09-21T00:00:00.000Z");
+const snapshot = parser.makeSnapshot([projectInput],
+  [{ code: "fixture", message: "ok" }], "2026-09-21T00:00:00.000Z");
 assert.equal(snapshot.schemaVersion, 1);
 assert.equal(snapshot.primaryTaskId, null);
 assert.equal(snapshot.projects[0].archiveSummary.loaded, false);
+assert.equal(snapshot.projects[0].tasks.length, 4);
+assert.equal(snapshot.projects[0].sessions.length, 5);
+assert.equal(snapshot.projects[0].tasks.find(task => task.id === "live").progress, null);
 assert.equal(Object.prototype.hasOwnProperty.call(snapshot.projects[0], "markdown"), false);
 assert.equal(JSON.stringify(snapshot).includes("not exposed"), false);
+const parserToProjection = projection.makePopoutProjection(snapshot);
+assert.equal(parserToProjection.projects.length, 1);
+assert.equal(parserToProjection.projects[0].tasks.length, 4);
+const projectedTasks = parserToProjection.projects[0].tasks;
+assert.equal(projectedTasks.find(task => task.id === "live").activeSessionCount, 3);
+assert.equal(projectedTasks.find(task => task.id === "live").state, "active");
+assert.equal(projectedTasks.find(task => task.id === "child").state, "unknown");
+assert.equal(projectedTasks.find(task => task.id === "planning-task").state, "planning");
+assert.equal(projectedTasks.find(task => task.id === "broken").state, "error");
+assert.equal(projection.makePillProjection(snapshot, "auto").label, "Live task");
 assert.equal(JSON.stringify(project).includes("August finished"), false);
 assert.equal(JSON.stringify(project).includes("September finished"), false);
 assert.equal(parser.parseJson(fs.readFileSync(

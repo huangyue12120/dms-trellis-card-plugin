@@ -14,11 +14,11 @@ Demonstrate that required project/task/session/archive/Markdown states remain tr
 
 ## Acceptance criteria
 
-- [ ] Every roadmap state row has an explicit observable expectation and a pass/fail record.
-- [ ] Parser, resolver, Snapshot, projection, and UI agree for healthy, degraded, stale, unknown, live, and archive states.
-- [ ] Fixture and static checks pass without writing to real Trellis data.
-- [ ] Runtime refresh, topology, Settings, horizontal/vertical, and popout results are separately recorded; unavailable checks remain unverified.
-- [ ] No percentage is fabricated and no archive/detail body enters the live Snapshot.
+- [x] Every roadmap state row has an explicit observable expectation and a pass/fail record.
+- [x] Parser, resolver, Snapshot, projection, and UI source contracts agree for healthy, degraded, stale, unknown, live, and archive states; actual runtime rendering remains a separate gate.
+- [x] Fixture and static checks pass without writing to real Trellis data.
+- [x] Runtime refresh, topology, Settings, horizontal/vertical, and popout results are separately recorded; unavailable checks remain unverified.
+- [x] No percentage is fabricated and no archive/detail body enters the live Snapshot.
 
 ## Dependencies and out of scope
 
