@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Comprehensive v0.3-v0.6 safety, consistency, and release review."}
+{"file": ".trellis/spec/frontend/recovery-responsive-contract.md", "reason": "Final refresh, degradation, responsive, and runtime evidence review."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Final cross-layer integration checklist."}
+{"file": "docs/ui-ux-spec.md", "reason": "Visual, responsive, focus, theme, and host-limitation acceptance baseline."}
+{"file": "docs/ui-state-matrix.md", "reason": "Every P0/P1 fixture and recovery path required for release."}
+{"file": "docs/ui-component-contract.md", "reason": "Final component ownership, sizing, and forbidden-surface checks."}
+{"file": ".trellis/tasks/09-23-dms-plugin-v06/research/v06-baseline.md", "reason": "Planning decisions and known DMS State/tooling limitations to verify truthfully."}

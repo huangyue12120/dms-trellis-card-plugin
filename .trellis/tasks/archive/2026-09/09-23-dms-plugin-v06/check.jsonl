@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Full v0.3-v0.5 regression and safety review baseline."}
+{"file": ".trellis/spec/frontend/recovery-responsive-contract.md", "reason": "Final release review for refresh, degradation, responsiveness, and runtime evidence."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Review checklist for preference and Snapshot data flow across layers."}
+{"file": "docs/ui-state-matrix.md", "reason": "Required P0/P1 state coverage and recovery expectations."}
+{"file": "docs/ui-component-contract.md", "reason": "Component ownership, focus, sizing, and forbidden-surface review contract."}
+{"file": ".trellis/tasks/09-23-dms-plugin-v06/research/v06-baseline.md", "reason": "Known implementation gaps, State API behavior, and scope decisions to verify."}

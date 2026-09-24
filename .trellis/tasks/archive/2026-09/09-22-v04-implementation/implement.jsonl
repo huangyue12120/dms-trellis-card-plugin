@@ -1,0 +1,9 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend-layer entry point for the QML plugin surfaces."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Executable v0.3 resolver, Snapshot, argv/process, read-only, and test contracts to preserve."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Required data-flow and boundary checklist for daemon, parser/resolver, global snapshot, and widget."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Single-contract-owner and search-before-new-helper guidance."}
+{"file": ".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/dms-api.md", "reason": "Verified FileView watcher, FolderListModel/topology, Timer, plugin lifecycle, and settings API evidence."}
+{"file": ".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/trellis-data-model.md", "reason": "Verified Trellis task/session/archive layout, lifecycle, and bounded data implications."}
+{"file": ".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/progress-semantics.md", "reason": "Verified nullable progress and state-layer separation contract."}
+{"file": ".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/path-safety.md", "reason": "Verified traversal, absolute-path, symlink, pointer, and Markdown resolver matrix."}
+{"file": ".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/environment.md", "reason": "Verified runtime/tooling limits and explicit live-DMS/QML/Git gates."}

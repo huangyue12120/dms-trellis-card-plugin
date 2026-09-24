@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Regression review for bounded projection, warnings, and read-only behavior."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Review State, filter, projection, and QML interaction boundaries."}
+{"file": "docs/ui-state-matrix.md", "reason": "Required filter, multi-session, warning, empty, and error behaviors."}
+{"file": "docs/ui-component-contract.md", "reason": "Focus, sizing, cap, and component ownership review baseline."}
+{"file": ".trellis/tasks/09-23-dms-plugin-v06/research/v06-baseline.md", "reason": "Known State backend risk and settled child boundary."}

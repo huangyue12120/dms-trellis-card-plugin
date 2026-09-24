@@ -1,0 +1,32 @@
+{
+  "id": "v05-ux-discovery-milestone",
+  "name": "v05-ux-discovery-milestone",
+  "title": "v0.5 UX and discovery milestone",
+  "description": "Plan, approve, implement, and verify the v0.5 UI/UX gate plus compact pill and safe project discovery additions.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "huangyue12120",
+  "assignee": "huangyue12120",
+  "createdAt": "2026-09-22",
+  "completedAt": "2026-09-22",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "09-22-v05-information-architecture",
+    "09-22-v05-visual-accessibility-contract",
+    "09-22-v05-ui-ux-gate",
+    "09-22-v05-pill-modes-popout",
+    "09-22-v05-project-discovery-settings"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

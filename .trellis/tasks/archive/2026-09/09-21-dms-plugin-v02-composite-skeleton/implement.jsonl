@@ -1,0 +1,6 @@
+{"file":"trellis-dms-plugin-spec-revised.md","reason":"Stage 1 composite skeleton scope, daemon/widget boundary, manifest shape, and explicit non-goals."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/dms-api.md","reason":"Verified DMS 1.6.1 manifest, composite lifecycle, PluginGlobalVar, settings, and component wrapper contracts."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/environment.md","reason":"Verified target versions and records live DMS/Git validation limitations that must not be overstated."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Guides the daemon-to-global-snapshot-to-widget contract and boundary validation."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Prevents duplicated payload/constant logic while creating the minimal skeleton."}
+{"file":".trellis/spec/frontend/index.md","reason":"Project frontend guideline entry point for QML/widget implementation; currently documents that detailed conventions are not yet filled."}

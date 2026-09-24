@@ -1,0 +1,6 @@
+{"file":"trellis-dms-plugin-spec-revised.md","reason":"Review v0.2 against Stage 1 acceptance and P0/P1/P2 boundaries."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/dms-api.md","reason":"Review manifest schema, daemon singleton, widget instances, global variables, settings, and runtime API claims."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/environment.md","reason":"Review environment compatibility and ensure unavailable live DMS/Git checks are reported honestly."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review snapshot transport contract and layer ownership for duplicated or leaky validation."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Review for duplicated contract logic and unnecessary skeleton abstractions."}
+{"file":".trellis/spec/frontend/index.md","reason":"Review against the available frontend guideline entry point."}

@@ -1,0 +1,10 @@
+{"file":"trellis-dms-plugin-spec-revised.md","reason":"Authoritative product scope, architecture decisions, safety boundary, and v0.3 roadmap requirements for the implementation."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Required data-flow and boundary checklist for the daemon, pure parser/resolver modules, global snapshot, and widget projection."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Required search-before-new-helper and single-contract-owner guidance for path and payload normalization."}
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend-layer entry point for the QML plugin surfaces and their project-specific conventions."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Executable v0.3 resolver, Snapshot, argv/process, read-only, and test contracts for implementation."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/trellis-data-model.md","reason":"Verified Trellis task fields, lifecycle, session pointer shape, archive boundary, and parser implications."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/progress-semantics.md","reason":"Verified nullable progress contract and separation of stored, runtime, and display state."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/path-safety.md","reason":"Verified traversal, absolute-path, symlink, task-directory, session-pointer, and Markdown allow-list matrix."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/dms-api.md","reason":"Verified DMS manifest, process permission, FileView, daemon/global-var, and watcher constraints."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/environment.md","reason":"Verified runtime versions and explicit limits for QML tooling, Git, and live DMS checks."}

@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check archive path canonicalization, explicit read-only opt-in, bounds, and absence from live Snapshot/watchers."}
+{"file":".trellis/spec/frontend/recovery-responsive-contract.md","reason":"Review archive empty/loading/error recovery and constrained one-scroll UI behavior."}
+{"file":"docs/ui-state-matrix.md","reason":"Map archive-unloaded, empty, degraded, and recovery rows to observable archive states."}
+{"file":".trellis/tasks/09-23-dms-plugin-v07/research/v07-baseline.md","reason":"Verify the observed `.trellis/tasks/archive` contract and host limitations."}

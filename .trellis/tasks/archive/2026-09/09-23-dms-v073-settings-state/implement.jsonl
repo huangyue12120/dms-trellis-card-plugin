@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Existing trusted-root, settings/state, projection, no-progress, and read-only widget contracts to preserve while adding v0.7 preferences."}
+{"file":".trellis/spec/frontend/recovery-responsive-contract.md","reason":"Settings/manual-refresh/error copy, local State failure, responsive controls, and runtime evidence gates."}
+{"file":"docs/ui-component-contract.md","reason":"Approved v0.6 Settings/Widget State APIs, migration-compatible controls, and read-only recovery boundary."}
+{"file":"docs/ui-state-matrix.md","reason":"Required empty, invalid preference, State failure, refresh, warning, and responsive recovery states."}
+{"file":".trellis/tasks/09-23-dms-plugin-v07/research/v07-baseline.md","reason":"Repository-backed DMS State API, existing keys, interval/root behavior, host limitation, and migration decisions."}

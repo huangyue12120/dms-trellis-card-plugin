@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Existing v0.3-v0.6 resolver, daemon-only reads, Snapshot, watcher, UI projection, and read-only safety contracts that v0.7 must extend without regression."}
+{"file":".trellis/spec/frontend/recovery-responsive-contract.md","reason":"Refresh, degraded-state, bounded popout, native controls, and runtime evidence requirements for detail/archive/settings recovery."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Required data-flow review across daemon readers, ephemeral detail channel, Snapshot, pure projection, QML, Settings, and State."}
+{"file":"docs/ui-component-contract.md","reason":"Approved v0.6 component ownership, sizing, focus, State, and read-only boundaries that v0.7 extends."}
+{"file":"docs/ui-state-matrix.md","reason":"Existing empty/error/degraded/responsive state expectations and recovery wording for v0.7 integration."}
+{"file":"docs/ui-ux-spec.md","reason":"Approved DMS-native information architecture, semantic Theme, accessibility, and no-heavy-Markdown constraints."}
+{"file":".trellis/tasks/09-23-dms-plugin-v07/research/v07-baseline.md","reason":"Repository-backed v0.7 archive path, host capability, detail-channel, migration, State, and runtime limitation decisions."}

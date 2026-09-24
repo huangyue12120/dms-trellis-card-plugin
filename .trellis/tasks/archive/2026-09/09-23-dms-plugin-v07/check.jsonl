@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Final cross-layer safety review: no widget filesystem access, canonical resolver, bounded readers, schema-1 Snapshot, and no fabricated progress."}
+{"file":".trellis/spec/frontend/recovery-responsive-contract.md","reason":"Final review of local detail/archive errors, refresh semantics, one-scroll responsive layout, and runtime limitation reporting."}
+{"file":"docs/ui-state-matrix.md","reason":"Map every v0.7 loading, empty, archive, Markdown, settings, State, and degraded outcome to observable recovery behavior."}
+{"file":"docs/ui-component-contract.md","reason":"Verify component ownership, request/response boundary, native controls, caps, and compatibility with v0.6 surfaces."}
+{"file":".trellis/tasks/09-23-dms-plugin-v07/research/v07-baseline.md","reason":"Check implementation and validation against the recorded repository evidence and resolved archive-path discrepancy."}

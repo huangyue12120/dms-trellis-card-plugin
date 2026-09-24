@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Archive opt-in resolver, daemon-only readers, bounded discovery, no live Snapshot/archive body mixing, and read-only safety."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Archive index/detail flow across validated path records, daemon requests, response projections, and separate UI modes."}
+{"file":"docs/ui-component-contract.md","reason":"Approved popout sizing, native controls, single scroll region, and separation of live projection responsibilities."}
+{"file":".trellis/tasks/09-23-dms-plugin-v07/research/v07-baseline.md","reason":"Verified archive layout, existing resolver, DMS capabilities, and v0.7 sequencing decision."}

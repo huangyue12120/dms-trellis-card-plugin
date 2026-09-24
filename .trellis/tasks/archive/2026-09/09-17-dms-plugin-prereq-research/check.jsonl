@@ -1,0 +1,14 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend layer entry point and pre-development checklist for repository work"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend layer entry point and QML/documentation conventions"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Cross-layer data-flow and boundary review guidance"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reuse and licensing review guidance for external references"}
+{"file": ".trellis/tasks/09-17-dms-plugin-prereq-research/prd.md", "reason": "Research requirements, acceptance criteria, and scope boundary"}
+{"file": ".trellis/tasks/09-17-dms-plugin-prereq-research/design.md", "reason": "Evidence model and deliverable mapping for Stage 0"}
+{"file": ".trellis/tasks/09-17-dms-plugin-prereq-research/implement.md", "reason": "Ordered research execution and validation checklist"}
+{"file": "trellis-dms-plugin-spec-revised.md", "reason": "Original revised specification and Stage 0 item definitions"}
+{"file": ".trellis/tasks/09-17-dms-plugin-prereq-research/research/environment.md", "reason": "Verified platform, version, CLI, and Stage 0 status matrix"}
+{"file": ".trellis/tasks/09-17-dms-plugin-prereq-research/research/trellis-data-model.md", "reason": "Observed Trellis layout, task schema, lifecycle, sessions, and CLI output"}
+{"file": ".trellis/tasks/09-17-dms-plugin-prereq-research/research/dms-api.md", "reason": "Installed DMS and Quickshell plugin API, watcher, persistence, and Theme evidence"}
+{"file": ".trellis/tasks/09-17-dms-plugin-prereq-research/research/progress-semantics.md", "reason": "Nullable progress contract and evidence against fabricated percentages"}
+{"file": ".trellis/tasks/09-17-dms-plugin-prereq-research/research/path-safety.md", "reason": "Canonical containment and disposable traversal/symlink/pointer matrix"}
+{"file": ".trellis/tasks/09-17-dms-plugin-prereq-research/research/codeisland-linux.md", "reason": "Linux CodeIsland protocol reference and macOS non-implementation boundary"}

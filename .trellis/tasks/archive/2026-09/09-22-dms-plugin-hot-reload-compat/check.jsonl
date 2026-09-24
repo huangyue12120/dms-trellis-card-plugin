@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend package index for the post-change quality review."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Quality and cross-layer contracts used to check that the resource rename does not regress v0.5 behavior."}
+{"file": ".trellis/tasks/09-22-dms-plugin-hot-reload-compat/research/runtime-evidence.md", "reason": "Evidence and limits for interpreting hot-reload validation results."}

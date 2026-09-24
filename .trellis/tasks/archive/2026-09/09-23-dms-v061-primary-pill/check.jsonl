@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Regression checklist for Snapshot truth, safety, and helper resource naming."}
+{"file": "docs/ui-state-matrix.md", "reason": "Expected pill projections and fallback behavior to review."}
+{"file": "docs/ui-component-contract.md", "reason": "Widget/projection separation and responsive pill review contract."}
+{"file": ".trellis/tasks/09-23-dms-plugin-v06/research/v06-baseline.md", "reason": "Verified parser/projection gaps and DMS constraints."}

@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend package routing for the QML/JavaScript discovery change."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Existing trusted-root, canonical path, topology, output-cache, and read-only contracts to preserve."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Cross-layer data-flow checklist for Settings → daemon → parser → Snapshot behavior."}
+{"file": ".trellis/tasks/09-22-trusted-project-root-discovery/research/discovery-evidence.md", "reason": "Confirmed current DMS configuration, source discovery behavior, and authority-boundary implication."}

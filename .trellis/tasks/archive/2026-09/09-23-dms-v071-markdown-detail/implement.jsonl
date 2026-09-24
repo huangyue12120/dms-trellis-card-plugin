@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Canonical resolver, daemon-only filesystem access, async reader, read-only FileView, Snapshot exclusion, and no fabricated progress."}
+{"file":".trellis/spec/frontend/markdown-detail-contract.md","reason":"Executable v0.7.1 request/response fields, byte cap, stale-generation guard, validation matrix, and widget fallback boundary."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Detail request → daemon resolver/reader → bounded response → widget rendering boundary."}
+{"file":"docs/ui-component-contract.md","reason":"Approved v0.6 popout sizing, single scroll, native controls, and widget read-only boundary."}
+{"file":".trellis/tasks/09-23-dms-plugin-v07/research/v07-baseline.md","reason":"Verified Markdown allow-list, Qt/DMS capability, FileView limitations, archive path, and detail-channel decisions."}

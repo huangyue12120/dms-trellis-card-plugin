@@ -1,0 +1,20 @@
+{
+    "id": "trellisDms",
+    "name": "Trellis DMS",
+    "description": "Read-only Trellis project status for DankMaterialShell",
+    "version": "0.7.0",
+    "author": "Trellis DMS Contributors",
+    "type": "composite",
+    "capabilities": ["daemon", "dankbar-widget"],
+    "components": {
+        "daemon": "./TrellisDaemon.qml",
+        "widget": "./TrellisWidget.qml"
+    },
+    "settings": "./TrellisSettings.qml",
+    "requires_dms": ">=1.6.1",
+    "permissions": [
+        "settings_read",
+        "settings_write",
+        "process"
+    ]
+}

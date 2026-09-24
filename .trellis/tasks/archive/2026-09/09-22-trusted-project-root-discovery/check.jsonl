@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend package routing for the quality review."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Quality contracts for path safety, discovery bounds, topology refresh, and v0.5 compatibility."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Cross-layer review checklist."}
+{"file": ".trellis/tasks/09-22-trusted-project-root-discovery/research/discovery-evidence.md", "reason": "Evidence and limits for interpreting discovery tests and live validation."}

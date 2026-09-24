@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Full data, watcher, discovery, UI projection, and reload regression contract."}
+{"file": ".trellis/spec/frontend/recovery-responsive-contract.md", "reason": "Executable v0.6 refresh, degraded-state, responsive, and runtime evidence contract."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Integration review across refresh, State, Snapshot, projection, and UI."}
+{"file": "docs/ui-ux-spec.md", "reason": "Approved responsive, accessibility, theme, motion, and runtime limits."}
+{"file": "docs/ui-state-matrix.md", "reason": "Authoritative P0/P1 integration state checklist."}
+{"file": "docs/ui-component-contract.md", "reason": "Component sizing, focus, data ownership, and DMS host contracts."}
+{"file": ".trellis/tasks/09-23-dms-plugin-v06/research/v06-baseline.md", "reason": "Known gaps, external State risk, and release-scope constraints."}

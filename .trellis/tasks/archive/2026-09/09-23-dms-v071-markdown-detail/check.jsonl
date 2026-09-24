@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review resolver-before-reader, widget no-file-access, body-free Snapshot, resource caps, and read-only guarantees."}
+{"file":".trellis/spec/frontend/markdown-detail-contract.md","reason":"Review the v0.7.1 cross-layer request/response contract, bounded detail states, and stale callback rules."}
+{"file":".trellis/spec/frontend/recovery-responsive-contract.md","reason":"Review local Markdown loading/error states, one-scroll responsive detail view, and runtime evidence limits."}
+{"file":"docs/ui-state-matrix.md","reason":"Check task detail loading, empty/error, degraded, and recovery behavior against the approved state matrix."}
+{"file":".trellis/tasks/09-23-dms-plugin-v07/research/v07-baseline.md","reason":"Verify implementation against the repository-backed capability and path evidence."}

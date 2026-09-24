@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Existing Snapshot, watcher, trusted-root, UI projection, and reload safety contracts for v0.6 integration."}
+{"file": ".trellis/spec/frontend/recovery-responsive-contract.md", "reason": "Executable v0.6 refresh, degraded-state, responsive, and runtime evidence contract."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Cross-layer review for DMS State, parser, Snapshot, projection, and QML boundaries."}
+{"file": "docs/ui-ux-spec.md", "reason": "Approved DMS-native visual, responsive, accessibility, and interaction baseline."}
+{"file": "docs/ui-state-matrix.md", "reason": "Approved state inventory that v0.6 must complete without inventing behavior."}
+{"file": "docs/ui-component-contract.md", "reason": "Existing component ownership, sizing, data-flow, and read-only contracts."}
+{"file": ".trellis/tasks/09-23-dms-plugin-v06/research/v06-baseline.md", "reason": "Repository and DMS API evidence plus settled v0.6 planning decisions."}

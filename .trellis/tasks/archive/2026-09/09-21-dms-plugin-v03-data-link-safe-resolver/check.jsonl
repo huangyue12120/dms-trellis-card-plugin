@@ -1,0 +1,10 @@
+{"file":"trellis-dms-plugin-spec-revised.md","reason":"Acceptance and non-goal source for checking v0.3 scope, security, data model, and deferred UI/runtime behavior."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review checklist for snapshot contract, parser/resolver ownership, and daemon-to-widget boundary consistency."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Review checklist for duplicated validation, payload parsing, and shared helper ownership."}
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend-layer context for reviewing QML surface boundaries and conventions."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Executable v0.3 resolver, Snapshot, argv/process, read-only, and test contracts for quality review."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/trellis-data-model.md","reason":"Reference oracle for task/session/archive fields and lifecycle edge cases."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/progress-semantics.md","reason":"Reference oracle for rejecting fabricated progress and preserving state-layer semantics."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/path-safety.md","reason":"Reference oracle for safe resolver containment and pointer rejection cases."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/dms-api.md","reason":"Reference oracle for manifest permissions, FileView/Proc lifecycle, globals, and watcher limits."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/environment.md","reason":"Reference for known validation/tooling/runtime limitations."}

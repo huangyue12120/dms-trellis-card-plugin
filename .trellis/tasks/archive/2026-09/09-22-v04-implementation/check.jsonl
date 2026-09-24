@@ -1,0 +1,9 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend-layer context for reviewing QML surface boundaries."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Review contract for resolver ownership, Snapshot compatibility, read-only behavior, and tests."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Review checklist for watcher-to-snapshot data flow and parser/widget boundaries."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Review checklist for duplicated validation, payload parsing, and shared helper ownership."}
+{"file": ".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/dms-api.md", "reason": "Reference oracle for FileView watch lifecycle, topology fallback, timers, and DMS settings."}
+{"file": ".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/trellis-data-model.md", "reason": "Reference oracle for task/session/archive edge cases and resource boundaries."}
+{"file": ".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/progress-semantics.md", "reason": "Reference oracle for rejecting fabricated progress and preserving state layers."}
+{"file": ".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/path-safety.md", "reason": "Reference oracle for resolver containment and pointer rejection."}
+{"file": ".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/environment.md", "reason": "Reference for known unavailable runtime/tooling checks."}

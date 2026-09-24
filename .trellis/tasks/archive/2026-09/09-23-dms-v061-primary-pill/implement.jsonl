@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Schema-1 Snapshot, pure projection, read-only, and reload contracts to preserve."}
+{"file": "docs/ui-ux-spec.md", "reason": "Approved six-mode pill, responsive, warning, and accessibility semantics."}
+{"file": "docs/ui-state-matrix.md", "reason": "Primary pill behavior across active, empty, warning, error, and vertical states."}
+{"file": "docs/ui-component-contract.md", "reason": "Widget input, pill content, sizing, and projection ownership contract."}
+{"file": ".trellis/tasks/09-23-dms-plugin-v06/research/v06-baseline.md", "reason": "Session last_seen_at evidence and primary-policy planning decisions."}

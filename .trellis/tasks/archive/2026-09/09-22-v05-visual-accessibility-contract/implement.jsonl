@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend package guideline index for the DMS QML surface."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Read-only Snapshot, resolver, watcher, and widget ownership contracts."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Settings to daemon to Snapshot to widget data-flow review."}
+{"file":".trellis/tasks/09-22-v05-ux-discovery-milestone/research/dms-ui-and-discovery.md","reason":"Verified installed DMS APIs and targeted UI/UX findings."}

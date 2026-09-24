@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Read-only Snapshot projection, bounded warnings, and trusted authority contracts."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "State-to-QML and Snapshot-to-projection data-flow checklist."}
+{"file": "docs/ui-ux-spec.md", "reason": "Approved popout hierarchy, sizing, warning, and accessibility baseline."}
+{"file": "docs/ui-state-matrix.md", "reason": "Multi-project/task/session and degraded-state behavior."}
+{"file": "docs/ui-component-contract.md", "reason": "Popout ownership, bounds, focus, and no-filesystem contract."}
+{"file": ".trellis/tasks/09-23-dms-plugin-v06/research/v06-baseline.md", "reason": "DMS State API evidence, key isolation, and project-qualified pin decision."}

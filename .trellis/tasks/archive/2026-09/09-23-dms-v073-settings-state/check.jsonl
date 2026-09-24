@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review no namespace-wide State clearing, no fallback writes, trusted-root authority, truthful progress, and projection ownership."}
+{"file":".trellis/spec/frontend/recovery-responsive-contract.md","reason":"Final review of restore/default/error/refresh copy, bounded responsive controls, and host persistence limitations."}
+{"file":"docs/ui-state-matrix.md","reason":"Verify all v0.7 setting/state/recovery outcomes have observable projections and actions."}
+{"file":".trellis/tasks/09-23-dms-plugin-v07/research/v07-baseline.md","reason":"Verify settings migration and State API assumptions against installed DMS evidence."}
