@@ -1,4 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Provides the parser, Snapshot, watcher, and read-only boundaries for the end-to-end state matrix."}
-{"file":".trellis/spec/frontend/recovery-responsive-contract.md","reason":"Defines degraded-state, refresh, responsive, and runtime evidence expectations."}
-{"file":".trellis/spec/frontend/markdown-detail-contract.md","reason":"Defines bounded Markdown response and Snapshot exclusion expectations."}
-{"file": ".trellis/spec/frontend/state-matrix-contract.md", "reason": "Defines parser-to-Snapshot-to-projection fixture and evidence-class expectations."}
