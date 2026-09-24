@@ -19,7 +19,7 @@ These classes are complementary; lower-level evidence never substitutes for a re
 
 ## Compatibility and release boundary
 
-Keep requires_dms at >=1.6.1 unless direct API evidence proves the minimum must change. The current host runs 1.6.2 while the roadmap targets 1.6.1; record these separately. Follow prior milestone practice and use manifest version 0.8.0 only after all release-candidate gates are reviewed. Do not change version metadata during 0.8.1 or 0.8.2.
+The user-selected v0.8 target is DMS 1.6.2. Keep `requires_dms` at >=1.6.1 unless direct API evidence proves the minimum must change; the tested target and declared minimum are distinct. Follow prior milestone practice and use manifest version 0.8.0 only after all release-candidate gates are reviewed. Do not change version metadata during 0.8.1 or 0.8.2.
 
 ## Operational and rollback shape
 

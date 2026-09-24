@@ -14,11 +14,11 @@ Verify that the singleton daemon remains bounded and recoverable under idle, rel
 
 ## Acceptance criteria
 
-- [ ] The full safety matrix rejects unsafe inputs without widening resolver policy.
-- [ ] Watcher, pending-work, warning, process, timer, and read limits remain bounded at their existing caps.
-- [ ] Reload, screen/bar changes, settings updates, and daemon destruction leave no stale callback, timer, reader, watcher, or duplicate subscription.
-- [ ] Idle behavior and large-data behavior have reproducible observations; any missing live measurement is explicitly unverified.
-- [ ] The shell remains usable with empty, malformed, inaccessible, and changing inputs.
+- [x] The full safety matrix rejects unsafe inputs without widening resolver policy.
+- [x] Watcher, pending-work, warning, process, timer, and read limits remain bounded at their existing caps by source contracts and fixture assertions.
+- [x] Reload, screen/bar changes, settings updates, and daemon destruction passed in the user's reported local manual suite; this live evidence was not independently replayed in this session.
+- [x] Idle behavior and large-data behavior have reproducible fixture/source observations; the user reports live idle/reload checks passed. Peak memory, throughput, and simultaneous process/reader counts were not numerically measured and remain explicitly unverified.
+- [x] The existing empty/malformed/changing-input fixtures pass; the user also reports that the permission-denied manual case recovered normally.
 
 ## Dependencies and out of scope
 

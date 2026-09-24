@@ -2,23 +2,23 @@
 
 ## Goal
 
-Determine whether the candidate installs, loads, reloads, disables, and behaves correctly on the roadmap's Fedora 44 + Wayland + niri + DMS 1.6.1 target, then record a reversible RC state.
+Determine whether the candidate installs, loads, reloads, disables, and behaves correctly on the user-selected Fedora 44 + Wayland + niri + DMS 1.6.2 target, then record a reversible RC state.
 
 ## Requirements
 
 - Verify plugin discovery, manifest schema, permissions, requires_dms, no-project startup, bar/widget, popout, multi-bar/screen, reload, and disable cleanup.
 - Check version warnings for the supported Trellis version and an unknown/newer version without hiding diagnostics.
-- Record exact host versions. Current DMS 1.6.2 is useful compatibility evidence but is distinct from the specified 1.6.1 target.
+- Record exact host versions and distinguish user-reported live evidence from checks independently observed in the development session.
 - Produce RC change notes, known issues, tested environment, install/disable instructions, and rollback steps.
 - Update the manifest to 0.8.0 only after the required preceding gates and release evidence pass. Preserve requires_dms >=1.6.1 unless direct evidence requires a justified change.
 
 ## Acceptance criteria
 
-- [ ] The target DMS loads the plugin with no project configured and without startup failure.
-- [ ] Installation, enable, reload, disable, and resource cleanup have live evidence, or each unavailable item remains explicitly unverified.
-- [ ] Multi-bar/screen and popout behavior have real runtime evidence; static/offscreen checks are not substituted.
-- [ ] Version/permission/unknown-Trellis warnings are accurate and bounded.
-- [ ] RC notes and rollback steps are complete, and the candidate is not marked v1.0-ready while a P0/P1 runtime blocker remains.
+- [x] The target DMS 1.6.2 loads the plugin with no project configured and without startup failure (user-reported manual verification).
+- [x] Installation, enable, reload, disable, and resource cleanup passed in the user's manual test suite on DMS 1.6.2; the report is not independently replayed in this session.
+- [x] Multi-bar/screen and popout behavior passed in the user's manual test suite; static/offscreen evidence is kept separate.
+- [x] Version/permission/unknown-Trellis warnings are covered by contract checks and the user-reported manual suite.
+- [x] RC notes and rollback steps are complete; no known P0/P1 blocker remains in the recorded evidence. This does not mark the project v1.0-ready.
 
 ## Dependencies and out of scope
 

@@ -15,7 +15,7 @@
 ## 当前基线
 
 - 规格 Stage 0 的调研材料已经写入 `.trellis/tasks/09-17-dms-plugin-prereq-research/research/`。
-- 已确认的开发基线：Fedora 44、Wayland、niri 26.04、DMS 1.6.1、Quickshell 0.3.1、Qt 6.11.2、Trellis 0.6.17。
+- 当前 release-candidate 基线：Fedora 44、Wayland、niri 26.04、DMS 1.6.2、Quickshell 0.3.1、Qt 6.11.2、Trellis 0.6.17；v0.8 目标版本由用户确认改为 DMS 1.6.2。
 - 已确认安全路径、session pointer、多 session、progress 语义和 Linux `codeIsland-dms` 参考边界。
 - `v0` 的 1 个 task 与 `v0.1` 的 3 个 task 已完成并归档；v0.2 已完成静态 composite 骨架实现。
 - v0.2 的实时 DMS IPC、reload、多屏/multi-bar 行为仍需在 DMS 运行环境中验收；当前实现不提前声称这些运行态检查通过。
@@ -956,7 +956,7 @@
 
 ## 版本目标
 
-将 P0/P1 汇总为可发布候选版本，在目标 Fedora 44 + Wayland + niri + DMS 1.6.1 环境中完成真实运行态、跨状态、性能和安全回归。
+将 P0/P1 汇总为可发布候选版本，在目标 Fedora 44 + Wayland + niri + DMS 1.6.2 环境中完成真实运行态、跨状态、性能和安全回归。
 
 ## 该版本细分 tasks
 
@@ -1038,7 +1038,7 @@
 
 #### 设计原则
 
-- 目标环境是 Fedora 44 + Wayland + niri + DMS 1.6.1；其他 compositor 只做非承诺兼容。
+- 目标环境是 Fedora 44 + Wayland + niri + DMS 1.6.2；其他 compositor 只做非承诺兼容。
 - 运行时实测优先于静态 manifest 检查。
 - 版本兼容 warning 要清晰，不用过宽版本声明掩盖风险。
 
@@ -1064,6 +1064,16 @@
 
 - 依赖 task 0.8.1、0.8.2 和 v0.1.1 API 证据。
 - 完成后进入 v1.0；若仅有 P2 未完成，不阻塞 P0/P1 发布。
+
+## v0.8 Release Candidate 状态（2026-09-24）
+
+- [x] v0.8.1 状态矩阵契约测试通过；fixture/static 证据已归档。
+- [x] v0.8.2 安全、生命周期与边界测试通过；用户补充报告本机 DMS 1.6.2 手动运行检查全部通过。
+- [x] v0.8.3 目标环境手测通过（用户报告）：Fedora 44、Wayland、niri 26.04、DMS 1.6.2、Quickshell 0.3.1、Qt 6.11.2、Trellis 0.6.17。
+- [x] Manifest 升至 `0.8.0`；`requires_dms >=1.6.1` 与权限集合保持不变。
+- 手测覆盖本轮计划的插件加载/无项目启动、bar/popout、多屏/多 bar、idle/reload、禁用及资源清理；用户另确认 permission-denied 场景恢复正常，且支持版/未知较新 Trellis 版本 warning 均通过。该证据来自用户确认，未附逐项日志或截图，未由本会话独立复跑。
+- 性能边界仍按源码与 fixture 验证：峰值内存、吞吐、同时存在的 process/reader 数和精确 refresh latency 没有独立测量；不要把资源上限写成实测吞吐结果。
+- v0.8 目标已由用户明确从 DMS 1.6.1 改为 1.6.2；manifest 的最低声明仍为 `>=1.6.1`，不据此单独声称在 1.6.1 上完成 live 验收。
 
 # v0.9（可选 P2 增强与独立 provider 评估）
 
@@ -1271,7 +1281,7 @@
 #### 要求实现
 
 - 复跑全状态矩阵、path-safety、watcher/topology、Markdown/archive、settings 和性能检查。
-- 在 Fedora 44 + Wayland + niri + DMS 1.6.1 验证多 bar/multi-display（若环境可用）、popout、reload 和禁用清理。
+- 在 Fedora 44 + Wayland + niri + DMS 1.6.2 验证多 bar/multi-display（若环境可用）、popout、reload 和禁用清理。
 - 检查 v1.0 默认不需要 trellis-card、CodeIsland daemon、Agent hooks、网络或 Trellis 写权限。
 
 #### 不要实现

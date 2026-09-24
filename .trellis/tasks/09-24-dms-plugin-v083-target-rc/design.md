@@ -2,11 +2,11 @@
 
 ## Target and compatibility
 
-The roadmap target is Fedora 44, Wayland, niri 26.04, DMS 1.6.1, Quickshell 0.3.1, Qt 6.11.2, and Trellis 0.6.17. The current host matches these except that DMS reports 1.6.2. Keep CLI version, bundled runtime version, and actual running shell evidence separate.
+The user-selected v0.8 target is Fedora 44, Wayland, niri 26.04, DMS 1.6.2, Quickshell 0.3.1, Qt 6.11.2, and Trellis 0.6.17. Keep CLI version, bundled runtime version, and actual running shell evidence separate.
 
 ## Installation flow
 
-First inspect the exact installed plugin directory and compare its manifest/resources with the workspace. If a live installation check is authorized and needed, preserve the current copy before replacing it, test enable/reload/disable, and restore the preserved copy on failure. Do not change the system DMS package or claim exact 1.6.1 coverage when only 1.6.2 is running.
+First inspect the exact installed plugin directory and compare its manifest/resources with the workspace. If a live installation check is authorized and needed, preserve the current copy before replacing it, test enable/reload/disable, and restore the preserved copy on failure. The live result recorded for this RC is user-reported on DMS 1.6.2; do not imply an independent replay or coverage of other versions.
 
 ## RC record
 

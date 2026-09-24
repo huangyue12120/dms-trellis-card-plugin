@@ -259,6 +259,7 @@ assert.equal(projection.normalizeDisplayMode("future-mode"), "auto");
 assert.equal(projection.normalizeDisplayMode(null), "auto");
 assert.equal(projection.normalizeBooleanSetting(false, true), false);
 assert.equal(projection.normalizeBooleanSetting("false", true), true);
+assert.equal(projection.normalizeUiState({}).versionWarning, true);
 assert.deepEqual(Array.from(projection.normalizeCollapsedProjectIds([
   "alpha", "alpha", "beta", 42, "x".repeat(2048)
 ])), ["alpha", "beta"]);
@@ -772,6 +773,11 @@ assert.match(daemonSource, /topologyIntervalDefault/);
 assert.match(daemonSource, /maxKnownWatchers/);
 assert.match(daemonSource, /maxPendingKnownReloads/);
 assert.match(daemonSource, /maxAncestorCandidates:\s*8/);
+assert.match(daemonSource, /verifiedTrellisVersion:\s*"0\.6\.17"/);
+assert.equal((daemonSource.match(/if \(version !== root\.verifiedTrellisVersion\)/g) || []).length, 2,
+  "initial discovery and version reload must compare against the verified Trellis version");
+assert.equal((daemonSource.match(/_warning\("version_unverified"/g) || []).length, 2,
+  "both version-read paths must preserve an explicit compatibility diagnostic");
 assert.match(daemonSource, /TrellisPaths\.ancestorPaths\(canonicalRoot,[\s\S]*?root\.maxAncestorCandidates\)/);
 assert.match(daemonSource, /\["test",\s*"-d",\s*candidateTrellis\]/);
 assert.match(daemonSource, /_discoverAncestorProject\(scan,\s*canonicalRoot\)/);
@@ -797,9 +803,20 @@ assert.match(daemonSource, /Component\.onDestruction:[\s\S]*?_destroyOwned\(\)/)
 assert.equal((daemonSource.match(/setGlobalVar\s*\(/g) || []).length, 1);
 assert.equal(manifest.components.daemon, "./TrellisDaemon.qml");
 assert.equal(manifest.components.widget, "./TrellisWidget.qml");
+assert.equal(manifest.type, "composite");
+assert.deepEqual(Object.keys(manifest.components).sort(), ["daemon", "widget"]);
+assert.equal(manifest.requires_dms, ">=1.6.1");
+assert.deepEqual([...manifest.permissions].sort(), ["process", "settings_read", "settings_write"]);
+assert.equal(manifest.permissions.includes("network"), false);
 assert.equal(manifest.capabilities.includes("daemon"), true);
+assert.equal(manifest.version, "0.8.0",
+  "publish v0.8.0 only after the v0.8 RC gates pass");
 assert.match(widgetSource, /varName:\s*"snapshot"/);
 assert.match(widgetSource, /readonly property var snapshot:\s*snapshotVar\.value/);
+assert.match(widgetSource, /visible:\s*root\.pillProjection\.warningCount > 0/,
+  "compatibility warnings remain visible in the pill by default");
+assert.match(widgetSource, /visible:\s*!root\.detailMode && !root\.archiveMode[\s\S]{0,120}root\.popoutProjection\.warningCount > 0/,
+  "compatibility warnings remain visible in the popout by default");
 assert.doesNotMatch(daemonSource, /\b(?:setInterval|setTimeout)\s*\(/);
 assert.match(daemonSource, /id:\s*topologyTimer[\s\S]*?repeat:\s*false[\s\S]*?root\.startScan\("interval"\)/);
 assert.match(daemonSource, /id:\s*knownReloadTimer[\s\S]*?repeat:\s*false[\s\S]*?root\.knownReloadDebounceMs[\s\S]*?root\._flushKnownReload\(\)/);
@@ -1130,7 +1147,7 @@ const matrixUnknownVersion = {
     sessions: [],
     archiveSummary: { loaded: false, taskCount: null }
   }],
-  warnings: [{ code: "trellis_version", message: "Trellis version has not been verified" }]
+  warnings: [{ code: "version_unverified", message: "Trellis version has not been verified" }]
 };
 const matrixDegraded = {
   schemaVersion: 1,
@@ -1329,6 +1346,21 @@ const stateMatrixFixtures = [
       assert.equal(projection.makePillProjection(matrixStaleSession, "auto").activeTaskCount, 0);
       assert.equal(projection.makePopoutProjection(matrixStaleSession).taskCount, 1);
       assert.equal(projection.makePopoutProjection(matrixUnknownVersion).projects[0].version, "99.0.0");
+      assert.equal(projection.makePillProjection(matrixUnknownVersion, "auto").warningCount, 1,
+        "unknown-version diagnostic is visible by default");
+      assert.equal(projection.makePillProjection(matrixUnknownVersion, "auto", {
+        versionWarning: false
+      }).warningCount, 0, "version warnings may be hidden only by explicit opt-out");
+      const supportedVersion = {
+        ...matrixUnknownVersion,
+        projects: matrixUnknownVersion.projects.map(project => ({
+          ...project,
+          trellisVersion: "0.6.17"
+        })),
+        warnings: []
+      };
+      assert.equal(projection.makePillProjection(supportedVersion, "auto").warningCount, 0,
+        "supported-version snapshots remain warning-free");
     }
   },
   {
@@ -1483,8 +1515,6 @@ for (const record of stateMatrixResults) {
 }
 assert.equal(stateMatrixResults.some(record => record.result === "fail"), false,
   "one or more state-matrix fixtures failed");
-
-assert.equal(manifest.version, "0.7.0");
 
 assert.equal(paths.normalizePointer(".trellis/tasks/live-task").ok, true);
 assert.equal(paths.normalizePointer("/tmp/outside").reason, "absolute");
