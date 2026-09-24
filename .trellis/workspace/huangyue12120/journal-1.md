@@ -243,3 +243,25 @@ Implemented and archived v0.7 Markdown detail, archive browsing/lazy loading, an
 ### Next Steps
 
 - Validate real Wayland/DMS rendering, Markdown/file channel, focus/scroll, multi-widget State convergence, and restart persistence on target host.
+
+
+## Session 8: Complete DMS v0.8.0 release candidate
+<!-- trellis-session: v=2 fp=3b116f5bf7f2a9c3 -->
+
+**Date**: 2026-09-24
+**Task**: Complete DMS v0.8.0 release candidate
+**Branch**: `codex/dms-plugin-v081-state-matrix`
+
+### Summary
+
+Published the v0.8.0 candidate after contract and task checks. User reported the Fedora 44/niri/DMS 1.6.2 manual suite passed, including version warnings and permission-denied recovery. Recorded manual evidence as user-reported; peak memory, throughput, exact latency, and concurrency remain unmeasured. Archived the v0.8 task tree.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `53d3085` | feat: release DMS plugin v0.8.0 candidate |
+
+### Status
+
+[OK] **Completed**
