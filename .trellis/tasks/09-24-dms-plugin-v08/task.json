@@ -1,0 +1,30 @@
+{
+  "id": "dms-plugin-v08",
+  "name": "dms-plugin-v08",
+  "title": "Complete Trellis DMS v0.8 Release Candidate",
+  "description": "Plan, implement, and assess the v0.8 P1 stability, compatibility, and release-candidate gates.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "huangyue12120",
+  "assignee": "huangyue12120",
+  "createdAt": "2026-09-24",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "09-24-dms-plugin-v081-state-matrix",
+    "09-24-dms-plugin-v082-stability-security",
+    "09-24-dms-plugin-v083-target-rc"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

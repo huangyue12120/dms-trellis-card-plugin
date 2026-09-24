@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check resource caps, daemon ownership, cleanup, and Snapshot invariants."}
+{"file":".trellis/spec/frontend/markdown-detail-contract.md","reason":"Check bounded reads, reader lifecycle, and safe Markdown path limits."}
+{"file":".trellis/spec/frontend/archive-browsing-contract.md","reason":"Check lazy archive access, containment, caps, and live/archive separation."}

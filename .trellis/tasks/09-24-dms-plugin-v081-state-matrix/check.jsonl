@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review the existing observer, Snapshot, and source-boundary invariants."}
+{"file":".trellis/spec/frontend/archive-browsing-contract.md","reason":"Review archive isolation, lazy loading, caps, and error behavior."}
+{"file":".trellis/spec/frontend/settings-state-contract.md","reason":"Review settings recovery and key-scoped UI State expectations."}
+{"file":".trellis/tasks/09-24-dms-plugin-v081-state-matrix/research/state-matrix-results.md","reason":"Review the implemented parser-to-projection assertions and distinguish pure/static results from unverified runtime gates."}
