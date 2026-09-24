@@ -1,3 +1,4 @@
 {"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines watcher, topology, resource, generation, and read-only contracts."}
 {"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/path-safety.md","reason":"Provides the evidence-backed canonical resolver and traversal/symlink security contract."}
 {"file":".trellis/tasks/09-24-dms-plugin-v08/research/v08-baseline.md","reason":"Records the current runtime/tooling limits and existing coverage to avoid duplicate work."}
+{"file":".trellis/tasks/archive/2026-09/09-24-dms-plugin-v081-state-matrix/research/state-matrix-results.md","reason":"Consume the preceding child result ledger, including verified static/fixture coverage and open host gates."}

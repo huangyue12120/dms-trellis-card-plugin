@@ -696,8 +696,12 @@ let pending = {};
 pending = watch.addPendingPath(pending, "/tmp/a", 2).pending;
 pending = watch.addPendingPath(pending, "/tmp/a", 2).pending;
 pending = watch.addPendingPath(pending, "/tmp/b", 2).pending;
+const repeatedPath = watch.addPendingPath(pending, "/tmp/a", 2);
+assert.equal(repeatedPath.accepted, true);
+assert.equal(repeatedPath.dropped, 0);
 const dropped = watch.addPendingPath(pending, "/tmp/c", 2);
 assert.equal(Object.keys(dropped.pending).length, 2);
+assert.equal(dropped.accepted, false);
 assert.equal(dropped.dropped, 1);
 assert.deepEqual(Array.from(watch.pendingPaths(pending)), ["/tmp/a", "/tmp/b"]);
 let warningLedger = {};
@@ -731,6 +735,31 @@ assert.match(pathsSource, /resolveTaskDirectory\(projectRoot,\s*expected,\s*cano
 assert.match(pathsSource, /ARCHIVE_MONTH_PATTERN\s*=\s*\/\^\\d\{4\}-/);
 assert.doesNotMatch(pathsSource, /\.trellis\/archive/);
 const daemonSource = fs.readFileSync(path.join(repoRoot, "TrellisDms/TrellisDaemon.qml"), "utf8");
+const widgetSource = fs.readFileSync(path.join(repoRoot, "TrellisDms/TrellisWidget.qml"), "utf8");
+const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "TrellisDms/plugin.json"), "utf8"));
+const daemonLimits = {
+  maxProjects: 32,
+  maxScanRoots: 16,
+  maxTasksPerProject: 128,
+  maxSessionsPerProject: 128,
+  maxDiscoveryDepth: 4,
+  maxAncestorCandidates: 8,
+  maxCommandBytes: 256 * 1024,
+  maxJsonBytes: 1024 * 1024,
+  maxWarnings: 256,
+  maxKnownWatchers: 512,
+  maxPendingKnownReloads: 256,
+  knownReloadDebounceMs: 200,
+  warningCooldownMs: 5000
+};
+for (const [name, value] of Object.entries(daemonLimits)) {
+  const sourceValue = name === "maxCommandBytes" ? "256\\s*\\*\\s*1024"
+    : name === "maxJsonBytes" ? "1024\\s*\\*\\s*1024"
+      : String(value);
+  assert.match(daemonSource,
+    new RegExp(`readonly\\s+property\\s+int\\s+${name}:\\s*${sourceValue}\\b`),
+    `${name} must keep its reviewed v0.8 contract value`);
+}
 assert.match(daemonSource, /watchChanges\s*:\s*true/);
 assert.match(daemonSource, /blockWrites\s*:\s*true/);
 assert.match(daemonSource, /atomicWrites\s*:\s*true/);
@@ -758,10 +787,113 @@ assert.doesNotMatch(daemonSource, /loadPluginState\([^)]*discoveredProjects/);
 assert.match(daemonSource, /kind:\s*"topology",[\s\S]{0,200}?queueing:\s*true/);
 assert.match(daemonSource, /scan\.queueing\s*=\s*false;[\s\S]*?_maybeFinish\(scan\)/);
 assert.match(daemonSource, /accepted\s*\|\|\s*!duplicate/);
+assert.match(daemonSource, /function _pushWarning\([\s\S]*?scan\.warnings\.length < root\.maxWarnings/);
+assert.match(daemonSource, /function _pushProjectWarning\([\s\S]*?project\.warnings\.length < root\.maxWarnings/);
+assert.match(daemonSource, /pendingKnownWarnings\.length > root\.maxWarnings/);
+assert.match(daemonSource, /warningCooldownMs, root\.maxWarnings/);
 assert.match(daemonSource, /id:\s*settingsRefreshTimer[\s\S]*?onTriggered:\s*root\.startScan\("settings"\)/);
 assert.match(daemonSource, /onPluginDataChanged:\s*settingsRefreshTimer\.restart\(\)/);
 assert.match(daemonSource, /Component\.onDestruction:[\s\S]*?_destroyOwned\(\)/);
 assert.equal((daemonSource.match(/setGlobalVar\s*\(/g) || []).length, 1);
+assert.equal(manifest.components.daemon, "./TrellisDaemon.qml");
+assert.equal(manifest.components.widget, "./TrellisWidget.qml");
+assert.equal(manifest.capabilities.includes("daemon"), true);
+assert.match(widgetSource, /varName:\s*"snapshot"/);
+assert.match(widgetSource, /readonly property var snapshot:\s*snapshotVar\.value/);
+assert.doesNotMatch(daemonSource, /\b(?:setInterval|setTimeout)\s*\(/);
+assert.match(daemonSource, /id:\s*topologyTimer[\s\S]*?repeat:\s*false[\s\S]*?root\.startScan\("interval"\)/);
+assert.match(daemonSource, /id:\s*knownReloadTimer[\s\S]*?repeat:\s*false[\s\S]*?root\.knownReloadDebounceMs[\s\S]*?root\._flushKnownReload\(\)/);
+assert.match(daemonSource, /id:\s*settingsRefreshTimer[\s\S]*?repeat:\s*false[\s\S]*?interval:\s*100[\s\S]*?root\.startScan\("settings"\)/);
+const processQueueSource = sourceSection(daemonSource,
+  "function _queueProcess(", "function _queueFile(");
+const fileQueueSource = sourceSection(daemonSource,
+  "function _queueFile(", "function _boundedLines(");
+const taskDiscoverySource = sourceSection(daemonSource,
+  "function _discoverTask(", "function _discoverSession(");
+const sessionDiscoverySource = sourceSection(daemonSource,
+  "function _discoverSession(", "function _discoverAncestorProject(");
+const destroyOwnedSource = sourceSection(daemonSource,
+  "function _destroyOwned(", "function _cancelDetailRead(");
+const destroyWatchersSource = sourceSection(daemonSource,
+  "function _destroyWatchers(", "function _queueProcess(");
+const startScanSource = sourceSection(daemonSource,
+  "function startScan(", "onPluginDataChanged:");
+const installWatchersSource = sourceSection(daemonSource,
+  "function _installWatchers(", "function _maybeFinish(");
+const applyKnownReloadSource = sourceSection(daemonSource,
+  "function _applyKnownReload(", "function _publishSnapshot(");
+const finishKnownReloadSource = sourceSection(daemonSource,
+  "function _finishKnownReload(", "function _flushKnownReload(");
+const knownReloadHandlerSource = sourceSection(daemonSource,
+  "function _onKnownFileChanged(", "function _findProjectInput(");
+const flushKnownReloadSource = sourceSection(daemonSource,
+  "function _flushKnownReload(", "function _installWatchers(");
+const finishScanSource = sourceSection(daemonSource,
+  "function _maybeFinish(", "function _armTopologyTimer(");
+const destructionSource = sourceSection(daemonSource,
+  "Component.onDestruction:", "\n    }\n}");
+assert.match(processQueueSource, /if \(!scan \|\| !_isCurrent\(scan\.generation\)\)\s*return/);
+assert.match(processQueueSource, /processComponent\.createObject/);
+assert.match(processQueueSource, /root\.ownedProcesses\.push\(process\)/);
+assert.match(processQueueSource, /var current = _isCurrent\(scan\.generation\);[\s\S]*?if \(current\)\s*callback\(output, exitCode\)/);
+assert.match(processQueueSource, /if \(!process\)[\s\S]*?scan\.pending -= 1;[\s\S]*?_maybeFinish\(scan\)/);
+assert.match(fileQueueSource, /if \(!scan \|\| !_isCurrent\(scan\.generation\)\)\s*return/);
+assert.match(fileQueueSource, /fileViewComponent\.createObject/);
+assert.match(fileQueueSource, /root\.ownedReaders\.push\(reader\)/);
+assert.match(fileQueueSource, /var current = _isCurrent\(scan\.generation\);[\s\S]*?if \(current\)\s*callback\(text, error\)/);
+assert.match(fileQueueSource, /if \(!reader\)[\s\S]*?scan\.pending -= 1;[\s\S]*?_maybeFinish\(scan\)/);
+assert.match(taskDiscoverySource, /TrellisPaths\.resolveTaskJson\(resolved, canonicalJson\)/);
+assert.match(taskDiscoverySource, /_queueFile\(scan, jsonResolved\.path/);
+assert.match(sessionDiscoverySource, /TrellisPaths\.resolveSessionFile\(project\.root, sessionsRoot, candidate, canonicalPath\)/);
+assert.match(sessionDiscoverySource, /_queueFile\(scan, resolved\.path/);
+assert.match(destroyOwnedSource, /topologyTimer\.stop\(\)/);
+assert.match(destroyOwnedSource, /knownReloadTimer\.stop\(\)/);
+assert.match(destroyOwnedSource, /settingsRefreshTimer\.stop\(\)/);
+assert.match(destroyOwnedSource, /processes\[i\]\.destroy\(\)/);
+assert.match(destroyOwnedSource, /readers\[j\]\.destroy\(\)/);
+assert.match(destroyOwnedSource, /root\.pendingKnownPaths = \(\{\}\)/);
+assert.match(destroyOwnedSource, /root\.pendingKnownWarnings = \[\]/);
+assert.match(destroyOwnedSource, /_destroyWatchers\(\)/);
+assert.match(destroyWatchersSource, /watchers\[i\]\.destroy\(\)/);
+assert.match(destroyWatchersSource, /root\.knownWatchers = \(\{\}\)/);
+assert.match(destroyWatchersSource, /root\.knownFileRegistry = \(\{\}\)/);
+assert.match(startScanSource, /root\.scanGeneration \+= 1;[\s\S]*?_destroyOwned\(\)/);
+assert.ok(startScanSource.indexOf("queueing: true") < startScanSource.indexOf("for (var i = 0; i < scan.roots.length; i++)"));
+assert.ok(startScanSource.indexOf("for (var i = 0; i < scan.roots.length; i++)")
+  < startScanSource.lastIndexOf("scan.queueing = false;"));
+assert.match(finishScanSource, /scan\.pending !== 0[\s\S]*?scan\.queueing[\s\S]*?!_isCurrent\(scan\.generation\)/);
+assert.match(finishScanSource, /_installWatchers\(scan, inputs\)[\s\S]*?_publishSnapshot\(root\.currentInputs, root\.currentWarnings\)/);
+assert.match(installWatchersSource, /watcherCount >= root\.maxKnownWatchers/);
+assert.match(installWatchersSource, /registry\[path\] = metadata/);
+assert.match(installWatchersSource, /tasks\[t\] && tasks\[t\]\.taskJson/);
+assert.match(installWatchersSource, /sessions\[s\] && sessions\[s\]\.path/);
+assert.match(knownReloadHandlerSource, /!_isCurrent\(generation\)[\s\S]*?!root\.knownFileRegistry\[path\]/);
+assert.match(knownReloadHandlerSource, /TrellisWatch\.addPendingPath\(root\.pendingKnownPaths, path, root\.maxPendingKnownReloads\)/);
+assert.match(knownReloadHandlerSource, /knownReloadTimer\.restart\(\)/);
+assert.doesNotMatch(knownReloadHandlerSource, /_publishSnapshot|setGlobalVar/);
+assert.match(flushKnownReloadSource, /TrellisWatch\.pendingPaths\(root\.pendingKnownPaths\)/);
+assert.match(flushKnownReloadSource, /_queueFile\(reload, pathValue/);
+assert.match(flushKnownReloadSource, /reload\.queueing = false;[\s\S]*?_finishKnownReload\(reload\)/);
+assert.match(applyKnownReloadSource, /metadata\.kind === "task"[\s\S]*?task\.readError = error[\s\S]*?TrellisParser\.parseJson\(text\)[\s\S]*?task\.value = parsedTask\.value/);
+assert.match(applyKnownReloadSource, /metadata\.kind === "session"[\s\S]*?session\.value = parsedSession\.value[\s\S]*?_resolveSessionPointer\(reload, project, session, false\)/);
+assert.match(finishKnownReloadSource, /!_isCurrent\(reload\.generation\)/);
+assert.match(finishKnownReloadSource, /_publishSnapshot\(root\.currentInputs, root\.currentWarnings\)/);
+assert.match(daemonSource, /function _publishSnapshot\([\s\S]*?TrellisParser\.makeSnapshot\([\s\S]*?setGlobalVar\(root\.pluginId, "snapshot", snapshot\)/);
+assert.match(destructionSource, /root\.scanGeneration \+= 1;[\s\S]*?root\.activeScan = null;[\s\S]*?_cancelDetailRead\(false\);[\s\S]*?_destroyOwned\(\)/);
+const boundedDetailReadSource = sourceSection(daemonSource,
+  "function _readBoundedDetailFile(", "function _detailResponse(");
+assert.match(boundedDetailReadSource, /\["test",\s*"-f",\s*canonicalPath\]/);
+assert.match(boundedDetailReadSource, /\["stat",\s*"-c",\s*"%s",\s*"--",\s*canonicalPath\]/);
+assert.ok(boundedDetailReadSource.indexOf("size > byteLimit")
+  < boundedDetailReadSource.indexOf("_queueDetailFile"));
+assert.match(boundedDetailReadSource, /errorPrefix \+ "_size_limit"/);
+const mainFileViewSource = sourceSection(daemonSource,
+  "id: fileViewComponent", "id: knownWatcherComponent");
+assert.match(mainFileViewSource, /typeof value === "string" && value\.length > root\.maxJsonBytes/);
+assert.match(mainFileViewSource, /fn\(oversized \? "" : value, oversized \? "size_limit" : null\)/);
+const lineOutputBound = paths.parseBoundedLines("x".repeat(4097), 8, 4096);
+assert.equal(lineOutputBound.truncated, true);
+assert.equal(lineOutputBound.warnings[0].code, "command_output_limit");
 assert.match(daemonSource, /varName:\s*"detailRequest"/);
 assert.match(daemonSource, /varName:\s*"detailResponse"/);
 assert.match(daemonSource, /TrellisPaths\.validateMarkdownRequest\(/);
@@ -831,7 +963,6 @@ assert.match(settingsSource, /loadPluginState\(root\.pluginId,\s*stateKeys\[load
 assert.match(settingsSource, /removePluginStateKey\(root\.pluginId,\s*stateKeys\[i\]\)/);
 assert.doesNotMatch(settingsSource, /clearPluginState/);
 assert.match(settingsSource, /discoveredProjects/);
-const widgetSource = fs.readFileSync(path.join(repoRoot, "TrellisDms/TrellisWidget.qml"), "utf8");
 assert.match(widgetSource, /TrellisProjection\.makePillProjection/);
 assert.match(widgetSource, /TrellisProjection\.makePopoutProjection\([\s\S]*?uiState\)/);
 assert.match(widgetSource, /popoutContent:\s*Component/);
@@ -1353,7 +1484,6 @@ for (const record of stateMatrixResults) {
 assert.equal(stateMatrixResults.some(record => record.result === "fail"), false,
   "one or more state-matrix fixtures failed");
 
-const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "TrellisDms/plugin.json"), "utf8"));
 assert.equal(manifest.version, "0.7.0");
 
 assert.equal(paths.normalizePointer(".trellis/tasks/live-task").ok, true);
@@ -1438,6 +1568,7 @@ assert.equal(bounded.truncated, true);
 const liveTask = paths.resolveTaskDir(projectRoot, taskDir, fs.realpathSync(taskDir), {});
 assert.equal(liveTask.ok, true);
 assert.equal(paths.resolveTaskDir(projectRoot, tasksRoot, tasksRoot, {}).reason, "tasks_root");
+assert.equal(paths.resolveTaskDir(projectRoot, outsideDir, fs.realpathSync(outsideDir), {}).reason, "outside_tasks");
 assert.equal(paths.resolveTaskDir(projectRoot, path.join(tasksRoot, "..", "outside"), outsideDir, {}).reason, "outside_tasks");
 const archiveTask = path.join(tasksRoot, "archive", "2026-09", "archived");
 assert.equal(paths.resolveTaskDir(projectRoot, archiveTask, archiveTask, {}).reason, "archive_not_enabled");
@@ -1492,7 +1623,22 @@ const sessionsRoot = path.join(projectRoot, ".trellis", ".runtime", "sessions");
 fs.mkdirSync(sessionsRoot, { recursive: true });
 assert.equal(paths.resolveSessionFile(projectRoot, sessionsRoot, path.join(sessionsRoot, "session.json"), path.join(sessionsRoot, "session.json")).ok, true);
 assert.equal(paths.resolveSessionFile(projectRoot, path.join(projectRoot, "other"), path.join(projectRoot, "other", "session.json"), path.join(projectRoot, "other", "session.json")).reason, "outside_project");
+const malformedSessionJsonPath = path.join(sessionsRoot, "malformed.json");
+fs.writeFileSync(malformedSessionJsonPath, "{");
+assert.equal(parser.parseJson(fs.readFileSync(malformedSessionJsonPath, "utf8")).error, "malformed_json");
+const staleSessionJsonPath = path.join(sessionsRoot, "stale.json");
+fs.writeFileSync(staleSessionJsonPath, JSON.stringify({
+  current_task: ".trellis/tasks/stale-target"
+}));
+const staleSessionJson = parser.parseJson(fs.readFileSync(staleSessionJsonPath, "utf8"));
+assert.equal(staleSessionJson.ok, true);
+const stalePointer = paths.normalizePointer(staleSessionJson.value.current_task);
+assert.equal(stalePointer.ok, true);
+assert.notEqual(spawnSync("realpath", ["-e", "--",
+  paths.joinPath(projectRoot, stalePointer.relativePath)]).status, 0);
 assert.equal(paths.resolveMarkdownFile(taskDir, "prd.md", path.join(taskDir, "prd.md")).ok, true);
+for (const name of ["prd.md", "design.md", "implement.md"])
+  assert.equal(paths.resolveMarkdownFile(taskDir, name, path.join(taskDir, name)).ok, true);
 assert.equal(paths.resolveMarkdownFile(taskDir, "notes.txt", path.join(taskDir, "notes.txt")).reason, "markdown_name");
 assert.equal(paths.resolveMarkdownFile(taskDir, "nested/prd.md", path.join(taskDir, "nested/prd.md")).reason, "markdown_name");
 assert.notEqual(spawnSync("realpath", ["-e", "--", path.join(taskDir, "missing.md")]).status, 0);

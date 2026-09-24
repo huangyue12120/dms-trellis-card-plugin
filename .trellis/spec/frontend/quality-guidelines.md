@@ -98,6 +98,16 @@ canonical path and stores `generation`, `projectId`, `kind` (`version`,
 - The topology timer defaults to 30 seconds and accepts only 15–300 seconds.
   Root/interval changes and the settings refresh token start an immediate
   topology scan; directory enumeration remains argv-only and bounded.
+- JSON and command-output limit semantics are not pre-read memory bounds:
+  ordinary task/session `FileView` reads call `text()` before checking the
+  1 MiB JavaScript-string limit, and `StdioCollector` accumulates stdout before
+  the 256 KiB line parser truncates it. Markdown/archive detail performs an
+  argv-only `stat` size check before creating its reader and checks UTF-8 size
+  again after load.
+- `ownedProcesses` and `ownedReaders` are cleanup registries, not independent
+  simultaneous-object caps. Do not infer peak memory or active-object counts
+  from parser limits or destruction tracking; a hard concurrency cap must be
+  explicit if one is introduced.
 - A task reload replaces its parsed value or retains the previous value while
   marking `readError`. A session reload reruns the safe pointer resolver. A
   version reload updates only the project version and compatibility warning.
@@ -143,6 +153,9 @@ canonical path and stores `generation`, `projectId`, `kind` (`version`,
 - Static source checks must reject shell-string commands, writes, network,
   hooks, sockets, widget-owned readers, high-frequency polling, and archive or
   Markdown body loading.
+- Tests/evidence must distinguish pre-read `stat` checks from post-read JSON
+  and command-output limits. Source assertions do not establish peak
+  simultaneous process/reader counts or runtime memory.
 - Runtime DMS checks should measure the two-second task refresh target,
   settings/manual refresh, topology changes, reload/hot-reload cleanup, and
   multi-widget sharing. If DMS/QML tooling is unavailable, record those gates

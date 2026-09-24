@@ -1,3 +1,4 @@
 {"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check resource caps, daemon ownership, cleanup, and Snapshot invariants."}
 {"file":".trellis/spec/frontend/markdown-detail-contract.md","reason":"Check bounded reads, reader lifecycle, and safe Markdown path limits."}
 {"file":".trellis/spec/frontend/archive-browsing-contract.md","reason":"Check lazy archive access, containment, caps, and live/archive separation."}
+{"file":".trellis/tasks/archive/2026-09/09-24-dms-plugin-v081-state-matrix/research/state-matrix-results.md","reason":"Review the preceding state-matrix evidence and carry its runtime limitations forward."}
