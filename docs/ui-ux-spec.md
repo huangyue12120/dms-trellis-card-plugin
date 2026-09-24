@@ -173,6 +173,20 @@ compatibility migration, not as a second active root control.
 - Large screens: the popout does not expand beyond the target width simply
   because space is available.
 
+## Localization
+
+The interface follows the locale selected in DMS Settings. The plugin ships a
+`zh_CN` catalog, with English QML source text as the fallback for unsupported
+locales and missing entries. Locale changes retranslate labels without
+rescanning Trellis or changing Snapshot or DMS State.
+
+Only plugin-authored labels and stable diagnostics are translated. Project
+names, task titles, file paths, Markdown, IDs, unknown Trellis status values,
+and dynamic system/parser error details remain unchanged. Compact bar labels
+stay single-line and elide; explanatory text wraps in the popout, Settings,
+and scrollable desktop widget. The Launcher uses the same catalog; its
+project/task names and unknown status values remain source data.
+
 ## Accessibility
 
 - Normal text targets WCAG AA contrast through DMS semantic colors.

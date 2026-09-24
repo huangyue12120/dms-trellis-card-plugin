@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Read-only DMS observer, shared Snapshot, QML resource and validation contracts."}
+{"file": ".trellis/spec/frontend/state-matrix-contract.md", "reason": "End-to-end parser/Snapshot/projection and evidence requirements."}
+{"file": ".trellis/tasks/09-24-dms-v09-optional-p2/research/v09-platform-apis.md", "reason": "Verified DMS 1.6.2 desktop, launcher, translation, and local activity availability evidence."}

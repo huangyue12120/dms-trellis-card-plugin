@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Check for surface-owned I/O, duplicated daemon resources, and contract regressions."}
+{"file": ".trellis/spec/frontend/desktop-projection-contract.md", "reason": "Check the approved desktop Snapshot projection and shared PluginService setting contract."}
+{"file": ".trellis/spec/frontend/recovery-responsive-contract.md", "reason": "Check narrow sizing, degraded data, warnings, and runtime evidence boundaries."}
+{"file": ".trellis/spec/frontend/state-matrix-contract.md", "reason": "Check the end-to-end project/task projection matrix."}

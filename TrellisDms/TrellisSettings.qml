@@ -19,6 +19,26 @@ PluginSettings {
     property int refreshRequestSerial: 0
     readonly property int maxScanRoots: 16
 
+    function localizedSettingsWarning(value) {
+        switch (value) {
+        case "Plugin settings are unavailable; the local choice was not saved.": return I18n.trFor("trellisDms", "Plugin settings are unavailable; the local choice was not saved.");
+        case "Plugin settings could not save this choice; local controls remain usable.": return I18n.trFor("trellisDms", "Plugin settings could not save this choice; local controls remain usable.");
+        case "Plugin settings are unavailable; safe defaults remain active.": return I18n.trFor("trellisDms", "Plugin settings are unavailable; safe defaults remain active.");
+        case "Plugin settings could not be loaded; safe local defaults remain active.": return I18n.trFor("trellisDms", "Plugin settings could not be loaded; safe local defaults remain active.");
+        case "Settings are unavailable or not writable; defaults could not be saved.": return I18n.trFor("trellisDms", "Settings are unavailable or not writable; defaults could not be saved.");
+        case "Defaults were applied to settings, but DMS State is unavailable.": return I18n.trFor("trellisDms", "Defaults were applied to settings, but DMS State is unavailable.");
+        case "Defaults changed locally, but DMS could not save every setting.": return I18n.trFor("trellisDms", "Defaults changed locally, but DMS could not save every setting.");
+        case "Defaults restored. Trusted folders are empty until you add one again.": return I18n.trFor("trellisDms", "Defaults restored. Trusted folders are empty until you add one again.");
+        case "Defaults changed locally, but DMS could not save every value.": return I18n.trFor("trellisDms", "Defaults changed locally, but DMS could not save every value.");
+        case "DMS State is unavailable; remembered projects remain local only.": return I18n.trFor("trellisDms", "DMS State is unavailable; remembered projects remain local only.");
+        case "DMS State could not be loaded; safe settings remain usable.": return I18n.trFor("trellisDms", "DMS State could not be loaded; safe settings remain usable.");
+        case "Refresh is unavailable because plugin settings are not writable.": return I18n.trFor("trellisDms", "Refresh is unavailable because plugin settings are not writable.");
+        case "Refresh requested; current data remains visible until the daemon publishes a new snapshot.": return I18n.trFor("trellisDms", "Refresh requested; current data remains visible until the daemon publishes a new snapshot.");
+        case "Refresh could not be requested from DMS.": return I18n.trFor("trellisDms", "Refresh could not be requested from DMS.");
+        default: return value;
+        }
+    }
+
     function savePluginSetting(key, value) {
         if (!root.pluginService || !root.hasPermission
                 || typeof root.pluginService.savePluginData !== "function") {
@@ -259,7 +279,7 @@ PluginSettings {
     FileBrowserModal {
         id: trustedFolderPicker
 
-        browserTitle: "Select a trusted Trellis scan folder"
+        browserTitle: I18n.trFor("trellisDms", "Select a trusted Trellis scan folder")
         browserIcon: "folder_open"
         browserType: "generic"
         folderMode: true
@@ -272,25 +292,33 @@ PluginSettings {
 
     StyledText {
         width: parent.width
-        text: "Trellis DMS v0.7"
+        text: I18n.trFor("trellisDms", "Trellis DMS v0.9")
         font.pixelSize: Theme.fontSizeLarge
         font.weight: Font.Bold
         color: Theme.surfaceText
+    }
+
+    StyledText {
+        width: parent.width
+        text: I18n.trFor("trellisDms", "The interface language follows DMS's active locale. Untranslated text uses the English source.")
+        font.pixelSize: Theme.fontSizeSmall
+        color: Theme.surfaceVariantText
+        wrapMode: Text.WordWrap
     }
 
     SelectionSetting {
         id: pillModeSetting
 
         settingKey: "pillMode"
-        label: "Bar display mode"
-        description: "Automatic shows the only active task when there is exactly one; otherwise it uses compact counts. Vertical bars always use icons."
+        label: I18n.trFor("trellisDms", "Bar display mode")
+        description: I18n.trFor("trellisDms", "Automatic shows the only active task when there is exactly one; otherwise it uses compact counts. Vertical bars always use icons.")
         options: [
-            { label: "Automatic (recommended)", value: "auto" },
-            { label: "Active task", value: "task" },
-            { label: "Project", value: "project" },
-            { label: "Compact counts", value: "counts" },
-            { label: "Icon only", value: "icon" },
-            { label: "Full text", value: "full" }
+            { label: I18n.trFor("trellisDms", "Automatic (recommended)"), value: "auto" },
+            { label: I18n.trFor("trellisDms", "Active task"), value: "task" },
+            { label: I18n.trFor("trellisDms", "Project"), value: "project" },
+            { label: I18n.trFor("trellisDms", "Compact counts"), value: "counts" },
+            { label: I18n.trFor("trellisDms", "Icon only"), value: "icon" },
+            { label: I18n.trFor("trellisDms", "Full text"), value: "full" }
         ]
         // The empty initial value prevents this child from overwriting a
         // legacy displayMode before loadUiSettings performs the migration.
@@ -299,28 +327,28 @@ PluginSettings {
 
     ToggleSetting {
         settingKey: "showProgress"
-        label: "Show numeric progress"
-        description: "Show a progress line only when the live Snapshot contains a real numeric value; no value is fabricated."
+        label: I18n.trFor("trellisDms", "Show numeric progress")
+        description: I18n.trFor("trellisDms", "Show a progress line only when the live Snapshot contains a real numeric value; no value is fabricated.")
         defaultValue: true
     }
 
     ToggleSetting {
         settingKey: "showArchive"
-        label: "Show archive entry"
-        description: "Expose the historical archive browser separately from live tasks. Archive data stays read-only and lazy."
+        label: I18n.trFor("trellisDms", "Show archive entry")
+        description: I18n.trFor("trellisDms", "Expose the historical archive browser separately from live tasks. Archive data stays read-only and lazy.")
         defaultValue: true
     }
 
     ToggleSetting {
         settingKey: "versionWarning"
-        label: "Show Trellis version warnings"
-        description: "Hide only compatibility warning presentation; the daemon keeps the version fact and diagnostics."
+        label: I18n.trFor("trellisDms", "Show Trellis version warnings")
+        description: I18n.trFor("trellisDms", "Hide only compatibility warning presentation; the daemon keeps the version fact and diagnostics.")
         defaultValue: true
     }
 
     StyledText {
         width: parent.width
-        text: "Trusted scan folders"
+        text: I18n.trFor("trellisDms", "Trusted scan folders")
         font.pixelSize: Theme.fontSizeMedium
         font.weight: Font.Medium
         color: Theme.surfaceText
@@ -328,7 +356,7 @@ PluginSettings {
 
     StyledText {
         width: parent.width
-        text: "Choose up to 16 folders you trust. Trellis DMS normally searches inside these folders, up to 4 levels deep, for .trellis projects. If the selected folder is a project, .trellis, .trellis/tasks, or a live task folder, it checks at most 8 parent candidates and automatically promotes that selection to its containing Trellis project, so sibling and new direct tasks appear on the next configured topology refresh or after a manual refresh with Refresh Trellis data now. A completely new project outside these trusted folders still needs a one-time addition of a containing trusted folder; DMS does not infer the current Codex task or working directory globally. It never selects your entire home, mounted drives, /, or /proc automatically; a broad folder is scanned only if you explicitly add it. It never writes to Trellis project files. Successfully discovered projects are remembered in DMS state and revalidated on later rescans."
+        text: I18n.trFor("trellisDms", "Choose up to 16 folders you trust. Trellis DMS normally searches inside these folders, up to 4 levels deep, for .trellis projects. If the selected folder is a project, .trellis, .trellis/tasks, or a live task folder, it checks at most 8 parent candidates and automatically promotes that selection to its containing Trellis project, so sibling and new direct tasks appear on the next configured topology refresh or after a manual refresh with Refresh Trellis data now. A completely new project outside these trusted folders still needs a one-time addition of a containing trusted folder; DMS does not infer the current Codex task or working directory globally. It never selects your entire home, mounted drives, /, or /proc automatically; a broad folder is scanned only if you explicitly add it. It never writes to Trellis project files. Successfully discovered projects are remembered in DMS state and revalidated on later rescans.")
         font.pixelSize: Theme.fontSizeSmall
         color: Theme.surfaceVariantText
         wrapMode: Text.WordWrap
@@ -337,7 +365,7 @@ PluginSettings {
     StyledText {
         visible: root.usingLegacyRoot
         width: parent.width
-        text: "Your existing Project or scan root is still active. Adding or removing a folder migrates this setting to the trusted-folder list."
+        text: I18n.trFor("trellisDms", "Your existing Project or scan root is still active. Adding or removing a folder migrates this setting to the trusted-folder list.")
         font.pixelSize: Theme.fontSizeSmall
         color: Theme.warning
         wrapMode: Text.WordWrap
@@ -392,7 +420,7 @@ PluginSettings {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 88
                     height: 36
-                    text: "Remove"
+                    text: I18n.trFor("trellisDms", "Remove")
                     iconName: "remove_circle"
                     onClicked: root.removeScanRoot(index)
                 }
@@ -402,7 +430,7 @@ PluginSettings {
         StyledText {
             visible: root.scanRoots.length === 0
             width: parent.width
-            text: "No trusted folders. Discovery is disabled."
+            text: I18n.trFor("trellisDms", "No trusted folders. Discovery is disabled.")
             font.pixelSize: Theme.fontSizeSmall
             color: Theme.surfaceVariantText
             wrapMode: Text.WordWrap
@@ -410,7 +438,7 @@ PluginSettings {
 
         DankButton {
             width: parent.width
-            text: "Add trusted folder"
+            text: I18n.trFor("trellisDms", "Add trusted folder")
             iconName: "create_new_folder"
             enabled: root.scanRoots.length < root.maxScanRoots
             onClicked: trustedFolderPicker.open()
@@ -424,7 +452,7 @@ PluginSettings {
 
         StyledText {
             width: parent.width
-            text: "Remembered projects"
+            text: I18n.trFor("trellisDms", "Remembered projects")
             font.pixelSize: Theme.fontSizeMedium
             font.weight: Font.Medium
             color: Theme.surfaceText
@@ -432,7 +460,7 @@ PluginSettings {
 
         StyledText {
             width: parent.width
-            text: "This is a read-only cache from the last successful scan and never expands the trusted folders above. A selected task folder is automatically promoted to its containing project; sibling and new direct tasks appear after the next configured topology refresh or the manual Refresh Trellis data now action. A project outside trusted folders still requires a one-time trusted-folder addition, and DMS has no knowledge of Codex's current working directory."
+            text: I18n.trFor("trellisDms", "This is a read-only cache from the last successful scan and never expands the trusted folders above. A selected task folder is automatically promoted to its containing project; sibling and new direct tasks appear after the next configured topology refresh or the manual Refresh Trellis data now action. A project outside trusted folders still requires a one-time trusted-folder addition, and DMS has no knowledge of Codex's current working directory.")
             font.pixelSize: Theme.fontSizeSmall
             color: Theme.surfaceVariantText
             wrapMode: Text.WordWrap
@@ -455,7 +483,8 @@ PluginSettings {
         StyledText {
             visible: root.rememberedProjects.length > 8
             width: parent.width
-            text: "+" + (root.rememberedProjects.length - 8) + " more remembered projects"
+            text: I18n.trFor("trellisDms", "%1 more remembered projects")
+                .arg(root.rememberedProjects.length - 8)
             font.pixelSize: Theme.fontSizeSmall
             color: Theme.surfaceVariantText
         }
@@ -463,8 +492,8 @@ PluginSettings {
 
     SliderSetting {
         settingKey: "topologyInterval"
-        label: "Topology rescan interval"
-        description: "How often new or moved Trellis files are discovered. The safe range is 15-300 seconds."
+        label: I18n.trFor("trellisDms", "Topology rescan interval")
+        description: I18n.trFor("trellisDms", "How often new or moved Trellis files are discovered. The safe range is 15-300 seconds.")
         defaultValue: TrellisWatch.topologyIntervalDefaults().defaultValue
         minimum: TrellisWatch.topologyIntervalDefaults().minimum
         maximum: TrellisWatch.topologyIntervalDefaults().maximum
@@ -474,14 +503,14 @@ PluginSettings {
 
     DankButton {
         width: parent.width
-        text: "Refresh Trellis data now"
+        text: I18n.trFor("trellisDms", "Refresh Trellis data now")
         iconName: "refresh"
         onClicked: root.requestRefresh()
     }
 
     DankButton {
         width: parent.width
-        text: "Restore defaults"
+        text: I18n.trFor("trellisDms", "Restore defaults")
         iconName: "restart_alt"
         onClicked: root.restoreDefaults()
     }
@@ -489,7 +518,7 @@ PluginSettings {
     StyledText {
         visible: root.settingsWarning !== ""
         width: parent.width
-        text: root.settingsWarning
+        text: root.localizedSettingsWarning(root.settingsWarning)
         font.pixelSize: Theme.fontSizeSmall
         color: Theme.warning
         wrapMode: Text.WordWrap

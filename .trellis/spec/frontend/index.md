@@ -23,6 +23,8 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [Recovery & Responsive](./recovery-responsive-contract.md) | v0.6 refresh, degraded-state, responsive, and runtime evidence contracts | Complete |
 | [Markdown Detail Contract](./markdown-detail-contract.md) | v0.7.1 bounded live-task Markdown request/response and rendering boundary | Complete |
 | [Archive Browsing Contract](./archive-browsing-contract.md) | v0.7.2 bounded read-only archive index/page/detail boundary | Complete |
+| [Desktop Projection Contract](./desktop-projection-contract.md) | v0.9.1 shared Snapshot desktop surface and warning projection | Complete |
+| [Launcher Projection Contract](./launcher-projection-contract.md) | v0.9.3 bounded Snapshot search, navigation State, and DMS result ordering | Complete |
 | [Settings and UI State Contract](./settings-state-contract.md) | v0.7.3 settings migration, key-scoped State, reset, and recovery boundary | Complete |
 | [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
 

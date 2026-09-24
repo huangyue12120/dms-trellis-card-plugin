@@ -1,4 +1,24 @@
-# Trellis DMS v0.7 component contract
+# Trellis DMS UI component contract
+
+> The v0.9.1 desktop section at the end of this document was approved at the
+> UI Gate on 2026-09-24.
+
+## Localization (v0.9.2)
+
+- QML source text uses literal `I18n.trFor("trellisDms", "English source")`
+  calls and `TrellisDms/translations/zh_CN.json`. DMS owns locale selection and
+  reloads plugin strings when its active locale changes; there is no plugin
+  language selector or `en.json`.
+- A missing entry or unsupported locale uses the English source term. Locale
+  changes only retranslate presentation; they do not rescan or mutate Snapshot,
+  DMS State, filters, pins, or archive pages.
+- Translate only plugin-authored labels and stable diagnostics. Preserve
+  project names, task titles, paths, Markdown, IDs, unknown statuses, and
+  dynamic system/parser error details as received.
+- Keep bar labels single-line and elided. Explanatory text may wrap in the
+  popout, settings, and scrollable desktop surface. Launcher source terms are
+  included in the same catalog; newly added Launcher copy follows this
+  contract.
 
 ## `TrellisWidget.qml`
 
@@ -193,6 +213,93 @@ Use `SelectionSetting` with visible labels:
 - The v0.6.3 workspace build has not been installed. Real Wayland visual,
   click, focus/scroll, direct Settings navigation, and restart persistence are
   still unverified release-environment gates.
+
+## `TrellisDesktopWidget.qml` (v0.9.1 approved UI Gate)
+
+### Inputs and projection
+
+- Read the daemon's shared `PluginGlobalVar("snapshot")`; read the existing
+  `versionWarning` setting only to filter presentation.
+- A pure `makeDesktopProjection(snapshot, uiState?)` owns readiness, the
+  unconfigured/empty distinction, warning bounds, and project/task summaries.
+- Preserve all projects and active tasks in the loaded Snapshot order. The
+  current daemon bounds inputs to 32 projects and 128 tasks per project; do not
+  add another project/task cap or discard rows at the surface.
+- Active means `runtimeState === "active"`. It is a Trellis session-derived
+  state, not a new claim about Agent activity. Preserve `progress: null`.
+- Show active-task count and live-task count per project. When there are no
+  active tasks, say `No active session-backed tasks` while retaining the live
+  task count.
+- Show total visible warning count and at most three bounded warning detail
+  rows. `+N more warnings` accounts for details omitted from the desktop view;
+  prioritize one degraded-scan warning within those rows when present. The
+  existing popout shows up to eight details and its own overflow count.
+
+### Rendering and lifecycle
+
+- Use `DesktopPluginComponent`, DMS Theme semantic colors, existing icon
+  conventions, and injected `widgetWidth`/`widgetHeight`.
+- Minimum dimensions are 180×160 logical px against the DMS 200×200
+  default. Use one vertical scroll region at every size; elide project/task
+  labels and wrap explanatory and warning copy.
+- Keep loading, no-root, no-project, no-active-task, warning, and degraded
+  last-good states explicit. Warnings augment healthy data.
+- No new State keys, controls, filesystem API, process, timer, watcher, or
+  daemon resource. The desktop component does not change bar/popout behavior.
+- Users disable the visible surface by removing its desktop placement; the
+  shared plugin and bar/popout remain enabled. Multiple placements read the
+  same Snapshot.
+
+### Compatibility floor
+
+DMS 1.6.2 is the locally inspected desktop API baseline. The existing 1.6.1
+minimum is not verified against the desktop component. The approved decision is
+to raise `requires_dms` to `>=1.6.2` with the optional component and document the
+older version as unverified.
+
+## `TrellisLauncher.qml` (v0.9.3 approved UI Gate)
+
+### Inputs and search projection
+
+- The optional `components.launcher` surface uses root trigger `!trellis` and
+  receives DMS `getItems(query)` / `executeItem(item)` calls.
+- Read the daemon's shared `PluginGlobalVar("snapshot")`; do not create a
+  reader, process, timer, watcher, socket, filesystem scan, or local cache.
+- A pure `makeLauncherProjection(snapshot, query)` returns bounded project and
+  task result view models plus a truncation count. Empty query returns project
+  results only. Non-empty query matches project names and live task titles by
+  case-insensitive substring, preserving Snapshot order and distinguishing
+  tasks by `(projectId, taskId)`.
+- Return at most 20 matches plus a non-action overflow result. Search does not
+  match comments, IDs, paths, warning text, archive entries, or Markdown.
+- Project results show active/live counts. Task results show project name,
+  stored/display status as defined by the Snapshot, and active session count
+  when present. Visible text and comments are bounded and contain no path/raw
+  ID.
+
+### Selection and failure behavior
+
+- Project selection writes only `selectedProjectId` through key-scoped DMS
+  State APIs, preserves the existing pin, and then requests the existing
+  `trellisDms` popout.
+- Task selection revalidates both IDs against the current Snapshot, writes
+  `selectedProjectId` and a project-qualified `pinnedTaskId` token (replacing
+  the prior pin), then requests the existing popout.
+- Stale/malformed IDs are a no-op. If key-scoped State APIs are unavailable,
+  selection does not mutate state or request the popout. Do not use settings or
+  Trellis files as fallback storage.
+- Missing Snapshot and valid empty Snapshots produce bounded informational
+  results. No-match queries use DMS's normal empty-result UI. Warnings remain
+  available in the popout and do not hide matching results.
+- If `BarWidgetService.triggerWidgetPopout("trellisDms")` returns false, keep
+  the valid State selection but do not claim the popout opened. DMS owns result
+  rows, focus, and keyboard activation.
+- Removing `components.launcher` and root `trigger` disables only the Launcher.
+  Registry publication, Control Center, task mutation, agent launch, and
+  activity collection remain out of scope.
+
+The approved implementation contract is recorded in
+`.trellis/tasks/09-24-dms-v093-launcher-registry/launcher-ui-gate.md`.
 
 ## v0.7.3 Settings and State addendum
 

@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/state-matrix-contract.md", "reason": "Check launcher results retain project/task identities and Snapshot semantics."}
+{"file": ".trellis/spec/frontend/settings-state-contract.md", "reason": "Check pin/filter writes remain project-qualified and key-scoped."}
+{"file": ".trellis/spec/frontend/desktop-projection-contract.md", "reason": "Keep the Launcher aligned with the shared Snapshot and existing v0.9 desktop surface contract."}
+{"file": "docs/ui-state-matrix.md", "reason": "Check the pending Launcher result and failure-state Gate matrix against the implementation."}
+{"file": "docs/ui-component-contract.md", "reason": "Check the pending Launcher data flow, State writes, and popout contract."}
+{"file": ".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/path-safety.md", "reason": "Confirm launcher adds no path read or bypass around the safe resolver."}

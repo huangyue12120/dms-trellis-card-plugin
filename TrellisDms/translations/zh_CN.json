@@ -1,0 +1,695 @@
+{
+    "PRD": {
+        "PRD": "PRD"
+    },
+    "Design": {
+        "Design": "设计"
+    },
+    "Implement": {
+        "Implement": "实施"
+    },
+    "All": {
+        "All": "全部项目"
+    },
+    "%1 project": {
+        "%1 project": "%1 个项目"
+    },
+    "%1 projects": {
+        "%1 projects": "%1 个项目"
+    },
+    "%1 task": {
+        "%1 task": "%1 个任务"
+    },
+    "%1 tasks": {
+        "%1 tasks": "%1 个任务"
+    },
+    "%1 warning": {
+        "%1 warning": "%1 条警告"
+    },
+    "%1 warnings": {
+        "%1 warnings": "%1 条警告"
+    },
+    "%1 session": {
+        "%1 session": "%1 个会话"
+    },
+    "%1 sessions": {
+        "%1 sessions": "%1 个会话"
+    },
+    "%1 child": {
+        "%1 child": "%1 个子任务"
+    },
+    "%1 children": {
+        "%1 children": "%1 个子任务"
+    },
+    "%1 active · %2 live": {
+        "%1 active · %2 live": "%1 个活动任务 · %2 个实时任务"
+    },
+    "Active": {
+        "Active": "活动"
+    },
+    "In progress": {
+        "In progress": "进行中"
+    },
+    "Planning": {
+        "Planning": "规划中"
+    },
+    "Error": {
+        "Error": "错误"
+    },
+    "Other": {
+        "Other": "其他"
+    },
+    "Parent: %1": {
+        "Parent: %1": "父任务：%1"
+    },
+    "No active task": {
+        "No active task": "无活动任务"
+    },
+    "No project": {
+        "No project": "无项目"
+    },
+    "Unknown %1 relation: %2": {
+        "Unknown %1 relation: %2": "未知的%1关系：%2"
+    },
+    "parent": {
+        "parent": "父任务"
+    },
+    "child": {
+        "child": "子任务"
+    },
+    "Project root rejected: %1": {
+        "Project root rejected: %1": "项目根目录已拒绝：%1"
+    },
+    "warning": {
+        "warning": "警告"
+    },
+    "Warning": {
+        "Warning": "警告"
+    },
+    "Task document could not be loaded.": {
+        "Task document could not be loaded.": "无法加载任务文档。"
+    },
+    "This task document could not be loaded.": {
+        "This task document could not be loaded.": "无法加载此任务文档。"
+    },
+    "Archive data could not be loaded.": {
+        "Archive data could not be loaded.": "无法加载归档数据。"
+    },
+    "The archive could not be loaded.": {
+        "The archive could not be loaded.": "无法加载归档数据。"
+    },
+    "could not create discovery process": {
+        "could not create discovery process": "无法创建发现进程"
+    },
+    "could not create file reader": {
+        "could not create file reader": "无法创建文件读取器"
+    },
+    "project discovery cap reached": {
+        "project discovery cap reached": "已达到项目发现数量上限"
+    },
+    "could not read .trellis/.version": {
+        "could not read .trellis/.version": "无法读取 .trellis/.version"
+    },
+    "version path rejected": {
+        "version path rejected": "版本文件路径已被拒绝"
+    },
+    "Trellis version is not the verified compatibility baseline": {
+        "Trellis version is not the verified compatibility baseline": "Trellis 版本不属于已验证的兼容基线"
+    },
+    "Trellis version is missing or malformed": {
+        "Trellis version is missing or malformed": "Trellis 版本缺失或格式错误"
+    },
+    "archive directory is unavailable; archive tasks are not loaded": {
+        "archive directory is unavailable; archive tasks are not loaded": "归档目录不可用；未加载归档任务"
+    },
+    "archive directory path rejected": {
+        "archive directory path rejected": "归档目录路径已被拒绝"
+    },
+    "could not discover live task directories": {
+        "could not discover live task directories": "无法发现实时任务目录"
+    },
+    "could not discover session pointers": {
+        "could not discover session pointers": "无法发现会话指针"
+    },
+    "task directory could not be canonicalized": {
+        "task directory could not be canonicalized": "无法规范化任务目录路径"
+    },
+    "task directory rejected": {
+        "task directory rejected": "任务目录已被拒绝"
+    },
+    "task.json could not be canonicalized": {
+        "task.json could not be canonicalized": "无法规范化 task.json 路径"
+    },
+    "task.json path rejected": {
+        "task.json path rejected": "task.json 路径已被拒绝"
+    },
+    "session pointer could not be canonicalized": {
+        "session pointer could not be canonicalized": "无法规范化会话指针路径"
+    },
+    "session file rejected": {
+        "session file rejected": "会话文件已被拒绝"
+    },
+    "canonical root escaped its configured root": {
+        "canonical root escaped its configured root": "规范化后的根目录超出已配置范围"
+    },
+    "could not discover .trellis directories": {
+        "could not discover .trellis directories": "无法发现 .trellis 目录"
+    },
+    "discovered .trellis path could not be canonicalized": {
+        "discovered .trellis path could not be canonicalized": "无法规范化发现的 .trellis 路径"
+    },
+    "discovered project is outside configured root": {
+        "discovered project is outside configured root": "发现的项目位于已配置根目录之外"
+    },
+    "known-file reload queue cap reached": {
+        "known-file reload queue cap reached": "已达到已知文件重载队列上限"
+    },
+    "known-file project is no longer loaded": {
+        "known-file project is no longer loaded": "已知文件所属项目已不再加载"
+    },
+    "could not reload .trellis/.version": {
+        "could not reload .trellis/.version": "无法重新加载 .trellis/.version"
+    },
+    "task.json reload failed; last valid value retained": {
+        "task.json reload failed; last valid value retained": "重新加载 task.json 失败；保留上次有效数据"
+    },
+    "task.json is malformed; last valid value retained": {
+        "task.json is malformed; last valid value retained": "task.json 格式错误；保留上次有效数据"
+    },
+    "session pointer reload failed; last valid value retained": {
+        "session pointer reload failed; last valid value retained": "重新加载会话指针失败；保留上次有效数据"
+    },
+    "session pointer is malformed; last valid value retained": {
+        "session pointer is malformed; last valid value retained": "会话指针格式错误；保留上次有效数据"
+    },
+    "known-file watcher cap reached": {
+        "known-file watcher cap reached": "已达到已知文件监视器上限"
+    },
+    "could not create known-file watcher": {
+        "could not create known-file watcher": "无法创建已知文件监视器"
+    },
+    "no Trellis project was found under the configured root": {
+        "no Trellis project was found under the configured root": "在已配置根目录下未找到 Trellis 项目"
+    },
+    "discovery was degraded; last valid Trellis snapshot retained": {
+        "discovery was degraded; last valid Trellis snapshot retained": "发现过程受限；保留上次有效的 Trellis 快照"
+    },
+    "trusted scan root cap reached": {
+        "trusted scan root cap reached": "已达到可信扫描根目录上限"
+    },
+    "topology interval was normalized to the safe 15–300 second range": {
+        "topology interval was normalized to the safe 15–300 second range": "拓扑重扫间隔已调整到安全范围 15–300 秒"
+    },
+    "configured root could not be canonicalized": {
+        "configured root could not be canonicalized": "无法规范化已配置的根目录"
+    },
+    "no project root is configured": {
+        "no project root is configured": "尚未配置项目根目录"
+    },
+    "duplicate project root ignored": {
+        "duplicate project root ignored": "已忽略重复的项目根目录"
+    },
+    "discovery output exceeded its byte limit": {
+        "discovery output exceeded its byte limit": "发现命令输出超过字节上限"
+    },
+    "discovery line contains a control character": {
+        "discovery line contains a control character": "发现结果行包含控制字符"
+    },
+    "discovery result cap reached": {
+        "discovery result cap reached": "已达到发现结果数量上限"
+    },
+    "parent/child relation conflict": {
+        "parent/child relation conflict": "父子任务关系存在冲突"
+    },
+    "session JSON must contain an object": {
+        "session JSON must contain an object": "会话 JSON 必须是对象"
+    },
+    "session current_task is not a non-empty string": {
+        "session current_task is not a non-empty string": "会话 current_task 必须是非空字符串"
+    },
+    "session pointer does not resolve to a task": {
+        "session pointer does not resolve to a task": "会话指针未解析到任务"
+    },
+    "session pointer resolved outside loaded task records": {
+        "session pointer resolved outside loaded task records": "会话指针解析到未加载的任务记录之外"
+    },
+    "The selected task is no longer available.": {
+        "The selected task is no longer available.": "所选任务已不可用。"
+    },
+    "This task document is not available.": {
+        "This task document is not available.": "此任务文档不可用。"
+    },
+    "This task document path was rejected.": {
+        "This task document path was rejected.": "此任务文档路径已被拒绝。"
+    },
+    "This task document exceeds the safe display limit.": {
+        "This task document exceeds the safe display limit.": "此任务文档超过安全显示上限。"
+    },
+    "This task document could not be read.": {
+        "This task document could not be read.": "无法读取此任务文档。"
+    },
+    "This task document path check could not start.": {
+        "This task document path check could not start.": "无法启动此任务文档路径检查。"
+    },
+    "The selected archive month could not be listed.": {
+        "The selected archive month could not be listed.": "无法列出所选归档月份。"
+    },
+    "Archive page selectors were normalized to safe bounds.": {
+        "Archive page selectors were normalized to safe bounds.": "归档页面参数已调整到安全范围。"
+    },
+    "Archive task discovery reached its finite cap.": {
+        "Archive task discovery reached its finite cap.": "归档任务发现已达到数量上限。"
+    },
+    "The selected archive month listing could not start.": {
+        "The selected archive month listing could not start.": "无法开始列出所选归档月份。"
+    },
+    "The selected archive month is no longer available.": {
+        "The selected archive month is no longer available.": "所选归档月份已不可用。"
+    },
+    "The selected archive month failed canonical validation.": {
+        "The selected archive month failed canonical validation.": "所选归档月份未通过规范路径校验。"
+    },
+    "The archive month path check could not start.": {
+        "The archive month path check could not start.": "无法启动归档月份路径检查。"
+    },
+    "This project has no accessible archive directory.": {
+        "This project has no accessible archive directory.": "此项目没有可访问的归档目录。"
+    },
+    "The archive root failed canonical validation.": {
+        "The archive root failed canonical validation.": "归档根目录未通过规范路径校验。"
+    },
+    "The archive directory could not be listed.": {
+        "The archive directory could not be listed.": "无法列出归档目录。"
+    },
+    "Archive month discovery reached its finite cap.": {
+        "Archive month discovery reached its finite cap.": "归档月份发现已达到数量上限。"
+    },
+    "An archive month failed canonical validation.": {
+        "An archive month failed canonical validation.": "某个归档月份未通过规范路径校验。"
+    },
+    "An archive month path check could not start.": {
+        "An archive month path check could not start.": "无法启动归档月份路径检查。"
+    },
+    "An archive month type check could not start.": {
+        "An archive month type check could not start.": "无法启动归档月份类型检查。"
+    },
+    "The archive listing could not start.": {
+        "The archive listing could not start.": "无法开始列出归档内容。"
+    },
+    "The archive root path check could not start.": {
+        "The archive root path check could not start.": "无法启动归档根目录路径检查。"
+    },
+    "The selected archived task is no longer available.": {
+        "The selected archived task is no longer available.": "所选归档任务已不可用。"
+    },
+    "The selected archived task identity could not be verified.": {
+        "The selected archived task identity could not be verified.": "无法验证所选归档任务的身份。"
+    },
+    "The selected archived task identity is stale.": {
+        "The selected archived task identity is stale.": "所选归档任务身份已过期。"
+    },
+    "The archived task identity check could not start.": {
+        "The archived task identity check could not start.": "无法启动归档任务身份检查。"
+    },
+    "The archived task path check could not start.": {
+        "The archived task path check could not start.": "无法启动归档任务路径检查。"
+    },
+    "Archive task path check could not start.": {
+        "Archive task path check could not start.": "无法启动归档任务路径检查。"
+    },
+    "Archive task type check could not start.": {
+        "Archive task type check could not start.": "无法启动归档任务类型检查。"
+    },
+    "The archive request is invalid.": {
+        "The archive request is invalid.": "归档请求无效。"
+    },
+    "The task document request is invalid.": {
+        "The task document request is invalid.": "任务文档请求无效。"
+    },
+    "The selected project is no longer available.": {
+        "The selected project is no longer available.": "所选项目已不可用。"
+    },
+    "The selected live task is no longer available.": {
+        "The selected live task is no longer available.": "所选实时任务已不可用。"
+    },
+    "DMS State is unavailable; UI choices will remain local.": {
+        "DMS State is unavailable; UI choices will remain local.": "DMS State 不可用；界面选择仅在本地生效。"
+    },
+    "Saved pin was invalid and was ignored.": {
+        "Saved pin was invalid and was ignored.": "已忽略无效的已保存固定任务。"
+    },
+    "Saved project filter was invalid and was ignored.": {
+        "Saved project filter was invalid and was ignored.": "已忽略无效的已保存项目筛选。"
+    },
+    "Some saved project collapse choices were invalid and were ignored.": {
+        "Some saved project collapse choices were invalid and were ignored.": "已忽略部分无效的已保存项目折叠选项。"
+    },
+    "Some saved group collapse choices were invalid and were ignored.": {
+        "Some saved group collapse choices were invalid and were ignored.": "已忽略部分无效的已保存任务组折叠选项。"
+    },
+    "Saved archive month was invalid and was ignored.": {
+        "Saved archive month was invalid and was ignored.": "已忽略无效的已保存归档月份。"
+    },
+    "DMS State could not load saved Trellis preferences; local choices remain usable.": {
+        "DMS State could not load saved Trellis preferences; local choices remain usable.": "无法从 DMS State 加载已保存的 Trellis 偏好设置；仍可使用本地选择。"
+    },
+    "Preference changed locally, but DMS State is unavailable.": {
+        "Preference changed locally, but DMS State is unavailable.": "偏好设置已在本地更改，但 DMS State 不可用。"
+    },
+    "Preference changed locally, but DMS State could not save it.": {
+        "Preference changed locally, but DMS State could not save it.": "偏好设置已在本地更改，但无法保存到 DMS State。"
+    },
+    "Trellis refresh is unavailable in this DMS session.": {
+        "Trellis refresh is unavailable in this DMS session.": "此 DMS 会话中无法刷新 Trellis。"
+    },
+    "Trellis refresh could not be requested from DMS.": {
+        "Trellis refresh could not be requested from DMS.": "无法通过 DMS 请求刷新 Trellis。"
+    },
+    "DMS Settings are unavailable in this session.": {
+        "DMS Settings are unavailable in this session.": "此会话中无法打开 DMS Settings。"
+    },
+    "DMS Settings could not be opened.": {
+        "DMS Settings could not be opened.": "无法打开 DMS Settings。"
+    },
+    "The task document response was invalid or stale.": {
+        "The task document response was invalid or stale.": "任务文档响应无效或已过期。"
+    },
+    "The archive response was invalid or stale.": {
+        "The archive response was invalid or stale.": "归档响应无效或已过期。"
+    },
+    "Archive · Read only": {
+        "Archive · Read only": "归档 · 只读"
+    },
+    "Historical / read only": {
+        "Historical / read only": "历史归档 / 只读"
+    },
+    "Loading status": {
+        "Loading status": "正在加载状态"
+    },
+    "Back": {
+        "Back": "返回"
+    },
+    "Loading %1...": {
+        "Loading %1...": "正在加载 %1……"
+    },
+    "This task document is empty.": {
+        "This task document is empty.": "此任务文档为空。"
+    },
+    "Shown as plain text because native Markdown rendering is unavailable.": {
+        "Shown as plain text because native Markdown rendering is unavailable.": "当前无法使用原生 Markdown 渲染，以下内容以纯文本显示。"
+    },
+    "Back to live": {
+        "Back to live": "返回实时任务"
+    },
+    "Reload": {
+        "Reload": "重新加载"
+    },
+    "Historical Archive · Read only": {
+        "Historical Archive · Read only": "历史归档 · 只读"
+    },
+    "Archived tasks are loaded on demand and never enter the live task list.": {
+        "Archived tasks are loaded on demand and never enter the live task list.": "归档任务按需加载，不会进入实时任务列表。"
+    },
+    "Loading archive index...": {
+        "Loading archive index...": "正在加载归档索引……"
+    },
+    "No archived tasks are available on this page.": {
+        "No archived tasks are available on this page.": "此页没有可用的归档任务。"
+    },
+    "This project has no archived task months.": {
+        "This project has no archived task months.": "此项目没有归档月份。"
+    },
+    "Month": {
+        "Month": "月份"
+    },
+    "Previous": {
+        "Previous": "上一页"
+    },
+    "Page %1": {
+        "Page %1": "第 %1 页"
+    },
+    "Next": {
+        "Next": "下一页"
+    },
+    "Open archived task details (read only)": {
+        "Open archived task details (read only)": "打开归档任务详情（只读）"
+    },
+    "Loading Trellis status...": {
+        "Loading Trellis status...": "正在加载 Trellis 状态……"
+    },
+    "The saved pin and project filter are unavailable; showing the current live data.": {
+        "The saved pin and project filter are unavailable; showing the current live data.": "已保存的固定任务和项目筛选不可用；当前显示实时数据。"
+    },
+    "The saved pin is unavailable; showing the current primary task.": {
+        "The saved pin is unavailable; showing the current primary task.": "已保存的固定任务不可用；当前显示主要任务。"
+    },
+    "The saved project filter is unavailable; showing all projects.": {
+        "The saved project filter is unavailable; showing all projects.": "已保存的项目筛选不可用；当前显示全部项目。"
+    },
+    "Refresh": {
+        "Refresh": "刷新"
+    },
+    "Settings": {
+        "Settings": "设置"
+    },
+    "Archive": {
+        "Archive": "归档"
+    },
+    "Refresh requested. Current data stays visible until a new coherent snapshot arrives.": {
+        "Refresh requested. Current data stays visible until a new coherent snapshot arrives.": "已请求刷新。新的完整快照到达前，当前数据会继续显示。"
+    },
+    "Project filter": {
+        "Project filter": "项目筛选"
+    },
+    "%1 more project filters are outside the visual limit": {
+        "%1 more project filters are outside the visual limit": "另有 %1 个项目筛选项超出显示上限"
+    },
+    "%1 more warnings": {
+        "%1 more warnings": "另有 %1 条警告"
+    },
+    "Rescan from Settings after correcting the path or file.": {
+        "Rescan from Settings after correcting the path or file.": "修正路径或文件后，请在设置中重新扫描。"
+    },
+    "Add a trusted scan folder in Trellis DMS Settings.": {
+        "Add a trusted scan folder in Trellis DMS Settings.": "在 Trellis DMS 设置中添加可信扫描文件夹。"
+    },
+    "No Trellis projects were found under the trusted scan folders.": {
+        "No Trellis projects were found under the trusted scan folders.": "在可信扫描文件夹下未找到 Trellis 项目。"
+    },
+    "Version unknown": {
+        "Version unknown": "版本未知"
+    },
+    "Expand project": {
+        "Expand project": "展开项目"
+    },
+    "Collapse project": {
+        "Collapse project": "折叠项目"
+    },
+    "Project collapsed.": {
+        "Project collapsed.": "项目已折叠。"
+    },
+    "No live tasks in this project.": {
+        "No live tasks in this project.": "此项目没有实时任务。"
+    },
+    "Expand task group": {
+        "Expand task group": "展开任务组"
+    },
+    "Collapse task group": {
+        "Collapse task group": "折叠任务组"
+    },
+    "Progress %1%": {
+        "Progress %1%": "进度 %1%"
+    },
+    "Open task details": {
+        "Open task details": "打开任务详情"
+    },
+    "Unpin task": {
+        "Unpin task": "取消固定任务"
+    },
+    "Pin task": {
+        "Pin task": "固定任务"
+    },
+    "%1 more in %2": {
+        "%1 more in %2": "另有 %1 项归于“%2”"
+    },
+    "%1 more projects": {
+        "%1 more projects": "另有 %1 个项目"
+    },
+    "Plugin settings are unavailable; the local choice was not saved.": {
+        "Plugin settings are unavailable; the local choice was not saved.": "插件设置不可用；本地选择未保存。"
+    },
+    "Plugin settings could not save this choice; local controls remain usable.": {
+        "Plugin settings could not save this choice; local controls remain usable.": "无法保存此选择；本地控件仍可使用。"
+    },
+    "Plugin settings are unavailable; safe defaults remain active.": {
+        "Plugin settings are unavailable; safe defaults remain active.": "插件设置不可用；安全默认值仍生效。"
+    },
+    "Plugin settings could not be loaded; safe local defaults remain active.": {
+        "Plugin settings could not be loaded; safe local defaults remain active.": "无法加载插件设置；安全的本地默认值仍生效。"
+    },
+    "Settings are unavailable or not writable; defaults could not be saved.": {
+        "Settings are unavailable or not writable; defaults could not be saved.": "设置不可用或不可写；无法保存默认值。"
+    },
+    "Defaults were applied to settings, but DMS State is unavailable.": {
+        "Defaults were applied to settings, but DMS State is unavailable.": "已应用设置默认值，但 DMS State 不可用。"
+    },
+    "Defaults changed locally, but DMS could not save every setting.": {
+        "Defaults changed locally, but DMS could not save every setting.": "默认值已在本地更改，但 DMS 未能保存全部设置。"
+    },
+    "Defaults restored. Trusted folders are empty until you add one again.": {
+        "Defaults restored. Trusted folders are empty until you add one again.": "已恢复默认值。重新添加可信文件夹前，扫描列表将保持为空。"
+    },
+    "Defaults changed locally, but DMS could not save every value.": {
+        "Defaults changed locally, but DMS could not save every value.": "默认值已在本地更改，但 DMS 未能保存所有值。"
+    },
+    "DMS State is unavailable; remembered projects remain local only.": {
+        "DMS State is unavailable; remembered projects remain local only.": "DMS State 不可用；记忆项目只保留在本地。"
+    },
+    "DMS State could not be loaded; safe settings remain usable.": {
+        "DMS State could not be loaded; safe settings remain usable.": "无法加载 DMS State；安全设置仍可使用。"
+    },
+    "Refresh is unavailable because plugin settings are not writable.": {
+        "Refresh is unavailable because plugin settings are not writable.": "插件设置不可写，无法刷新。"
+    },
+    "Refresh requested; current data remains visible until the daemon publishes a new snapshot.": {
+        "Refresh requested; current data remains visible until the daemon publishes a new snapshot.": "已请求刷新；守护进程发布新快照前会继续显示当前数据。"
+    },
+    "Refresh could not be requested from DMS.": {
+        "Refresh could not be requested from DMS.": "无法通过 DMS 请求刷新。"
+    },
+    "Select a trusted Trellis scan folder": {
+        "Select a trusted Trellis scan folder": "选择可信的 Trellis 扫描文件夹"
+    },
+    "The interface language follows DMS's active locale. Untranslated text uses the English source.": {
+        "The interface language follows DMS's active locale. Untranslated text uses the English source.": "界面语言跟随 DMS 当前语言。未翻译的文本会显示英文源文案。"
+    },
+    "Bar display mode": {
+        "Bar display mode": "状态栏显示模式"
+    },
+    "Automatic shows the only active task when there is exactly one; otherwise it uses compact counts. Vertical bars always use icons.": {
+        "Automatic shows the only active task when there is exactly one; otherwise it uses compact counts. Vertical bars always use icons.": "恰有一个活动任务时自动显示其标题，否则显示精简计数。竖向状态栏始终只显示图标。"
+    },
+    "Automatic (recommended)": {
+        "Automatic (recommended)": "自动（推荐）"
+    },
+    "Active task": {
+        "Active task": "活动任务"
+    },
+    "Project": {
+        "Project": "项目"
+    },
+    "Compact counts": {
+        "Compact counts": "精简计数"
+    },
+    "Icon only": {
+        "Icon only": "仅图标"
+    },
+    "Full text": {
+        "Full text": "完整文字"
+    },
+    "Show numeric progress": {
+        "Show numeric progress": "显示数字进度"
+    },
+    "Show a progress line only when the live Snapshot contains a real numeric value; no value is fabricated.": {
+        "Show a progress line only when the live Snapshot contains a real numeric value; no value is fabricated.": "仅当实时快照包含真实数字时显示进度；不会生成估算值。"
+    },
+    "Show archive entry": {
+        "Show archive entry": "显示归档入口"
+    },
+    "Expose the historical archive browser separately from live tasks. Archive data stays read-only and lazy.": {
+        "Expose the historical archive browser separately from live tasks. Archive data stays read-only and lazy.": "在实时任务之外单独提供历史归档浏览器。归档数据保持只读并按需加载。"
+    },
+    "Show Trellis version warnings": {
+        "Show Trellis version warnings": "显示 Trellis 版本警告"
+    },
+    "Hide only compatibility warning presentation; the daemon keeps the version fact and diagnostics.": {
+        "Hide only compatibility warning presentation; the daemon keeps the version fact and diagnostics.": "仅隐藏兼容性警告的界面显示；守护进程仍保留版本信息和诊断。"
+    },
+    "Trusted scan folders": {
+        "Trusted scan folders": "可信扫描文件夹"
+    },
+    "Choose up to 16 folders you trust. Trellis DMS normally searches inside these folders, up to 4 levels deep, for .trellis projects. If the selected folder is a project, .trellis, .trellis/tasks, or a live task folder, it checks at most 8 parent candidates and automatically promotes that selection to its containing Trellis project, so sibling and new direct tasks appear on the next configured topology refresh or after a manual refresh with Refresh Trellis data now. A completely new project outside these trusted folders still needs a one-time addition of a containing trusted folder; DMS does not infer the current Codex task or working directory globally. It never selects your entire home, mounted drives, /, or /proc automatically; a broad folder is scanned only if you explicitly add it. It never writes to Trellis project files. Successfully discovered projects are remembered in DMS state and revalidated on later rescans.": {
+        "Choose up to 16 folders you trust. Trellis DMS normally searches inside these folders, up to 4 levels deep, for .trellis projects. If the selected folder is a project, .trellis, .trellis/tasks, or a live task folder, it checks at most 8 parent candidates and automatically promotes that selection to its containing Trellis project, so sibling and new direct tasks appear on the next configured topology refresh or after a manual refresh with Refresh Trellis data now. A completely new project outside these trusted folders still needs a one-time addition of a containing trusted folder; DMS does not infer the current Codex task or working directory globally. It never selects your entire home, mounted drives, /, or /proc automatically; a broad folder is scanned only if you explicitly add it. It never writes to Trellis project files. Successfully discovered projects are remembered in DMS state and revalidated on later rescans.": "最多添加 16 个你信任的文件夹。Trellis DMS 通常会在这些文件夹内最多向下搜索 4 层，以查找 .trellis 项目。如果所选文件夹是项目目录、.trellis、.trellis/tasks 或实时任务目录，插件最多检查 8 层父目录，并自动将选择提升到所属 Trellis 项目；同级任务和新建的直接子任务会在下次拓扑扫描或手动刷新后出现。可信文件夹之外的新项目仍需手动添加其所属文件夹；DMS 不会全局推断当前 Codex 任务或工作目录。插件不会自动选择整个主目录、挂载盘、/ 或 /proc；只有你明确添加后才会扫描范围较大的文件夹。插件不会写入 Trellis 项目文件。成功发现的项目会记录在 DMS State 中，并在后续扫描时重新验证。"
+    },
+    "Your existing Project or scan root is still active. Adding or removing a folder migrates this setting to the trusted-folder list.": {
+        "Your existing Project or scan root is still active. Adding or removing a folder migrates this setting to the trusted-folder list.": "现有 Project 或扫描根目录仍在使用。添加或移除文件夹时，此设置会迁移到可信文件夹列表。"
+    },
+    "Remove": {
+        "Remove": "移除"
+    },
+    "No trusted folders. Discovery is disabled.": {
+        "No trusted folders. Discovery is disabled.": "没有可信文件夹。项目发现已禁用。"
+    },
+    "Add trusted folder": {
+        "Add trusted folder": "添加可信文件夹"
+    },
+    "Remembered projects": {
+        "Remembered projects": "记忆的项目"
+    },
+    "This is a read-only cache from the last successful scan and never expands the trusted folders above. A selected task folder is automatically promoted to its containing project; sibling and new direct tasks appear after the next configured topology refresh or the manual Refresh Trellis data now action. A project outside trusted folders still requires a one-time trusted-folder addition, and DMS has no knowledge of Codex's current working directory.": {
+        "This is a read-only cache from the last successful scan and never expands the trusted folders above. A selected task folder is automatically promoted to its containing project; sibling and new direct tasks appear after the next configured topology refresh or the manual Refresh Trellis data now action. A project outside trusted folders still requires a one-time trusted-folder addition, and DMS has no knowledge of Codex's current working directory.": "这是上次成功扫描的只读缓存，不会扩展上方的可信文件夹。选中的任务文件夹会自动提升到所属项目；同级和新建的直接子任务会在下次拓扑扫描或手动刷新后出现。可信文件夹之外的项目仍需手动添加一次；DMS 无法获知 Codex 当前工作目录。"
+    },
+    "%1 more remembered projects": {
+        "%1 more remembered projects": "另有 %1 个记忆项目"
+    },
+    "Topology rescan interval": {
+        "Topology rescan interval": "拓扑重扫间隔"
+    },
+    "How often new or moved Trellis files are discovered. The safe range is 15-300 seconds.": {
+        "How often new or moved Trellis files are discovered. The safe range is 15-300 seconds.": "发现新增或移动 Trellis 文件的频率。安全范围为 15 至 300 秒。"
+    },
+    "Refresh Trellis data now": {
+        "Refresh Trellis data now": "立即刷新 Trellis 数据"
+    },
+    "Restore defaults": {
+        "Restore defaults": "恢复默认设置"
+    },
+    "%1 more warnings · see the bar popout": {
+        "%1 more warnings · see the bar popout": "另有 %1 条警告；请查看状态栏弹出面板"
+    },
+    "No active session-backed tasks": {
+        "No active session-backed tasks": "没有由活动会话关联的任务"
+    },
+    "Active · %1": {
+        "Active · %1": "活动 · %1"
+    },
+    "Trellis DMS": {
+        "Trellis DMS": "Trellis DMS"
+    },
+    "%1 more matches; refine your search": {
+        "%1 more matches; refine your search": "另有 %1 个匹配项；请缩小搜索范围"
+    },
+    "%1 active · %2 live tasks": {
+        "%1 active · %2 live tasks": "%1 个活动任务 · %2 个实时任务"
+    },
+    "Project: %1": {
+        "Project: %1": "项目：%1"
+    },
+    "%1 active session": {
+        "%1 active session": "%1 个活动会话"
+    },
+    "%1 active sessions": {
+        "%1 active sessions": "%1 个活动会话"
+    },
+    "Trellis status is loading": {
+        "Trellis status is loading": "正在加载 Trellis 状态"
+    },
+    "Open Trellis to review the latest status.": {
+        "Open Trellis to review the latest status.": "打开 Trellis 查看最新状态。"
+    },
+    "Set a trusted scan folder": {
+        "Set a trusted scan folder": "设置可信扫描文件夹"
+    },
+    "Choose a project folder in Trellis settings.": {
+        "Choose a project folder in Trellis settings.": "在 Trellis 设置中选择项目文件夹。"
+    },
+    "No Trellis projects found": {
+        "No Trellis projects found": "未找到 Trellis 项目"
+    },
+    "Check the configured trusted scan folders.": {
+        "Check the configured trusted scan folders.": "检查已配置的可信扫描文件夹。"
+    },
+    "Trellis DMS v0.9": {
+        "Trellis DMS v0.9": "Trellis DMS v0.9"
+    }
+}

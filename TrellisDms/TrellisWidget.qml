@@ -60,9 +60,9 @@ PluginComponent {
     readonly property int maxDetailCharacters: 256 * 1024
     readonly property bool nativeMarkdownAvailable: typeof Text.MarkdownText !== "undefined"
     readonly property var detailDocuments: [
-        { document: "prd.md", label: "PRD" },
-        { document: "design.md", label: "Design" },
-        { document: "implement.md", label: "Implement" }
+        { document: "prd.md", label: I18n.trFor("trellisDms", "PRD") },
+        { document: "design.md", label: I18n.trFor("trellisDms", "Design") },
+        { document: "implement.md", label: I18n.trFor("trellisDms", "Implement") }
     ]
 
     readonly property var snapshot: snapshotVar.value || ({})
@@ -89,8 +89,228 @@ PluginComponent {
         snapshot, root.pillMode, uiState)
     readonly property var popoutProjection: TrellisProjection.makePopoutProjection(
         snapshot, {}, uiState)
-    readonly property var projectFilterOptions: [{ id: "", name: "All" }]
+    readonly property var projectFilterOptions: [{ id: "", name: I18n.trFor("trellisDms", "All") }]
         .concat(popoutProjection.projectOptions || [])
+
+    function projectCountLabel(count) {
+        return count === 1
+            ? I18n.trFor("trellisDms", "%1 project").arg(count)
+            : I18n.trFor("trellisDms", "%1 projects").arg(count);
+    }
+
+    function taskCountLabel(count) {
+        return count === 1
+            ? I18n.trFor("trellisDms", "%1 task").arg(count)
+            : I18n.trFor("trellisDms", "%1 tasks").arg(count);
+    }
+
+    function warningCountLabel(count) {
+        return count === 1
+            ? I18n.trFor("trellisDms", "%1 warning").arg(count)
+            : I18n.trFor("trellisDms", "%1 warnings").arg(count);
+    }
+
+    function sessionCountLabel(count) {
+        return count === 1
+            ? I18n.trFor("trellisDms", "%1 session").arg(count)
+            : I18n.trFor("trellisDms", "%1 sessions").arg(count);
+    }
+
+    function childCountLabel(count) {
+        return count === 1
+            ? I18n.trFor("trellisDms", "%1 child").arg(count)
+            : I18n.trFor("trellisDms", "%1 children").arg(count);
+    }
+
+    function localizedTaskGroup(key) {
+        switch (key) {
+        case "active": return I18n.trFor("trellisDms", "Active");
+        case "in_progress": return I18n.trFor("trellisDms", "In progress");
+        case "planning": return I18n.trFor("trellisDms", "Planning");
+        case "error": return I18n.trFor("trellisDms", "Error");
+        case "other": return I18n.trFor("trellisDms", "Other");
+        default: return key;
+        }
+    }
+
+    function localizedTaskState(state) {
+        switch (state) {
+        case "active": return I18n.trFor("trellisDms", "Active");
+        case "in_progress": return I18n.trFor("trellisDms", "In progress");
+        case "planning": return I18n.trFor("trellisDms", "Planning");
+        case "error": return I18n.trFor("trellisDms", "Error");
+        default: return state;
+        }
+    }
+
+    function localizedDocumentName(document) {
+        switch (document) {
+        case "prd.md": return I18n.trFor("trellisDms", "PRD");
+        case "design.md": return I18n.trFor("trellisDms", "Design");
+        case "implement.md": return I18n.trFor("trellisDms", "Implement");
+        default: return document;
+        }
+    }
+
+    function relationLabel(task) {
+        var parts = [];
+        if (task.parentTitle)
+            parts.push(I18n.trFor("trellisDms", "Parent: %1").arg(task.parentTitle));
+        if (task.childCount > 0)
+            parts.push(childCountLabel(task.childCount));
+        return parts.join(" · ");
+    }
+
+    function fullPillLabel() {
+        return projectCountLabel(root.pillProjection.projectCount)
+            + " · " + taskCountLabel(root.pillProjection.taskCount)
+            + " · " + warningCountLabel(root.pillProjection.warningCount);
+    }
+
+    function pillLabel() {
+        if (root.pillProjection.kind === "full")
+            return fullPillLabel();
+        if (root.pillProjection.mode === "task"
+                && !root.pillProjection.primaryTaskId)
+            return I18n.trFor("trellisDms", "No active task");
+        if (root.pillProjection.mode === "project"
+                && !root.pillProjection.primaryProjectId)
+            return I18n.trFor("trellisDms", "No project");
+        return root.pillProjection.label;
+    }
+
+    function localizedWarningMessage(value) {
+        var message = typeof value === "string" ? value : "";
+        var parentPrefix = "unknown parent relation: ";
+        if (message.indexOf(parentPrefix) === 0)
+            return I18n.trFor("trellisDms", "Unknown %1 relation: %2")
+                .arg(I18n.trFor("trellisDms", "parent"))
+                .arg(message.slice(parentPrefix.length));
+        var childPrefix = "unknown child relation: ";
+        if (message.indexOf(childPrefix) === 0)
+            return I18n.trFor("trellisDms", "Unknown %1 relation: %2")
+                .arg(I18n.trFor("trellisDms", "child"))
+                .arg(message.slice(childPrefix.length));
+        var rootPrefix = "project root rejected: ";
+        if (message.indexOf(rootPrefix) === 0)
+            return I18n.trFor("trellisDms", "Project root rejected: %1")
+                .arg(message.slice(rootPrefix.length));
+
+        switch (message) {
+        case "warning": return I18n.trFor("trellisDms", "warning");
+        case "Warning": return I18n.trFor("trellisDms", "Warning");
+        case "DMS State is unavailable; UI choices will remain local.": return I18n.trFor("trellisDms", "DMS State is unavailable; UI choices will remain local.");
+        case "DMS State could not load saved Trellis preferences; local choices remain usable.": return I18n.trFor("trellisDms", "DMS State could not load saved Trellis preferences; local choices remain usable.");
+        case "Preference changed locally, but DMS State is unavailable.": return I18n.trFor("trellisDms", "Preference changed locally, but DMS State is unavailable.");
+        case "Preference changed locally, but DMS State could not save it.": return I18n.trFor("trellisDms", "Preference changed locally, but DMS State could not save it.");
+        case "Saved pin was invalid and was ignored.": return I18n.trFor("trellisDms", "Saved pin was invalid and was ignored.");
+        case "Saved project filter was invalid and was ignored.": return I18n.trFor("trellisDms", "Saved project filter was invalid and was ignored.");
+        case "Some saved project collapse choices were invalid and were ignored.": return I18n.trFor("trellisDms", "Some saved project collapse choices were invalid and were ignored.");
+        case "Some saved group collapse choices were invalid and were ignored.": return I18n.trFor("trellisDms", "Some saved group collapse choices were invalid and were ignored.");
+        case "Saved archive month was invalid and was ignored.": return I18n.trFor("trellisDms", "Saved archive month was invalid and was ignored.");
+        case "Trellis refresh is unavailable in this DMS session.": return I18n.trFor("trellisDms", "Trellis refresh is unavailable in this DMS session.");
+        case "Trellis refresh could not be requested from DMS.": return I18n.trFor("trellisDms", "Trellis refresh could not be requested from DMS.");
+        case "DMS Settings are unavailable in this session.": return I18n.trFor("trellisDms", "DMS Settings are unavailable in this session.");
+        case "DMS Settings could not be opened.": return I18n.trFor("trellisDms", "DMS Settings could not be opened.");
+        case "The task document response was invalid or stale.": return I18n.trFor("trellisDms", "The task document response was invalid or stale.");
+        case "The archive response was invalid or stale.": return I18n.trFor("trellisDms", "The archive response was invalid or stale.");
+        case "Task document could not be loaded.": return I18n.trFor("trellisDms", "Task document could not be loaded.");
+        case "This task document could not be loaded.": return I18n.trFor("trellisDms", "This task document could not be loaded.");
+        case "Archive data could not be loaded.": return I18n.trFor("trellisDms", "Archive data could not be loaded.");
+        case "The archive could not be loaded.": return I18n.trFor("trellisDms", "The archive could not be loaded.");
+        case "could not create discovery process": return I18n.trFor("trellisDms", "could not create discovery process");
+        case "could not create file reader": return I18n.trFor("trellisDms", "could not create file reader");
+        case "project discovery cap reached": return I18n.trFor("trellisDms", "project discovery cap reached");
+        case "could not read .trellis/.version": return I18n.trFor("trellisDms", "could not read .trellis/.version");
+        case "version path rejected": return I18n.trFor("trellisDms", "version path rejected");
+        case "Trellis version is not the verified compatibility baseline": return I18n.trFor("trellisDms", "Trellis version is not the verified compatibility baseline");
+        case "Trellis version is missing or malformed": return I18n.trFor("trellisDms", "Trellis version is missing or malformed");
+        case "archive directory is unavailable; archive tasks are not loaded": return I18n.trFor("trellisDms", "archive directory is unavailable; archive tasks are not loaded");
+        case "archive directory path rejected": return I18n.trFor("trellisDms", "archive directory path rejected");
+        case "could not discover live task directories": return I18n.trFor("trellisDms", "could not discover live task directories");
+        case "could not discover session pointers": return I18n.trFor("trellisDms", "could not discover session pointers");
+        case "task directory could not be canonicalized": return I18n.trFor("trellisDms", "task directory could not be canonicalized");
+        case "task directory rejected": return I18n.trFor("trellisDms", "task directory rejected");
+        case "task.json could not be canonicalized": return I18n.trFor("trellisDms", "task.json could not be canonicalized");
+        case "task.json path rejected": return I18n.trFor("trellisDms", "task.json path rejected");
+        case "session pointer could not be canonicalized": return I18n.trFor("trellisDms", "session pointer could not be canonicalized");
+        case "session file rejected": return I18n.trFor("trellisDms", "session file rejected");
+        case "canonical root escaped its configured root": return I18n.trFor("trellisDms", "canonical root escaped its configured root");
+        case "could not discover .trellis directories": return I18n.trFor("trellisDms", "could not discover .trellis directories");
+        case "discovered .trellis path could not be canonicalized": return I18n.trFor("trellisDms", "discovered .trellis path could not be canonicalized");
+        case "discovered project is outside configured root": return I18n.trFor("trellisDms", "discovered project is outside configured root");
+        case "known-file reload queue cap reached": return I18n.trFor("trellisDms", "known-file reload queue cap reached");
+        case "known-file project is no longer loaded": return I18n.trFor("trellisDms", "known-file project is no longer loaded");
+        case "could not reload .trellis/.version": return I18n.trFor("trellisDms", "could not reload .trellis/.version");
+        case "task.json reload failed; last valid value retained": return I18n.trFor("trellisDms", "task.json reload failed; last valid value retained");
+        case "task.json is malformed; last valid value retained": return I18n.trFor("trellisDms", "task.json is malformed; last valid value retained");
+        case "session pointer reload failed; last valid value retained": return I18n.trFor("trellisDms", "session pointer reload failed; last valid value retained");
+        case "session pointer is malformed; last valid value retained": return I18n.trFor("trellisDms", "session pointer is malformed; last valid value retained");
+        case "known-file watcher cap reached": return I18n.trFor("trellisDms", "known-file watcher cap reached");
+        case "could not create known-file watcher": return I18n.trFor("trellisDms", "could not create known-file watcher");
+        case "no Trellis project was found under the configured root": return I18n.trFor("trellisDms", "no Trellis project was found under the configured root");
+        case "discovery was degraded; last valid Trellis snapshot retained": return I18n.trFor("trellisDms", "discovery was degraded; last valid Trellis snapshot retained");
+        case "trusted scan root cap reached": return I18n.trFor("trellisDms", "trusted scan root cap reached");
+        case "topology interval was normalized to the safe 15–300 second range": return I18n.trFor("trellisDms", "topology interval was normalized to the safe 15–300 second range");
+        case "configured root could not be canonicalized": return I18n.trFor("trellisDms", "configured root could not be canonicalized");
+        case "no project root is configured": return I18n.trFor("trellisDms", "no project root is configured");
+        case "duplicate project root ignored": return I18n.trFor("trellisDms", "duplicate project root ignored");
+        case "discovery output exceeded its byte limit": return I18n.trFor("trellisDms", "discovery output exceeded its byte limit");
+        case "discovery line contains a control character": return I18n.trFor("trellisDms", "discovery line contains a control character");
+        case "discovery result cap reached": return I18n.trFor("trellisDms", "discovery result cap reached");
+        case "parent/child relation conflict": return I18n.trFor("trellisDms", "parent/child relation conflict");
+        case "session JSON must contain an object": return I18n.trFor("trellisDms", "session JSON must contain an object");
+        case "session current_task is not a non-empty string": return I18n.trFor("trellisDms", "session current_task is not a non-empty string");
+        case "session pointer does not resolve to a task": return I18n.trFor("trellisDms", "session pointer does not resolve to a task");
+        case "session pointer resolved outside loaded task records": return I18n.trFor("trellisDms", "session pointer resolved outside loaded task records");
+        case "The selected task is no longer available.": return I18n.trFor("trellisDms", "The selected task is no longer available.");
+        case "This task document is not available.": return I18n.trFor("trellisDms", "This task document is not available.");
+        case "This task document path was rejected.": return I18n.trFor("trellisDms", "This task document path was rejected.");
+        case "This task document exceeds the safe display limit.": return I18n.trFor("trellisDms", "This task document exceeds the safe display limit.");
+        case "This task document could not be read.": return I18n.trFor("trellisDms", "This task document could not be read.");
+        case "This task document path check could not start.": return I18n.trFor("trellisDms", "This task document path check could not start.");
+        case "The selected archive month could not be listed.": return I18n.trFor("trellisDms", "The selected archive month could not be listed.");
+        case "Archive page selectors were normalized to safe bounds.": return I18n.trFor("trellisDms", "Archive page selectors were normalized to safe bounds.");
+        case "Archive task discovery reached its finite cap.": return I18n.trFor("trellisDms", "Archive task discovery reached its finite cap.");
+        case "The selected archive month listing could not start.": return I18n.trFor("trellisDms", "The selected archive month listing could not start.");
+        case "The selected archive month is no longer available.": return I18n.trFor("trellisDms", "The selected archive month is no longer available.");
+        case "The selected archive month failed canonical validation.": return I18n.trFor("trellisDms", "The selected archive month failed canonical validation.");
+        case "The archive month path check could not start.": return I18n.trFor("trellisDms", "The archive month path check could not start.");
+        case "This project has no accessible archive directory.": return I18n.trFor("trellisDms", "This project has no accessible archive directory.");
+        case "The archive root failed canonical validation.": return I18n.trFor("trellisDms", "The archive root failed canonical validation.");
+        case "The archive directory could not be listed.": return I18n.trFor("trellisDms", "The archive directory could not be listed.");
+        case "Archive month discovery reached its finite cap.": return I18n.trFor("trellisDms", "Archive month discovery reached its finite cap.");
+        case "An archive month failed canonical validation.": return I18n.trFor("trellisDms", "An archive month failed canonical validation.");
+        case "An archive month path check could not start.": return I18n.trFor("trellisDms", "An archive month path check could not start.");
+        case "An archive month type check could not start.": return I18n.trFor("trellisDms", "An archive month type check could not start.");
+        case "The archive listing could not start.": return I18n.trFor("trellisDms", "The archive listing could not start.");
+        case "The archive root path check could not start.": return I18n.trFor("trellisDms", "The archive root path check could not start.");
+        case "The selected archived task is no longer available.": return I18n.trFor("trellisDms", "The selected archived task is no longer available.");
+        case "The selected archived task identity could not be verified.": return I18n.trFor("trellisDms", "The selected archived task identity could not be verified.");
+        case "The selected archived task identity is stale.": return I18n.trFor("trellisDms", "The selected archived task identity is stale.");
+        case "The archived task identity check could not start.": return I18n.trFor("trellisDms", "The archived task identity check could not start.");
+        case "The archived task path check could not start.": return I18n.trFor("trellisDms", "The archived task path check could not start.");
+        case "Archive task path check could not start.": return I18n.trFor("trellisDms", "Archive task path check could not start.");
+        case "Archive task type check could not start.": return I18n.trFor("trellisDms", "Archive task type check could not start.");
+        case "The archive request is invalid.": return I18n.trFor("trellisDms", "The archive request is invalid.");
+        case "The task document request is invalid.": return I18n.trFor("trellisDms", "The task document request is invalid.");
+        case "The selected project is no longer available.": return I18n.trFor("trellisDms", "The selected project is no longer available.");
+        case "The selected live task is no longer available.": return I18n.trFor("trellisDms", "The selected live task is no longer available.");
+        default: return message;
+        }
+    }
+
+    function localizedWarningMessages(value) {
+        if (typeof value !== "string" || value === "")
+            return "";
+        var messages = value.split("\n");
+        var localized = [];
+        for (var i = 0; i < messages.length; i++) {
+            if (messages[i] !== "")
+                localized.push(root.localizedWarningMessage(messages[i]));
+        }
+        return localized.join(" ").slice(0, 240);
+    }
 
     function loadPreferenceState() {
         if (!root.pluginService || !root.pluginId
@@ -151,7 +371,7 @@ PluginComponent {
                     && loadedArchiveMonth !== "" && !normalizedMonth)
                 warnings.push("Saved archive month was invalid and was ignored.");
             root.selectedArchiveMonth = normalizedMonth;
-            root.preferenceStateWarning = warnings.join(" ").slice(0, 240);
+            root.preferenceStateWarning = warnings.join("\n");
             root.stateWarning = "";
         } catch (error) {
             root.preferenceStateWarning = "";
@@ -669,7 +889,7 @@ PluginComponent {
                     || root.pillProjection.kind === "full"
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(implicitWidth, 180)
-                text: root.pillProjection.label
+                text: root.pillLabel()
                 font.pixelSize: Theme.fontSizeMedium
                 color: Theme.surfaceText
                 wrapMode: Text.NoWrap
@@ -725,15 +945,16 @@ PluginComponent {
             width: parent ? parent.width : root.popoutWidth - Theme.spacingS * 2
             headerText: "Trellis"
             detailsText: root.detailMode
-                ? (root.detailArchive ? "Archive · Read only · " : "") + root.detailTitle
+                ? (root.detailArchive
+                    ? I18n.trFor("trellisDms", "Archive · Read only") + " · " : "")
+                    + root.detailTitle
                 : (root.archiveMode
-                ? root.archiveProjectName + " · Historical / read only"
+                ? root.archiveProjectName + " · "
+                    + I18n.trFor("trellisDms", "Historical / read only")
                 : (root.popoutProjection.ready
-                ? root.popoutProjection.projectCount + " project"
-                    + (root.popoutProjection.projectCount === 1 ? "" : "s")
-                    + " / " + root.popoutProjection.taskCount + " task"
-                    + (root.popoutProjection.taskCount === 1 ? "" : "s")
-                : "Loading status"))
+                ? root.projectCountLabel(root.popoutProjection.projectCount)
+                    + " / " + root.taskCountLabel(root.popoutProjection.taskCount)
+                : I18n.trFor("trellisDms", "Loading status")))
             showCloseButton: true
 
             DankFlickable {
@@ -758,7 +979,7 @@ PluginComponent {
                         DankButton {
                             width: Math.min(120, parent.width)
                             clip: true
-                            text: "Back"
+                            text: I18n.trFor("trellisDms", "Back")
                             iconName: "arrow_back"
                             buttonHeight: 40
                             onClicked: root.closeTaskDetail()
@@ -797,7 +1018,8 @@ PluginComponent {
                         StyledText {
                             visible: root.detailStatus === "loading"
                             width: parent.width
-                            text: "Loading " + root.detailDocument + "..."
+                            text: I18n.trFor("trellisDms", "Loading %1...")
+                                .arg(root.localizedDocumentName(root.detailDocument))
                             font.pixelSize: Theme.fontSizeMedium
                             color: Theme.surfaceVariantText
                             wrapMode: Text.WordWrap
@@ -806,7 +1028,7 @@ PluginComponent {
                         StyledText {
                             visible: root.detailStatus === "empty"
                             width: parent.width
-                            text: "This task document is empty."
+                            text: I18n.trFor("trellisDms", "This task document is empty.")
                             font.pixelSize: Theme.fontSizeMedium
                             color: Theme.surfaceVariantText
                             wrapMode: Text.WordWrap
@@ -815,7 +1037,7 @@ PluginComponent {
                         StyledText {
                             visible: root.detailStatus === "error"
                             width: parent.width
-                            text: root.detailError
+                            text: root.localizedWarningMessage(root.detailError)
                             font.pixelSize: Theme.fontSizeMedium
                             color: Theme.warning
                             wrapMode: Text.WordWrap
@@ -826,7 +1048,7 @@ PluginComponent {
                                 && (root.detailFormat === "plain"
                                     || !root.nativeMarkdownAvailable)
                             width: parent.width
-                            text: "Shown as plain text because native Markdown rendering is unavailable."
+                            text: I18n.trFor("trellisDms", "Shown as plain text because native Markdown rendering is unavailable.")
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
                             wrapMode: Text.WordWrap
@@ -861,7 +1083,7 @@ PluginComponent {
                             DankButton {
                                 width: Math.min(140, archiveHeaderActions.width)
                                 clip: true
-                                text: "Back to live"
+                                text: I18n.trFor("trellisDms", "Back to live")
                                 iconName: "arrow_back"
                                 buttonHeight: 40
                                 onClicked: root.closeArchive()
@@ -870,7 +1092,7 @@ PluginComponent {
                             DankButton {
                                 width: Math.min(120, archiveHeaderActions.width)
                                 clip: true
-                                text: "Reload"
+                                text: I18n.trFor("trellisDms", "Reload")
                                 iconName: "refresh"
                                 buttonHeight: 40
                                 onClicked: root.requestArchiveIndex()
@@ -879,7 +1101,7 @@ PluginComponent {
 
                         StyledText {
                             width: parent.width
-                            text: "Historical Archive · Read only"
+                            text: I18n.trFor("trellisDms", "Historical Archive · Read only")
                             font.pixelSize: Theme.fontSizeMedium
                             font.weight: Font.DemiBold
                             color: Theme.surfaceText
@@ -888,7 +1110,7 @@ PluginComponent {
 
                         StyledText {
                             width: parent.width
-                            text: "Archived tasks are loaded on demand and never enter the live task list."
+                            text: I18n.trFor("trellisDms", "Archived tasks are loaded on demand and never enter the live task list.")
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
                             wrapMode: Text.WordWrap
@@ -897,7 +1119,7 @@ PluginComponent {
                         StyledText {
                             visible: root.archiveStatus === "loading"
                             width: parent.width
-                            text: "Loading archive index..."
+                            text: I18n.trFor("trellisDms", "Loading archive index...")
                             font.pixelSize: Theme.fontSizeMedium
                             color: Theme.surfaceVariantText
                             wrapMode: Text.WordWrap
@@ -907,8 +1129,8 @@ PluginComponent {
                             visible: root.archiveStatus === "empty"
                             width: parent.width
                             text: root.archiveSelectedMonth
-                                ? "No archived tasks are available on this page."
-                                : "This project has no archived task months."
+                                ? I18n.trFor("trellisDms", "No archived tasks are available on this page.")
+                                : I18n.trFor("trellisDms", "This project has no archived task months.")
                             font.pixelSize: Theme.fontSizeMedium
                             color: Theme.surfaceVariantText
                             wrapMode: Text.WordWrap
@@ -919,7 +1141,7 @@ PluginComponent {
                                 || root.archiveStatus === "unknown-layout"
                                 || root.archiveStatus === "stale"
                             width: parent.width
-                            text: root.archiveError
+                            text: root.localizedWarningMessage(root.archiveError)
                             font.pixelSize: Theme.fontSizeMedium
                             color: Theme.warning
                             wrapMode: Text.WordWrap
@@ -932,7 +1154,7 @@ PluginComponent {
 
                             StyledText {
                                 width: parent.width
-                                text: "Month"
+                                text: I18n.trFor("trellisDms", "Month")
                                 font.pixelSize: Theme.fontSizeSmall
                                 font.weight: Font.DemiBold
                                 color: Theme.surfaceVariantText
@@ -979,7 +1201,7 @@ PluginComponent {
                             DankButton {
                                 width: Math.min(112, archivePageControls.width)
                                 clip: true
-                                text: "Previous"
+                                text: I18n.trFor("trellisDms", "Previous")
                                 iconName: "chevron_left"
                                 buttonHeight: 40
                                 enabled: root.archivePage > 0
@@ -991,7 +1213,8 @@ PluginComponent {
                             StyledText {
                                 height: 40
                                 verticalAlignment: Text.AlignVCenter
-                                text: "Page " + (root.archivePage + 1)
+                                text: I18n.trFor("trellisDms", "Page %1")
+                                    .arg(root.archivePage + 1)
                                 font.pixelSize: Theme.fontSizeSmall
                                 color: Theme.surfaceVariantText
                             }
@@ -999,7 +1222,7 @@ PluginComponent {
                             DankButton {
                                 width: Math.min(96, archivePageControls.width)
                                 clip: true
-                                text: "Next"
+                                text: I18n.trFor("trellisDms", "Next")
                                 iconName: "chevron_right"
                                 buttonHeight: 40
                                 enabled: root.archiveHasMore
@@ -1054,7 +1277,8 @@ PluginComponent {
 
                                     StyledText {
                                         width: parent.width
-                                        text: archiveTaskRow.modelData.storedStatus + " · "
+                                        text: root.localizedTaskState(
+                                                archiveTaskRow.modelData.storedStatus) + " · "
                                             + archiveTaskRow.modelData.priority + " · "
                                             + archiveTaskRow.modelData.month
                                         font.pixelSize: Theme.fontSizeSmall
@@ -1076,7 +1300,7 @@ PluginComponent {
                                     iconName: "description"
                                     iconColor: Theme.surfaceVariantText
                                     backgroundColor: "transparent"
-                                    tooltipText: "Open archived task details (read only)"
+                                    tooltipText: I18n.trFor("trellisDms", "Open archived task details (read only)")
                                     tooltipSide: "left"
                                     onClicked: root.openArchiveTask(archiveTaskRow.modelData)
                                 }
@@ -1095,7 +1319,8 @@ PluginComponent {
                                     required property var modelData
 
                                     width: parent.width
-                                    text: modelData.code + ": " + modelData.message
+                                    text: modelData.code + ": "
+                                        + root.localizedWarningMessage(modelData.message)
                                     font.pixelSize: Theme.fontSizeSmall
                                     color: Theme.warning
                                     wrapMode: Text.WordWrap
@@ -1108,7 +1333,7 @@ PluginComponent {
                         visible: !root.detailMode && !root.archiveMode
                             && !root.popoutProjection.ready
                         width: parent.width
-                        text: "Loading Trellis status..."
+                        text: I18n.trFor("trellisDms", "Loading Trellis status...")
                         font.pixelSize: Theme.fontSizeMedium
                         color: Theme.surfaceVariantText
                         wrapMode: Text.WordWrap
@@ -1118,7 +1343,7 @@ PluginComponent {
                         visible: !root.detailMode && !root.archiveMode
                             && root.preferenceStateWarning !== ""
                         width: parent.width
-                        text: root.preferenceStateWarning
+                        text: root.localizedWarningMessages(root.preferenceStateWarning)
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.warning
                         wrapMode: Text.WordWrap
@@ -1128,7 +1353,7 @@ PluginComponent {
                         visible: !root.detailMode && !root.archiveMode
                             && root.stateWarning !== ""
                         width: parent.width
-                        text: root.stateWarning
+                        text: root.localizedWarningMessage(root.stateWarning)
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.warning
                         wrapMode: Text.WordWrap
@@ -1142,10 +1367,10 @@ PluginComponent {
                         width: parent.width
                         text: root.popoutProjection.invalidPinnedTask
                             && root.popoutProjection.invalidSelectedProject
-                            ? "The saved pin and project filter are unavailable; showing the current live data."
+                            ? I18n.trFor("trellisDms", "The saved pin and project filter are unavailable; showing the current live data.")
                             : (root.popoutProjection.invalidPinnedTask
-                                ? "The saved pin is unavailable; showing the current primary task."
-                                : "The saved project filter is unavailable; showing all projects.")
+                                ? I18n.trFor("trellisDms", "The saved pin is unavailable; showing the current primary task.")
+                                : I18n.trFor("trellisDms", "The saved project filter is unavailable; showing all projects."))
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                         wrapMode: Text.WordWrap
@@ -1167,7 +1392,7 @@ PluginComponent {
                             DankButton {
                                 width: Math.min(120, recoveryActions.width)
                                 clip: true
-                                text: "Refresh"
+                                text: I18n.trFor("trellisDms", "Refresh")
                                 iconName: "refresh"
                                 buttonHeight: 40
                                 onClicked: root.requestRefresh()
@@ -1176,7 +1401,7 @@ PluginComponent {
                             DankButton {
                                 width: Math.min(120, recoveryActions.width)
                                 clip: true
-                                text: "Settings"
+                                text: I18n.trFor("trellisDms", "Settings")
                                 iconName: "settings"
                                 buttonHeight: 40
                                 onClicked: root.openPluginSettings()
@@ -1187,7 +1412,7 @@ PluginComponent {
                                     && root.popoutProjection.projectCount > 0
                                 width: Math.min(120, recoveryActions.width)
                                 clip: true
-                                text: "Archive"
+                                text: I18n.trFor("trellisDms", "Archive")
                                 iconName: "inventory_2"
                                 buttonHeight: 40
                                 onClicked: root.openArchive()
@@ -1197,7 +1422,7 @@ PluginComponent {
                         StyledText {
                             visible: root.refreshPending
                             width: parent.width
-                            text: "Refresh requested. Current data stays visible until a new coherent snapshot arrives."
+                            text: I18n.trFor("trellisDms", "Refresh requested. Current data stays visible until a new coherent snapshot arrives.")
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
                             wrapMode: Text.WordWrap
@@ -1206,7 +1431,7 @@ PluginComponent {
                         StyledText {
                             visible: root.recoveryActionWarning !== ""
                             width: parent.width
-                            text: root.recoveryActionWarning
+                            text: root.localizedWarningMessage(root.recoveryActionWarning)
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.warning
                             wrapMode: Text.WordWrap
@@ -1221,7 +1446,7 @@ PluginComponent {
                         spacing: Theme.spacingXS
 
                         StyledText {
-                            text: "Project filter"
+                            text: I18n.trFor("trellisDms", "Project filter")
                             font.pixelSize: Theme.fontSizeSmall
                             font.weight: Font.DemiBold
                             color: Theme.surfaceVariantText
@@ -1262,8 +1487,8 @@ PluginComponent {
                         StyledText {
                             visible: root.popoutProjection.hiddenProjectOptionCount > 0
                             width: parent.width
-                            text: "+" + root.popoutProjection.hiddenProjectOptionCount
-                                + " more project filters are outside the visual limit"
+                            text: I18n.trFor("trellisDms", "%1 more project filters are outside the visual limit")
+                                .arg(root.popoutProjection.hiddenProjectOptionCount)
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
                             wrapMode: Text.WordWrap
@@ -1289,8 +1514,7 @@ PluginComponent {
 
                             StyledText {
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: root.popoutProjection.warningCount + " warning"
-                                    + (root.popoutProjection.warningCount === 1 ? "" : "s")
+                                text: root.warningCountLabel(root.popoutProjection.warningCount)
                                 font.pixelSize: Theme.fontSizeMedium
                                 font.weight: Font.DemiBold
                                 color: Theme.warning
@@ -1304,7 +1528,8 @@ PluginComponent {
                                 required property var modelData
 
                                 width: parent.width
-                                text: modelData.code + ": " + modelData.message
+                                text: modelData.code + ": "
+                                    + root.localizedWarningMessage(modelData.message)
                                 font.pixelSize: Theme.fontSizeSmall
                                 color: Theme.surfaceVariantText
                                 wrapMode: Text.WordWrap
@@ -1314,14 +1539,15 @@ PluginComponent {
                         StyledText {
                             visible: root.popoutProjection.hiddenWarningCount > 0
                             width: parent.width
-                            text: "+" + root.popoutProjection.hiddenWarningCount + " more warnings"
+                            text: I18n.trFor("trellisDms", "%1 more warnings")
+                                .arg(root.popoutProjection.hiddenWarningCount)
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
                         }
 
                         StyledText {
                             width: parent.width
-                            text: "Rescan from Settings after correcting the path or file."
+                            text: I18n.trFor("trellisDms", "Rescan from Settings after correcting the path or file.")
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
                             wrapMode: Text.WordWrap
@@ -1340,7 +1566,7 @@ PluginComponent {
                             && root.popoutProjection.projectCount === 0
                             && root.popoutProjection.unconfigured
                         width: parent.width
-                        text: "Add a trusted scan folder in Trellis DMS Settings."
+                        text: I18n.trFor("trellisDms", "Add a trusted scan folder in Trellis DMS Settings.")
                         font.pixelSize: Theme.fontSizeMedium
                         color: Theme.surfaceVariantText
                         wrapMode: Text.WordWrap
@@ -1352,7 +1578,7 @@ PluginComponent {
                             && root.popoutProjection.projectCount === 0
                             && !root.popoutProjection.unconfigured
                         width: parent.width
-                        text: "No Trellis projects were found under the trusted scan folders."
+                        text: I18n.trFor("trellisDms", "No Trellis projects were found under the trusted scan folders.")
                         font.pixelSize: Theme.fontSizeMedium
                         color: Theme.surfaceVariantText
                         wrapMode: Text.WordWrap
@@ -1397,7 +1623,7 @@ PluginComponent {
                                         parent.width * 0.35)
                                     text: projectSection.modelData.version
                                         ? projectSection.modelData.version
-                                        : "Version unknown"
+                                        : I18n.trFor("trellisDms", "Version unknown")
                                     font.pixelSize: Theme.fontSizeSmall
                                     color: Theme.surfaceVariantText
                                     wrapMode: Text.NoWrap
@@ -1416,7 +1642,8 @@ PluginComponent {
                                     iconColor: Theme.surfaceVariantText
                                     backgroundColor: "transparent"
                                     tooltipText: projectSection.modelData.collapsed
-                                        ? "Expand project" : "Collapse project"
+                                        ? I18n.trFor("trellisDms", "Expand project")
+                                        : I18n.trFor("trellisDms", "Collapse project")
                                     tooltipSide: "left"
                                     onClicked: root.toggleProjectCollapsed(
                                         projectSection.modelData.id)
@@ -1427,7 +1654,7 @@ PluginComponent {
                                 visible: projectSection.modelData.collapsed
                                 width: parent.width
                                 leftPadding: Theme.spacingM
-                                text: "Project collapsed."
+                                text: I18n.trFor("trellisDms", "Project collapsed.")
                                 font.pixelSize: Theme.fontSizeSmall
                                 color: Theme.surfaceVariantText
                             }
@@ -1436,7 +1663,7 @@ PluginComponent {
                                 visible: projectSection.modelData.groups.length === 0
                                 width: parent.width
                                 leftPadding: Theme.spacingM
-                                text: "No live tasks in this project."
+                                text: I18n.trFor("trellisDms", "No live tasks in this project.")
                                 font.pixelSize: Theme.fontSizeSmall
                                 color: Theme.surfaceVariantText
                             }
@@ -1469,7 +1696,7 @@ PluginComponent {
                                             anchors.rightMargin: Theme.spacingXS
                                             anchors.verticalCenter: parent.verticalCenter
                                             leftPadding: Theme.spacingM
-                                            text: taskGroup.modelData.label + " · "
+                                            text: root.localizedTaskGroup(taskGroup.modelData.key) + " · "
                                                 + taskGroup.modelData.taskCount
                                             font.pixelSize: Theme.fontSizeSmall
                                             font.weight: Font.DemiBold
@@ -1490,7 +1717,8 @@ PluginComponent {
                                             iconColor: Theme.surfaceVariantText
                                             backgroundColor: "transparent"
                                             tooltipText: taskGroup.modelData.collapsed
-                                                ? "Expand task group" : "Collapse task group"
+                                                ? I18n.trFor("trellisDms", "Expand task group")
+                                                : I18n.trFor("trellisDms", "Collapse task group")
                                             tooltipSide: "left"
                                             onClicked: root.toggleTaskGroupCollapsed(
                                                 projectSection.modelData.id,
@@ -1551,14 +1779,11 @@ PluginComponent {
 
                                                 StyledText {
                                                     width: parent.width
-                                                    text: taskRow.modelData.state + " · "
+                                                    text: root.localizedTaskState(taskRow.modelData.state) + " · "
                                                         + taskRow.modelData.priority
                                                         + (taskRow.modelData.activeSessionCount > 0
                                                             ? " · "
-                                                                + taskRow.modelData.activeSessionCount
-                                                                + " session"
-                                                                + (taskRow.modelData.activeSessionCount
-                                                                    === 1 ? "" : "s")
+                                                                + root.sessionCountLabel(taskRow.modelData.activeSessionCount)
                                                             : "")
                                                     font.pixelSize: Theme.fontSizeSmall
                                                     color: taskRow.modelData.state === "error"
@@ -1570,8 +1795,8 @@ PluginComponent {
                                                 StyledText {
                                                     visible: taskRow.modelData.progress !== null
                                                     width: parent.width
-                                                    text: "Progress "
-                                                        + Math.round(taskRow.modelData.progress) + "%"
+                                                    text: I18n.trFor("trellisDms", "Progress %1%")
+                                                        .arg(Math.round(taskRow.modelData.progress))
                                                     font.pixelSize: Theme.fontSizeSmall
                                                     color: Theme.surfaceVariantText
                                                     wrapMode: Text.NoWrap
@@ -1581,7 +1806,7 @@ PluginComponent {
                                                 StyledText {
                                                     visible: taskRow.modelData.relationText !== ""
                                                     width: parent.width
-                                                    text: taskRow.modelData.relationText
+                                                    text: root.relationLabel(taskRow.modelData)
                                                     font.pixelSize: Theme.fontSizeSmall
                                                     color: Theme.surfaceVariantText
                                                     wrapMode: Text.NoWrap
@@ -1599,7 +1824,7 @@ PluginComponent {
                                                 iconName: "description"
                                                 iconColor: Theme.surfaceVariantText
                                                 backgroundColor: "transparent"
-                                                tooltipText: "Open task details"
+                                                tooltipText: I18n.trFor("trellisDms", "Open task details")
                                                 tooltipSide: "left"
                                                 onClicked: root.openTaskDetail(
                                                     projectSection.modelData.id,
@@ -1620,7 +1845,8 @@ PluginComponent {
                                                     ? Theme.primary : Theme.surfaceVariantText
                                                 backgroundColor: "transparent"
                                                 tooltipText: taskRow.modelData.pinned
-                                                    ? "Unpin task" : "Pin task"
+                                                    ? I18n.trFor("trellisDms", "Unpin task")
+                                                    : I18n.trFor("trellisDms", "Pin task")
                                                 tooltipSide: "left"
                                                 onClicked: root.togglePinnedTask(
                                                     projectSection.modelData.id,
@@ -1635,8 +1861,9 @@ PluginComponent {
                                             && taskGroup.modelData.hiddenTaskCount > 0
                                         width: parent.width
                                         leftPadding: Theme.spacingM
-                                        text: "+" + taskGroup.modelData.hiddenTaskCount
-                                            + " more in " + taskGroup.modelData.label
+                                        text: I18n.trFor("trellisDms", "%1 more in %2")
+                                            .arg(taskGroup.modelData.hiddenTaskCount)
+                                            .arg(root.localizedTaskGroup(taskGroup.modelData.key))
                                         font.pixelSize: Theme.fontSizeSmall
                                         color: Theme.surfaceVariantText
                                     }
@@ -1655,7 +1882,8 @@ PluginComponent {
                         visible: !root.detailMode && !root.archiveMode
                             && root.popoutProjection.hiddenProjectCount > 0
                         width: parent.width
-                        text: "+" + root.popoutProjection.hiddenProjectCount + " more projects"
+                        text: I18n.trFor("trellisDms", "%1 more projects")
+                            .arg(root.popoutProjection.hiddenProjectCount)
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                     }

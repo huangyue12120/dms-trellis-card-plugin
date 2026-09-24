@@ -3,6 +3,14 @@
 Every row is a normal modeled state. A compact projection may summarize it,
 but the Snapshot and popout keep the available facts.
 
+> v0.9.1 Desktop UI Gate approved 2026-09-24; desktop entries below are the
+> accepted implementation contract.
+
+> v0.9.2 interface labels follow DMS's active locale. The `zh_CN` plugin
+> catalog is used when available; untranslated or unsupported-locale strings
+> fall back to the English source. Trellis names, titles, paths, Markdown,
+> IDs, and unknown status values remain unchanged.
+
 | State | Pill projection | Popout projection | User action / recovery |
 |---|---|---|---|
 | Startup before first Snapshot | Trellis icon; no fabricated counts | `Loading Trellis status...` | Wait; no focus movement |
@@ -44,6 +52,46 @@ but the Snapshot and popout keep the available facts.
 | Restore defaults | `auto`/safe visibility defaults | Known UI State is removed individually; remembered-project cache is not a reset target | Add trusted folders again if discovery is intentionally empty |
 | Root removed from settings | Recompute from remaining roots | Removed-root projects disappear after scan | Re-add only if trusted |
 | Remembered project no longer found | Never used as live data | Absent from successful replacement cache | Re-add valid root or leave removed |
+
+### Desktop surface (v0.9.1 approved UI Gate)
+
+| State | Desktop projection |
+|---|---|
+| Startup before first Snapshot | Loading copy; no fabricated counts |
+| No trusted roots | Unconfigured guidance plus warning summary |
+| Trusted roots, no project found | Empty-discovery copy plus warning summary |
+| Project has live tasks but no active task | Project/live-task counts and `No active session-backed tasks` |
+| Active task/session | Project section and every active task title/session count in Snapshot order |
+| Warning with healthy data | Preserve project/task facts; show up to three bounded warning details |
+| More than three visible warnings | Show total count, three details, and `+N more warnings` |
+| Degraded scan with last-good Snapshot | Preserve last-good project/task facts and add a bounded degraded warning |
+| Narrow or short widget | One vertical scroll region; elide names and wrap explanatory/warning copy |
+
+The desktop surface is a read-only projection of the shared Snapshot. It adds
+no progress, archive body, activity claim, project filter, or task action.
+
+### Launcher surface (v0.9.3 approved UI Gate)
+
+| State | Launcher result / action |
+|---|---|
+| `!trellis` with empty query | Project results only, in Snapshot order |
+| Query matches project names or live task titles | Case-insensitive substring results; project-name matches first, then task-title matches in Snapshot order |
+| More than 20 matches | Show 20 results and one non-action `N more matches; refine your search` item |
+| Non-empty query with no match | Let DMS show its normal no-results state |
+| No valid Snapshot | Bounded loading item; selecting requests the existing popout when a bar widget is present |
+| No trusted roots / no discovered projects | Corresponding guidance item; selecting requests the existing popout when available |
+| Healthy Snapshot with warnings | Keep matching results; warning details remain in the popout |
+| Select a project | Save its `selectedProjectId`, preserve the current pin, then request the popout |
+| Select a task | Revalidate current IDs, save its project filter and project-qualified pin, then request the popout |
+| Stale or malformed result | No State update and no popout request |
+| State API unavailable | Keep results searchable; selection makes no State or popout change |
+| No bar widget | Keep valid saved selection; popout request returns false without claiming it opened |
+| Launcher disabled | Remove `components.launcher` and root `trigger`; other surfaces remain available |
+
+Search matches project names and live task titles only. It does not search
+paths, IDs, comments, Markdown, warnings, or archive entries. The approved
+implementation contract is in
+`.trellis/tasks/09-24-dms-v093-launcher-registry/launcher-ui-gate.md`.
 
 ## Priority rules
 

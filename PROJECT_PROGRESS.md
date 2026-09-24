@@ -1079,7 +1079,7 @@
 
 ## 版本目标
 
-在 P0/P1 RC 稳定后，按项增加 desktop、i18n、launcher/registry 或可选 Agent activity 能力；每项都必须独立设计、可关闭、可降级，不改变 Trellis-only 核心。
+在 P0/P1 RC 稳定后，按项实现 Desktop、DMS locale 和 Launcher 本地 registry readiness；每项都必须独立设计、可关闭、可降级，不改变 Trellis-only 核心。Agent activity 本版只做可行性评估；Control Center 延期。
 
 ## 该版本细分 tasks
 
@@ -1153,11 +1153,11 @@
 - 依赖 v0.6 UI contract 和 v0.8 状态矩阵；可与 0.9.1 并行。
 - 不完成时不阻塞 v1.0；必须在 release notes 中说明支持语言。
 
-### task 0.9.3：Launcher / Control Center / Registry（可选）
+### task 0.9.3：Launcher / Registry readiness（可选；Control Center 延期）
 
 #### 任务目标
 
-评估并按需提供 `!trellis` launcher、Control Center 入口或 DMS plugin registry 发布。
+提供经批准的 `!trellis` Launcher，只做只读搜索与导航；准备本地 DMS plugin registry metadata，不在本 task 发布。
 
 #### 设计原则
 
@@ -1168,7 +1168,7 @@
 #### 要求实现
 
 - 明确批准的 surface、trigger、搜索字段和空/错误状态。
-- 若发布 registry，补齐 manifest、截图/说明、版本和兼容声明。
+- 准备本地 manifest、安装/禁用说明、版本和兼容声明；registry 要求的截图/外部材料留待另行审查。
 - 验证 feature disabled 时核心 plugin 行为不变。
 
 #### 不要实现
@@ -1186,7 +1186,7 @@
 #### 实现边界、前后 task 依赖
 
 - 依赖 v0.8 RC 和新增 surface 的 UI Gate；与 0.9.1/0.9.2 松耦合。
-- registry 发布属于外部发布动作，须单独确认，不作为 v1.0 本地稳定性的必要条件。
+- Control Center 和实际 registry 发布不在本版范围内；外部发布须单独确认，不作为 v1.0 本地稳定性的必要条件。
 
 ### task 0.9.4：Agent Activity Provider 可行性评估（独立、可选）
 
@@ -1222,6 +1222,15 @@
 
 - 依赖 v0.8 RC、v0.1.3 P2 边界和新一轮 UI Gate；与 0.9.1～0.9.3 独立。
 - 该 task 的评估结果进入 post-v1 backlog；只有另行批准才进入后续版本，不阻塞 v1.0。
+
+## v0.9 实施状态（2026-09-24）
+
+- [x] v0.9.1 Desktop 已实现：只消费共享 Snapshot，单列滚动展示所有 loaded projects 与 active task 摘要，最多展示 3 条 warning 详情并报告余量；默认尺寸 200×200、最小 180×160。`requires_dms` 的兼容下限提升至 `>=1.6.2`，权限集合不变。静态投影/manifest 检查通过；桌面摆放、resize、多屏和禁用后的真实 DMS 行为仍待目标 host 验证。
+- [x] v0.9.2 i18n 已实现：plugin-owned UI labels 使用 DMS `I18n.trFor`，随 DMS active locale 加载 `zh_CN` catalog；英文源文案提供 fallback。项目名、task title、路径、Markdown、ID 和未知状态保持原值。231 个 literal source 与 catalog 一一对应，所有 `%1`/`%2` 占位符匹配；真实 locale 切换与中英文布局仍待 DMS host 验证。
+- [x] v0.9.3 Launcher 与本地 registry readiness 已实现：`!trellis` 空查询列项目，非空查询只匹配项目名和 live task 标题，最多 20 个匹配并显示溢出提示；项目选择只更新 project filter，任务选择更新项目限定 pin 并请求现有 popout。Manifest 保留 `>=1.6.2` 和现有权限，并声明 `0.9.0` 包版本。安装、禁用和回滚说明已写入本地文档；未发布外部 registry。Launcher 搜索、State 保存、popout 和多 surface reload 仍待目标 DMS host 验证。
+- [x] v0.9.4 Agent Activity Provider 评估已完成并归档；由于 daemon 部署、协议兼容、reconnect 与 task mapping 证据不足，建议延期，不安装 daemon/hooks、不改 agent 配置、不采集 prompt 或工具 I/O。
+- [ ] v0.9 Desktop、locale 和 Launcher 的真实 DMS 1.6.2 运行态验证仍未完成；本地静态结果不代表 QML load、UI layout、locale reload、popout 或 State restart persistence 已通过。
+- [ ] Control Center 延期；外部 registry metadata review、截图准备和发布均待后续单独确认。
 
 # v1.0（稳定发布）
 

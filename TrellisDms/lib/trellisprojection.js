@@ -4,6 +4,7 @@ var DISPLAY_MODES = ["auto", "task", "project", "counts", "icon", "full"];
 var MAX_POPOUT_PROJECTS = 8;
 var MAX_POPOUT_TASKS_PER_PROJECT = 12;
 var MAX_POPOUT_WARNINGS = 8;
+var MAX_DESKTOP_WARNINGS = 3;
 var MAX_PROJECT_FILTER_OPTIONS = 32;
 var MAX_PROJECT_FILTER_LABEL_LENGTH = 10;
 var MAX_PREFERENCE_ID_LENGTH = 1024;
@@ -16,6 +17,9 @@ var MAX_TASK_PRIORITY_LENGTH = 24;
 var MAX_COLLAPSED_PROJECTS = 32;
 var MAX_COLLAPSED_GROUPS = 128;
 var MAX_COLLAPSED_TOKEN_LENGTH = 1024;
+var MAX_LAUNCHER_RESULTS = 20;
+var MAX_LAUNCHER_QUERY_LENGTH = 256;
+var MAX_LAUNCHER_ACTION_LENGTH = 4096;
 var ARCHIVE_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 var TASK_GROUPS = [
     { key: "active", label: "Active" },
@@ -683,4 +687,317 @@ function makePopoutProjection(snapshot, limits, uiState) {
         warnings: warnings,
         hiddenWarningCount: Math.max(0, visibleWarnings.length - warningLimit)
     };
+}
+
+function makeDesktopProjection(snapshot, uiState) {
+    var facts = _snapshotFacts(snapshot);
+    var state = normalizeUiState(uiState);
+    var projects = [];
+
+    for (var i = 0; i < facts.projects.length; i++) {
+        var sourceProject = facts.projects[i] || {};
+        var sourceTasks = _array(sourceProject.tasks);
+        var activeTasks = [];
+        for (var t = 0; t < sourceTasks.length; t++) {
+            var sourceTask = sourceTasks[t] || {};
+            if (sourceTask.runtimeState !== "active")
+                continue;
+            activeTasks.push({
+                id: _string(sourceTask.id),
+                title: _string(sourceTask.title, "unknown").slice(0, MAX_TASK_TITLE_LENGTH),
+                activeSessionCount: _number(sourceTask.activeSessionCount)
+            });
+        }
+        projects.push({
+            id: _string(sourceProject.id),
+            name: _string(sourceProject.name, "unknown").slice(0, MAX_PROJECT_NAME_LENGTH),
+            taskCount: sourceTasks.length,
+            activeTaskCount: activeTasks.length,
+            activeTasks: activeTasks
+        });
+    }
+
+    var unconfigured = false;
+    var degraded = false;
+    var degradedWarningIndex = -1;
+    for (var c = 0; c < facts.warnings.length; c++) {
+        var sourceWarning = facts.warnings[c] || {};
+        if (sourceWarning.code === "root_empty")
+            unconfigured = true;
+        if (DEGRADED_WARNING_CODES.indexOf(sourceWarning.code) !== -1) {
+            degraded = true;
+        }
+    }
+
+    var visibleWarnings = _visibleWarnings(facts.warnings, state.versionWarning);
+    for (var d = 0; d < visibleWarnings.length; d++) {
+        if (DEGRADED_WARNING_CODES.indexOf(
+                (visibleWarnings[d] || {}).code) !== -1) {
+            degradedWarningIndex = d;
+            break;
+        }
+    }
+
+    var warnings = [];
+    if (degradedWarningIndex !== -1) {
+        var degradedWarning = visibleWarnings[degradedWarningIndex] || {};
+        warnings.push({
+            code: _string(degradedWarning.code, "warning").slice(0, 48),
+            message: _string(degradedWarning.message, "Warning").slice(0, 240)
+        });
+    }
+    for (var w = 0; w < visibleWarnings.length
+            && warnings.length < MAX_DESKTOP_WARNINGS; w++) {
+        if (w === degradedWarningIndex)
+            continue;
+        var warning = visibleWarnings[w] || {};
+        warnings.push({
+            code: _string(warning.code, "warning").slice(0, 48),
+            message: _string(warning.message, "Warning").slice(0, 240)
+        });
+    }
+
+    return {
+        ready: facts.ready,
+        projectCount: facts.projectCount,
+        unconfigured: unconfigured,
+        degraded: degraded,
+        projects: projects,
+        warningCount: visibleWarnings.length,
+        warnings: warnings,
+        hiddenWarningCount: Math.max(0, visibleWarnings.length - warnings.length)
+    };
+}
+
+function _launcherText(value, fallback, maximum) {
+    var text = typeof value === "string" ? value : "";
+    text = text.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+    if (!text)
+        text = fallback || "";
+    if (text.length > maximum)
+        text = text.slice(0, Math.max(0, maximum - 1)) + "…";
+    return text;
+}
+
+function _launcherId(value) {
+    var id = _preferenceId(value);
+    return id && !/[\u0000-\u001f\u007f]/.test(id) ? id : "";
+}
+
+function _launcherAction(kind, projectId, taskId) {
+    var action;
+    if (kind === "project")
+        action = { type: kind, projectId: projectId };
+    else if (kind === "task")
+        action = { type: kind, projectId: projectId, taskId: taskId };
+    else
+        action = { type: "info", reason: kind };
+    var encoded = JSON.stringify(action);
+    return encoded.length <= MAX_LAUNCHER_ACTION_LENGTH ? encoded : "";
+}
+
+function _launcherProjectResult(project) {
+    project = project || {};
+    var projectId = _launcherId(project.id);
+    if (!projectId)
+        return null;
+    var tasks = _array(project.tasks);
+    var activeTaskCount = 0;
+    for (var i = 0; i < tasks.length; i++) {
+        if (tasks[i] && tasks[i].runtimeState === "active")
+            activeTaskCount += 1;
+    }
+    return {
+        kind: "project",
+        name: _launcherText(project.name, "unknown", MAX_PROJECT_NAME_LENGTH),
+        projectId: projectId,
+        activeTaskCount: activeTaskCount,
+        taskCount: tasks.length,
+        action: _launcherAction("project", projectId, "")
+    };
+}
+
+function _launcherTaskResult(project, task) {
+    project = project || {};
+    task = task || {};
+    var projectId = _launcherId(project.id);
+    var taskId = _launcherId(task.id);
+    if (!projectId || !taskId)
+        return null;
+    var runtimeState = _string(task.runtimeState, "inactive");
+    var state = runtimeState === "error"
+        ? "error" : _string(task.displayState, _string(task.storedStatus, "unknown"));
+    return {
+        kind: "task",
+        name: _launcherText(task.title, "unknown", MAX_TASK_TITLE_LENGTH),
+        projectName: _launcherText(project.name, "unknown", MAX_PROJECT_NAME_LENGTH),
+        state: _launcherText(state, "unknown", MAX_TASK_STATE_LENGTH),
+        activeSessionCount: _number(task.activeSessionCount),
+        projectId: projectId,
+        taskId: taskId,
+        action: _launcherAction("task", projectId, taskId)
+    };
+}
+
+function _launcherInfoResult(reason) {
+    return {
+        kind: "info",
+        reason: reason,
+        action: _launcherAction(reason, "", "")
+    };
+}
+
+function _hasRootEmptyWarning(warnings) {
+    for (var i = 0; i < warnings.length; i++) {
+        if (warnings[i] && warnings[i].code === "root_empty")
+            return true;
+    }
+    return false;
+}
+
+function makeLauncherProjection(snapshot, query) {
+    var facts = _snapshotFacts(snapshot);
+    if (!facts.ready) {
+        return {
+            ready: false,
+            items: [_launcherInfoResult("loading")],
+            overflowCount: 0
+        };
+    }
+
+    if (!facts.projects.length) {
+        var emptyReason = _hasRootEmptyWarning(facts.warnings)
+            ? "unconfigured" : "no_projects";
+        return {
+            ready: true,
+            items: [_launcherInfoResult(emptyReason)],
+            overflowCount: 0
+        };
+    }
+
+    var normalizedQuery = typeof query === "string"
+        ? query.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().toLowerCase()
+        : "";
+    if (normalizedQuery.length > MAX_LAUNCHER_QUERY_LENGTH) {
+        return { ready: true, items: [], overflowCount: 0 };
+    }
+
+    var matches = [];
+    var matchCount = 0;
+    function addMatch(result) {
+        if (!result || !result.action)
+            return;
+        matchCount += 1;
+        if (matches.length < MAX_LAUNCHER_RESULTS)
+            matches.push(result);
+    }
+
+    for (var p = 0; p < facts.projects.length; p++) {
+        var project = facts.projects[p] || {};
+        var projectName = _launcherText(project.name, "unknown", MAX_PROJECT_NAME_LENGTH);
+        if (!normalizedQuery || projectName.toLowerCase().indexOf(normalizedQuery) !== -1)
+            addMatch(_launcherProjectResult(project));
+    }
+
+    if (normalizedQuery) {
+        for (var projectIndex = 0; projectIndex < facts.projects.length; projectIndex++) {
+            var taskProject = facts.projects[projectIndex] || {};
+            var tasks = _array(taskProject.tasks);
+            for (var t = 0; t < tasks.length; t++) {
+                var task = tasks[t] || {};
+                var taskTitle = _launcherText(task.title, "unknown", MAX_TASK_TITLE_LENGTH);
+                if (taskTitle.toLowerCase().indexOf(normalizedQuery) !== -1)
+                    addMatch(_launcherTaskResult(taskProject, task));
+            }
+        }
+    }
+
+    var overflowCount = Math.max(0, matchCount - matches.length);
+    if (overflowCount) {
+        matches.push({
+            kind: "overflow",
+            hiddenCount: overflowCount,
+            action: ""
+        });
+    }
+    return {
+        ready: true,
+        items: matches,
+        overflowCount: overflowCount
+    };
+}
+
+function _findUniqueProject(projects, projectId) {
+    var found = null;
+    for (var i = 0; i < projects.length; i++) {
+        if (_launcherId(projects[i] && projects[i].id) !== projectId)
+            continue;
+        if (found)
+            return null;
+        found = projects[i];
+    }
+    return found;
+}
+
+function _findUniqueTask(project, taskId) {
+    var tasks = _array(project && project.tasks);
+    var found = null;
+    for (var i = 0; i < tasks.length; i++) {
+        if (_launcherId(tasks[i] && tasks[i].id) !== taskId)
+            continue;
+        if (found)
+            return null;
+        found = tasks[i];
+    }
+    return found;
+}
+
+function resolveLauncherAction(snapshot, encodedAction) {
+    if (typeof encodedAction !== "string" || !encodedAction
+            || encodedAction.length > MAX_LAUNCHER_ACTION_LENGTH)
+        return null;
+    var action;
+    try {
+        action = JSON.parse(encodedAction);
+    } catch (error) {
+        return null;
+    }
+    if (!action || typeof action !== "object" || Array.isArray(action)
+            || typeof action.type !== "string")
+        return null;
+
+    var facts = _snapshotFacts(snapshot);
+    if (action.type === "info") {
+        if (!facts.ready && action.reason === "loading")
+            return { kind: "info" };
+        if (facts.ready && !facts.projects.length) {
+            var unconfigured = _hasRootEmptyWarning(facts.warnings);
+            if ((unconfigured && action.reason === "unconfigured")
+                    || (!unconfigured && action.reason === "no_projects"))
+                return { kind: "info" };
+        }
+        return null;
+    }
+    if (!facts.ready)
+        return null;
+
+    var projectId = _launcherId(action.projectId);
+    if (!projectId || action.projectId !== projectId)
+        return null;
+    var project = _findUniqueProject(facts.projects, projectId);
+    if (!project)
+        return null;
+
+    if (action.type === "project")
+        return { kind: "project", projectId: projectId };
+    if (action.type !== "task")
+        return null;
+
+    var taskId = _launcherId(action.taskId);
+    if (!taskId || action.taskId !== taskId || !_findUniqueTask(project, taskId))
+        return null;
+    var pinnedTaskId = makePinnedTaskToken(projectId, taskId);
+    return pinnedTaskId
+        ? { kind: "task", projectId: projectId, taskId: taskId, pinnedTaskId: pinnedTaskId }
+        : null;
 }

@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Desktop remains a projection of the daemon's single Snapshot."}
+{"file": ".trellis/spec/frontend/state-matrix-contract.md", "reason": "Pure projection must preserve Snapshot semantics and bounded states."}
+{"file": ".trellis/tasks/09-24-dms-v09-optional-p2/research/v09-platform-apis.md", "reason": "DesktopPluginComponent lifecycle, size, and placement API evidence."}
+{"file": "docs/ui-ux-spec.md", "reason": "Reuse the existing DMS visual, accessibility, motion, and responsive direction."}
