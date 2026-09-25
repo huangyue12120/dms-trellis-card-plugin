@@ -64,7 +64,7 @@ remain **UNVERIFIED**:
 | Markdown/archive lazy loading and degraded/error recovery | UNVERIFIED |
 | Desktop placement/resize/scroll/disable | UNVERIFIED |
 | zh_CN ↔ English locale reload, fallback and layout | UNVERIFIED |
-| `!trellis` empty/query/no-match, project/task selection, popout and State persistence | **FAIL (Launcher load)** — the journal reports `TrellisLauncher.qml:150:5: PluginGlobalVar is not a type`; search/selection/State behavior remains untested. |
+| `!trellis` empty/query/no-match, project/task selection, popout and State persistence | **UNVERIFIED (latest fix)** — the last host run failed before the `Item`-root correction with `TrellisLauncher.qml:151:5: Cannot assign to non-existent default property`; search/selection/State behavior remains untested. |
 | One-daemon/shared-Snapshot behavior across retained surfaces and reload | UNVERIFIED |
 
 ### Observed host failure
@@ -72,15 +72,18 @@ remain **UNVERIFIED**:
 - **Evidence class:** independently observed host journal.
 - **Environment:** DMS 1.6.2, Quickshell 0.3.1; the user copied the candidate
   to `~/.config/DankMaterialShell/plugins/TrellisDms` and restarted DMS.
-- **Result:** DMS reports `component error trellisDms launcher` at
-  `TrellisLauncher.qml:150:5`: `PluginGlobalVar is not a type`. The installed
-  time of failure, before this correction, all 13 installed files matched the
-  then-current repository byte-for-byte, ruling out a partial copy for that
-  run. The failure was in the candidate QML imports. DMS exposes
-  `PluginGlobalVar.qml` from `qs.Widgets`; the Launcher
-  omitted that import. A focused fix was made under the v0.9.3 Launcher task.
-  Launcher host acceptance must be rerun after the corrected file is
-  copied; this failure remains open until then.
+- **Result:** The first DMS 1.6.2 attempt (12:42:42) reported
+  `TrellisLauncher.qml:150:5: PluginGlobalVar is not a type`; the installed
+  tree matched the repository at the time, and the missing `qs.Widgets` import
+  was fixed under the v0.9.3 Launcher task. After the user copied that change,
+  the installed file matched the repository and the import was present. DMS
+  then reported `TrellisLauncher.qml:151:5: Cannot assign to non-existent
+  default property` at 12:59:38 and subsequent attempts. At the time of this
+  second failure, the Launcher root was `QtObject`, which cannot contain
+  `PluginGlobalVar` as a child. The source has since been changed to an `Item`
+  root with a regression assertion under the v0.9.3 task. The latest root fix
+  still needs to be copied and retested; no host result for that fix is
+  recorded, so Launcher acceptance remains open.
 
 The installed CLI versions alone do not prove UI, IPC, persistence, timing, or
 lifecycle behavior. The prior v0.8 user-reported checks remain attributed to
