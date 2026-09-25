@@ -5,7 +5,7 @@
 ## 路线图使用约定
 
 - `v0` 是规划与事实冻结阶段；`v0.x` 是可迭代的开发预览；`v1.0` 是 P0/P1 稳定发布版本。
-- 每个版本的所有 task 都通过验收后，才允许进入下一个版本；同一版本内的 task 按“依赖”一节的顺序执行。
+- task 依赖定义实现顺序；进入后续版本不等于此前所有运行态门槛已通过，发布只按下方有来源的证据关闭门槛。
 - P0/P1 始终是只读 Trellis observer：只消费 `.trellis/` 产生的数据，不修改 Trellis 数据，不安装 Agent hooks，不依赖 trellis-card 或额外 daemon。
 - `progress` 固定为 `number | null`。没有经版本验证的权威进度来源时，不显示或计算虚构百分比。
 - 采集只在 composite 的 daemon 中发生；bar widget、popout、desktop 等 surface 只消费同一份 snapshot。
@@ -18,12 +18,15 @@
 - 当前 release-candidate 基线：Fedora 44、Wayland、niri 26.04、DMS 1.6.2、Quickshell 0.3.1、Qt 6.11.2、Trellis 0.6.17；v0.8 目标版本由用户确认改为 DMS 1.6.2。
 - 已确认安全路径、session pointer、多 session、progress 语义和 Linux `codeIsland-dms` 参考边界。
 - `v0` 的 1 个 task 与 `v0.1` 的 3 个 task 已完成并归档；v0.2 已完成静态 composite 骨架实现。
-- v0.2 的实时 DMS IPC、reload、多屏/multi-bar 行为仍需在 DMS 运行环境中验收；当前实现不提前声称这些运行态检查通过。
+- v0.2 目前有静态 composite 骨架；共享 Snapshot 生命周期、实时 DMS IPC、reload 和多屏/multi-bar 行为仍需在 DMS 运行环境中验收，静态实现不代表这些运行态检查通过。
+- v0.3 parser/resolver 与完整 session 保留有后续 fixture/path 测试证据；primary selection 由 v0.6 确定性矩阵覆盖。这些证据不替代实时 watcher 或 DMS 生命周期验收。
 - v0.4 的 watcher、拓扑刷新、错误恢复和资源上限代码已完成静态/纯测试基线。
 - v0.5 的 UI/UX Gate、紧凑 pill、最小只读 popout、受控多 root 发现与 project 记忆已完成静态实现；`plugin.json` 已更新为 `0.5.0`。
 - v0.6 的 project-qualified primary/pin、live task 分组、项目筛选、降级恢复和响应式适配已完成；发布清单区分了已通过的纯/静态/offscreen 门槛与仍待真实 Wayland/DMS restart 验证的门槛。
 - v0.7 的按需 Markdown 详情、只读 archive 浏览与懒加载、Settings/State 迁移和恢复流程已完成；发布清单区分了已通过的契约/静态门槛与仍待真实 Wayland/DMS host 验证的门槛。
-- v0.4 的 live DMS watcher 延迟、reload/hot-reload、多 widget/多屏和目录拓扑运行态仍未验证；在可用 DMS/QML 环境前不将 v0.4 发布门槛标记为通过。
+- v0.4 的精确 watcher 延迟仍未验证；v0.8 用户报告覆盖 topology、reload 和 multi-widget/multi-screen 的部分运行态检查，但本会话未独立复跑且无逐项日志或精确延迟数据。资源上限是实现边界，不是实测性能，因此 v0.4 发布门槛仍未关闭。
+- v0.8 core RC 有归档的 fixture/static 证据和用户报告的 DMS 1.6.2 核心检查；该运行态证据未由本会话独立复跑，性能/精确延迟仍未测量。
+- v0.9 Desktop、locale 与 Launcher 已作为可选项实现并纳入本地候选；相应 DMS host 检查仍待 task 1.0.2。
 
 # v0（规划基线与范围冻结）
 
@@ -1234,6 +1237,10 @@
 
 # v1.0（稳定发布）
 
+## 当前候选状态（2026-09-25）
+
+本地冻结候选为 `1.0.0`，目标 DMS 为 `>=1.6.2`，权限保持现有集合；Desktop、zh_CN 和 `!trellis` Launcher 仍是可选候选项。task 1.0.2 的最终验收尚未完成：v0.2 共享 Snapshot 生命周期、v0.4 精确 watcher 延迟以及独立确认的 topology 行为、v0.9 三个 surface 的 host 检查仍待验证。v0.8 用户报告覆盖部分核心 DMS 检查并有 fixture/static 证据支持；性能限制未实测。本地候选不代表最终发布就绪。
+
 ## 版本目标
 
 发布经过目标环境验证的稳定 Trellis DMS plugin：P0/P1 只读 observer 行为、数据安全、响应式 UI、设置与错误恢复均有可追溯验收；P2 功能若未独立完成则明确保持关闭或延期。
@@ -1291,6 +1298,8 @@
 
 - 复跑全状态矩阵、path-safety、watcher/topology、Markdown/archive、settings 和性能检查。
 - 在 Fedora 44 + Wayland + niri + DMS 1.6.2 验证多 bar/multi-display（若环境可用）、popout、reload 和禁用清理。
+- 分别验收保留的可选项：Desktop 的加载、摆放、resize 与禁用后核心不回归；zh_CN 的 locale 切换、重载、文案覆盖和英文 fallback；Launcher 的空/无匹配搜索、项目/任务选择、popout、State 持久化和多 surface reload。逐项记录证据等级与结果。
+- 单项失败时仅从候选包移除该项：Desktop 移除 `components.desktop` 与 `desktop-widget` capability；zh_CN 从候选包移除 `translations/zh_CN.json` 并保留英文源文案；Launcher 移除 `components.launcher`、根级 `trigger` 与 `launcher` capability。注明延期项并重跑 P0/P1 核心验收。
 - 检查 v1.0 默认不需要 trellis-card、CodeIsland daemon、Agent hooks、网络或 Trellis 写权限。
 
 #### 不要实现
@@ -1304,6 +1313,7 @@
 - P0：pill、project discovery、完整 task/session snapshot、更新、设置、empty/error 降级全部通过。
 - P1：项目筛选、live task、父子/priority/session count、Markdown detail、archive、性能全部通过。
 - `progress` 无权威来源时始终为 `null`/不显示百分比；安全路径矩阵全部通过；shell 不因坏数据退出。
+- 每个纳入包的可选项均有对应 host 证据；失败项按上文单独关闭或延期，英文与 P0/P1 核心 fallback 可用，且剩余核心验收通过。
 
 #### 实现边界、前后 task 依赖
 
@@ -1347,13 +1357,13 @@
 
 ## v1.0 发布门槛总表
 
-- [ ] v0.1 的环境、数据模型、progress、path-safety、P2 边界证据已归档。
-- [ ] v0.2 composite daemon/widget 生命周期和单一 snapshot 已通过。
-- [ ] v0.3 parser、multi-session、primary policy 和 safe resolver 已通过。
-- [ ] v0.4 watcher、topology rescan、错误恢复、资源上限和 idle 性能已通过。
+- [x] v0.1 环境、数据模型、progress、path-safety 与 P2 边界研究已归档；这是研究证据，不表示 host runtime 通过。
+- [ ] v0.2 共享 Snapshot 生命周期及实时 DMS IPC/reload/multi-surface 验收；现有 evidence 仅支持静态 composite 骨架。
+- [x] v0.3 parser/resolver 与完整 multi-session 保留由后续确定性 fixture/path tests 覆盖；primary policy 由 v0.6 矩阵覆盖，不据此推断实时 DMS 行为。
+- [ ] v0.4 watcher latency、topology rescan 和错误恢复的 runtime gate；v0.8 用户报告覆盖部分 topology/reload/multi-screen 检查但未独立复跑；精确延迟、idle 性能与资源峰值未测。
 - [x] v0.5 UI/UX Design Gate 已由用户确认。
 - [x] v0.6 pill/popout 已通过确定性 state-matrix、静态和 offscreen 门槛；真实 Wayland/DMS restart 限制已单列且未冒充通过。
 - [x] v0.7 Markdown、archive、settings 和 empty/error recovery 已通过契约/静态门槛；真实 Wayland/DMS host gates 按上方状态单列，未冒充运行态通过。
-- [ ] v0.8 目标环境 RC、安全和性能回归已通过。
-- [ ] v0.9 的未完成 P2 项已明确关闭/延期，且不成为核心启动依赖。
+- [ ] v0.8 fixture/static 核心矩阵与安全证据已归档，DMS 1.6.2 核心 RC 检查有用户报告；本会话未独立复跑，性能/精确延迟未测，因此包含性能回归的完整 RC 门槛仍未关闭。
+- [ ] v0.9 Desktop、locale 和 Launcher 的 DMS host 检查仍待 task 1.0.2；届时逐项通过或关闭/延期，且不成为核心启动依赖。
 - [ ] v1.0 文档、权限、禁用/回滚路径和已知限制与实际行为一致。

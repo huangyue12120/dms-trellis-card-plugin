@@ -292,7 +292,7 @@ PluginSettings {
 
     StyledText {
         width: parent.width
-        text: I18n.trFor("trellisDms", "Trellis DMS v0.9")
+        text: I18n.trFor("trellisDms", "Trellis DMS v1.0")
         font.pixelSize: Theme.fontSizeLarge
         font.weight: Font.Bold
         color: Theme.surfaceText
