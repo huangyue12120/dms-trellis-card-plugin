@@ -803,14 +803,16 @@ assert.match(daemonSource, /Component\.onDestruction:[\s\S]*?_destroyOwned\(\)/)
 assert.equal((daemonSource.match(/setGlobalVar\s*\(/g) || []).length, 1);
 assert.equal(manifest.components.daemon, "./TrellisDaemon.qml");
 assert.equal(manifest.components.widget, "./TrellisWidget.qml");
+assert.equal(manifest.components.desktop, "./TrellisDesktopWidget.qml");
+assert.equal(manifest.components.launcher, "./TrellisLauncher.qml");
 assert.equal(manifest.type, "composite");
-assert.deepEqual(Object.keys(manifest.components).sort(), ["daemon", "widget"]);
-assert.equal(manifest.requires_dms, ">=1.6.1");
+assert.deepEqual(Object.keys(manifest.components).sort(), ["daemon", "desktop", "launcher", "widget"]);
+assert.equal(manifest.requires_dms, ">=1.6.2");
 assert.deepEqual([...manifest.permissions].sort(), ["process", "settings_read", "settings_write"]);
 assert.equal(manifest.permissions.includes("network"), false);
-assert.equal(manifest.capabilities.includes("daemon"), true);
-assert.equal(manifest.version, "0.8.0",
-  "publish v0.8.0 only after the v0.8 RC gates pass");
+assert.deepEqual([...manifest.capabilities].sort(), ["daemon", "dankbar-widget", "desktop-widget", "launcher"]);
+assert.equal(manifest.version, "1.0.0",
+  "the frozen v1.0 candidate must report its stable package version");
 assert.match(widgetSource, /varName:\s*"snapshot"/);
 assert.match(widgetSource, /readonly property var snapshot:\s*snapshotVar\.value/);
 assert.match(widgetSource, /visible:\s*root\.pillProjection\.warningCount > 0/,
@@ -1028,7 +1030,7 @@ assert.match(widgetSource, /varName:\s*"detailResponse"/);
 assert.match(widgetSource, /detailRequestVar\.set\(\{[\s\S]*?kind:\s*"markdown"[\s\S]*?projectId:[\s\S]*?taskId:[\s\S]*?document:/);
 assert.match(widgetSource, /Text\.MarkdownText/);
 assert.match(widgetSource, /Text\.PlainText/);
-assert.match(widgetSource, /text:\s*"Back"/);
+assert.match(widgetSource, /text:\s*I18n\.trFor\("trellisDms",\s*"Back"\)/);
 for (const document of ["prd.md", "design.md", "implement.md"])
   assert.match(widgetSource, new RegExp(`document:\\s*"${document.replace(".", "\\.")}"`));
 assert.match(widgetSource, /id:\s*detailDocumentTabs[\s\S]*?Flow\s*\{|Flow\s*\{[\s\S]*?id:\s*detailDocumentTabs/);
@@ -1436,7 +1438,7 @@ const stateMatrixFixtures = [
       assert.match(archiveIndexSource, /archive_permission/);
       assert.match(archiveErrorFunction, /\)\.toString\(\)\.slice\(0, 160\)/);
       assert.match(widgetSource,
-        /visible:\s*root\.archiveStatus === "error"[\s\S]*?text:\s*root\.archiveError/);
+        /visible:\s*root\.archiveStatus === "error"[\s\S]*?text:\s*root\.localizedWarningMessage\(root\.archiveError\)/);
     }
   },
   {
@@ -1468,7 +1470,7 @@ const stateMatrixFixtures = [
       assert.match(detailObserverSource,
         /response\.status === "error"[\s\S]*?root\.detailError = message/);
       assert.match(widgetSource,
-        /visible:\s*root\.detailStatus === "error"[\s\S]*?text:\s*root\.detailError/);
+        /visible:\s*root\.detailStatus === "error"[\s\S]*?text:\s*root\.localizedWarningMessage\(root\.detailError\)/);
     }
   },
   {

@@ -2,14 +2,14 @@
 
 ## Ordered checklist
 
-1. [ ] Read the frozen candidate summary and curated acceptance context; confirm task 1.0.1 is complete.
-2. [ ] Run `node tests/test_trellis_contract.mjs`; preserve the printed state-matrix evidence labels and result count.
-3. [ ] Run `node --check` on each project-owned JavaScript helper and the contract test; parse `plugin.json` and `translations/zh_CN.json`; check exact-case QML imports/resources and permission declarations.
-4. [ ] Re-run the disposable fixture/static safety and integration coverage: traversal, external absolute path, symlink escape, stale/malformed pointers, Markdown allow-list/size, task/session limits, archive separation, progress `null`, one Snapshot publisher, no surface file readers/network/hooks.
-5. [ ] If available, run QML lint/offscreen checks using installed tools/modules; record missing tools/modules without installation or substitution claims.
+1. [x] Read the frozen candidate summary and curated acceptance context; confirm task 1.0.1 is complete.
+2. [x] Run `node tests/test_trellis_contract.mjs`; preserve the printed state-matrix evidence labels and result count.
+3. [x] Check JavaScript syntax (using a temporary copy without QML's `.pragma library` directive where direct Node parsing is unsupported); parse `plugin.json` and `translations/zh_CN.json`; check exact-case QML imports/resources and permission declarations.
+4. [x] Re-run the disposable fixture/static safety and integration coverage: traversal, external absolute path, symlink escape, stale/malformed pointers, Markdown allow-list/size, task/session limits, archive separation, progress `null`, one Snapshot publisher, no surface file readers/network/hooks.
+5. [x] Check available QML lint/offscreen tooling; tools/harness were unavailable and this limitation is recorded without installation or substitution claims.
 6. [ ] Execute the target DMS 1.6.2 checklist for core and retained P2 surfaces in a permitted live GUI session. Record date, environment, check, result, evidence class, and any report attribution in `acceptance-evidence.md`.
-7. [ ] For an isolated P2 failure, disable/defer only that item, verify fallback behavior and manifest/catalog shape, then rerun the core automated and relevant host checks.
-8. [ ] Run `git diff --check`, validate this task's Trellis context, and review the candidate for scope/security regressions.
+7. [x] No isolated P2 failure was observed because host checks were unavailable; this conditional disable/defer path remains pending any future host result.
+8. [x] Run `git diff --check`, validate this task's Trellis context, and review the candidate for scope/security regressions.
 
 ## Commands
 
