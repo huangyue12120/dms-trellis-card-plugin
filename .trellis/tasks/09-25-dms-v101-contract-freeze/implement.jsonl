@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Freeze the P0/P1 read-only, shared Snapshot, and resource boundaries."}
+{"file": ".trellis/spec/frontend/state-matrix-contract.md", "reason": "Keep schema, status, session, and progress semantics aligned with fixtures."}
+{"file": ".trellis/spec/frontend/settings-state-contract.md", "reason": "Preserve the existing Settings/State migration and reset boundaries."}
+{"file": ".trellis/tasks/09-25-dms-v10-stable-release/research/baseline-evidence.md", "reason": "Use archived v0.8 evidence and approved v0.9 scope as source facts."}
+{"file": ".trellis/tasks/09-24-dms-v09-optional-p2/research/v09-platform-apis.md", "reason": "Confirm candidate DMS 1.6.2 component and API declarations."}

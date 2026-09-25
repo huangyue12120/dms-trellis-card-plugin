@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Review contract changes against frontend safety and lifecycle rules."}
+{"file": ".trellis/spec/frontend/state-matrix-contract.md", "reason": "Review Snapshot and projection contract consistency."}
+{"file": ".trellis/tasks/09-25-dms-v10-stable-release/research/baseline-evidence.md", "reason": "Check claimed evidence classes and version baseline."}
+{"file": ".trellis/tasks/09-24-dms-v09-optional-p2/research/v09-platform-apis.md", "reason": "Check compatibility and optional surface declarations against local API research."}

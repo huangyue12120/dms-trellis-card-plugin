@@ -1,0 +1,9 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Review acceptance coverage against frontend quality and read-only rules."}
+{"file": ".trellis/spec/frontend/state-matrix-contract.md", "reason": "Check parser/Snapshot/projection evidence and nullable progress."}
+{"file": ".trellis/spec/frontend/recovery-responsive-contract.md", "reason": "Review failure, refresh, and host-evidence classifications."}
+{"file": ".trellis/spec/frontend/archive-browsing-contract.md", "reason": "Review lazy archive and live/archive boundary checks."}
+{"file": ".trellis/spec/frontend/markdown-detail-contract.md", "reason": "Review path/size/detail checks."}
+{"file": ".trellis/spec/frontend/launcher-projection-contract.md", "reason": "Review Launcher navigation and no-filesystem boundary."}
+{"file": ".trellis/spec/frontend/desktop-projection-contract.md", "reason": "Review shared-Snapshot and optional-disable behavior."}
+{"file": ".trellis/tasks/09-25-dms-v10-stable-release/research/baseline-evidence.md", "reason": "Check evidence source and host limitations."}
+{"file": ".trellis/tasks/09-24-dms-v09-optional-p2/research/v09-platform-apis.md", "reason": "Check host gate coverage for Desktop, locale, and Launcher."}

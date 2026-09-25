@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Keep user-facing safety and permission claims aligned with the existing contract."}
+{"file": ".trellis/tasks/09-25-dms-v10-stable-release/research/baseline-evidence.md", "reason": "Use evidence-backed package metadata, known limits, and version history."}
+{"file": ".trellis/tasks/09-24-dms-v09-optional-p2/research/v09-platform-apis.md", "reason": "Describe optional Desktop, locale, and Launcher using the verified host API baseline."}

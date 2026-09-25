@@ -1,0 +1,9 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Apply no surface-reader, read-only, bounded-input, and lifecycle gates."}
+{"file": ".trellis/spec/frontend/state-matrix-contract.md", "reason": "Run end-to-end parser-to-Snapshot-to-projection matrix."}
+{"file": ".trellis/spec/frontend/recovery-responsive-contract.md", "reason": "Check reload, errors, last-good, responsive recovery, and evidence boundaries."}
+{"file": ".trellis/spec/frontend/archive-browsing-contract.md", "reason": "Verify archive remains separate, bounded, and lazy."}
+{"file": ".trellis/spec/frontend/markdown-detail-contract.md", "reason": "Verify allow-listed Markdown reads and bounded detail behavior."}
+{"file": ".trellis/spec/frontend/launcher-projection-contract.md", "reason": "Check Launcher uses bounded shared-Snapshot projection and existing State."}
+{"file": ".trellis/spec/frontend/desktop-projection-contract.md", "reason": "Check Desktop reuses the shared Snapshot and follows the approved state contract."}
+{"file": ".trellis/tasks/09-25-dms-v10-stable-release/research/baseline-evidence.md", "reason": "Use prior static/user-reported evidence without upgrading its class."}
+{"file": ".trellis/tasks/09-24-dms-v09-optional-p2/research/v09-platform-apis.md", "reason": "Check retained optional surfaces against verified DMS 1.6.2 API contracts."}
