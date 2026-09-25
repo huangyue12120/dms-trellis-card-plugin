@@ -737,6 +737,7 @@ assert.match(pathsSource, /ARCHIVE_MONTH_PATTERN\s*=\s*\/\^\\d\{4\}-/);
 assert.doesNotMatch(pathsSource, /\.trellis\/archive/);
 const daemonSource = fs.readFileSync(path.join(repoRoot, "TrellisDms/TrellisDaemon.qml"), "utf8");
 const widgetSource = fs.readFileSync(path.join(repoRoot, "TrellisDms/TrellisWidget.qml"), "utf8");
+const launcherSource = fs.readFileSync(path.join(repoRoot, "TrellisDms/TrellisLauncher.qml"), "utf8");
 const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "TrellisDms/plugin.json"), "utf8"));
 const daemonLimits = {
   maxProjects: 32,
@@ -813,6 +814,8 @@ assert.equal(manifest.permissions.includes("network"), false);
 assert.deepEqual([...manifest.capabilities].sort(), ["daemon", "dankbar-widget", "desktop-widget", "launcher"]);
 assert.equal(manifest.version, "1.0.0",
   "the frozen v1.0 candidate must report its stable package version");
+assert.match(launcherSource, /^\s*import qs\.Widgets\s*$/m,
+  "Launcher must import DMS widgets, including PluginGlobalVar");
 assert.match(widgetSource, /varName:\s*"snapshot"/);
 assert.match(widgetSource, /readonly property var snapshot:\s*snapshotVar\.value/);
 assert.match(widgetSource, /visible:\s*root\.pillProjection\.warningCount > 0/,

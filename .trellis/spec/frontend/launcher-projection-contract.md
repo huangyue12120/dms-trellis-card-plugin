@@ -26,6 +26,10 @@ their project ID when converted to the existing `pinnedTaskId` token.
 - Read `PluginGlobalVar("snapshot")` from the parent component's `pluginId`;
   never scan files, create a process/watcher/timer/socket, or cache a separate
   Snapshot in the Launcher.
+- `PluginGlobalVar.qml` is supplied by DMS's `qs.Widgets` module. Any Launcher
+  component that instantiates it must include `import qs.Widgets`; without this
+  import, DMS cannot instantiate the Launcher and logs
+  `PluginGlobalVar is not a type`.
 - Empty query returns project rows only. A non-empty query matches project
   names first, then live task titles, using case-insensitive substring matching
   in Snapshot order. Do not search IDs, comments, paths, warnings, archive rows,
@@ -87,6 +91,8 @@ their project ID when converted to the existing `pinnedTaskId` token.
 - Host checks should inspect scorer ordering and exercise Launcher selection,
   popout/no-widget behavior, and multi-surface reload on DMS 1.6.2. These live
   checks remain distinct from pure/static verification.
+- The source contract test should assert that `TrellisLauncher.qml` imports
+  `qs.Widgets` whenever it uses `PluginGlobalVar`.
 
 ### 7. Wrong vs Correct
 
