@@ -64,7 +64,7 @@ remain **UNVERIFIED**:
 | Markdown/archive lazy loading and degraded/error recovery | UNVERIFIED |
 | Desktop placement/resize/scroll/disable | UNVERIFIED |
 | zh_CN ↔ English locale reload, fallback and layout | UNVERIFIED |
-| `!trellis` empty/query/no-match, project/task selection, popout and State persistence | **UNVERIFIED (latest fix)** — the last host run failed before the `Item`-root correction with `TrellisLauncher.qml:151:5: Cannot assign to non-existent default property`; search/selection/State behavior remains untested. |
+| `!trellis` empty/query/no-match, project/task selection, popout and State persistence | **UNVERIFIED (Launcher UI not invoked)** — latest startup logged the Trellis bar widget and daemon as loaded without a new component error, but `!trellis` was entered in zsh rather than the DMS Launcher search field. |
 | One-daemon/shared-Snapshot behavior across retained surfaces and reload | UNVERIFIED |
 
 ### Observed host failure
@@ -81,15 +81,20 @@ remain **UNVERIFIED**:
   default property` at 12:59:38 and subsequent attempts. At the time of this
   second failure, the Launcher root was `QtObject`, which cannot contain
   `PluginGlobalVar` as a child. The source has since been changed to an `Item`
-  root with a regression assertion under the v0.9.3 task. The latest root fix
-  still needs to be copied and retested; no host result for that fix is
-  recorded, so Launcher acceptance remains open.
+  root with a regression assertion under the v0.9.3 task. The user copied the
+  latest file; it matches the repository and uses `Item`. DMS restarted at
+  22:39:35; its journal reports the Trellis bar widget and daemon loaded and no
+  new component error through 22:39:42. The user's Niri binding opens DMS
+  Launcher with `Alt+Space`, but `!trellis` was entered in zsh, so actual
+  Launcher trigger/search, selection, State, and popout behavior remains
+  unverified.
 
 The installed CLI versions alone do not prove UI, IPC, persistence, timing, or
 lifecycle behavior. The prior v0.8 user-reported checks remain attributed to
-that report and do not cover all v0.9 surfaces. The Launcher load failure is
-the only newly observed P2 result; Desktop and zh_CN still need host checks.
-No performance value was measured.
+that report and do not cover all v0.9 surfaces. The initial Launcher load
+failures were traced to and fixed by the import and root changes; Launcher
+interaction remains unverified. Desktop and zh_CN still need host checks. No
+performance value was measured.
 
 ## Release gate status
 

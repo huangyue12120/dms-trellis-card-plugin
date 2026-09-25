@@ -3,7 +3,7 @@
   "name": "dms-v10-stable-release",
   "title": "DMS plugin v1.0 stable release",
   "description": "Freeze the P0/P1 Trellis DMS contract, complete final acceptance, and prepare accurate v1.0 release documentation.",
-  "status": "planning",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "huangyue12120",
   "assignee": "huangyue12120",
   "createdAt": "2026-09-25",
-  "completedAt": null,
+  "completedAt": "2026-09-25",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
@@ -26,5 +26,8 @@
   "parent": null,
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {
+    "statusAtArchiveRequest": "planning",
+    "archiveReason": "Administratively archived per user request on 2026-09-25; outstanding acceptance gates remain as recorded in task artifacts."
+  }
 }

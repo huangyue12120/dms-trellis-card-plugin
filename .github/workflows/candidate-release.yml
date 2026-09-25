@@ -1,0 +1,96 @@
+name: Candidate release
+
+on:
+  push:
+    tags:
+      - 'v*-rc.*'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Verify version tag and main branch ancestry
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const manifest = JSON.parse(fs.readFileSync('TrellisDms/plugin.json', 'utf8'));
+          const tag = process.env.RELEASE_TAG;
+          if (!/^v\d+\.\d+\.\d+-rc\.\d+$/.test(tag)) {
+            throw new Error(`Expected a vMAJOR.MINOR.PATCH-rc.N tag; got ${tag}`);
+          }
+          const releaseVersion = tag.replace(/-rc\.\d+$/, '');
+          if (releaseVersion !== `v${manifest.version}`) {
+            throw new Error(`Tag ${tag} does not match manifest version ${manifest.version}`);
+          }
+          NODE
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          release_version="${RELEASE_TAG%%-rc.*}"
+          test -f "docs/releases/${release_version}-candidate.md"
+
+      - name: Run repository contract checks
+        run: node tests/test_trellis_contract.mjs
+
+      - name: Build distributable ZIP
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist/package
+          cp -R TrellisDms dist/package/TrellisDms
+          cp LICENSE README.md dist/package/
+          (cd dist/package && zip -qr "../trellis-dms-${RELEASE_TAG}.zip" TrellisDms LICENSE README.md)
+          unzip -Z1 "dist/trellis-dms-${RELEASE_TAG}.zip" | grep -Fx 'TrellisDms/plugin.json'
+          unzip -Z1 "dist/trellis-dms-${RELEASE_TAG}.zip" | grep -Fx 'LICENSE'
+
+      - name: Upload candidate package
+        uses: actions/upload-artifact@v7
+        with:
+          name: candidate-package
+          path: dist/trellis-dms-${{ github.ref_name }}.zip
+          if-no-files-found: error
+
+  create-github-prerelease:
+    needs: validate-and-package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release notes
+        uses: actions/checkout@v7
+
+      - name: Download candidate package
+        uses: actions/download-artifact@v8
+        with:
+          name: candidate-package
+          path: dist
+
+      - name: Create GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          release_version="${RELEASE_TAG%%-rc.*}"
+          gh release create "$RELEASE_TAG" \
+            "dist/trellis-dms-${RELEASE_TAG}.zip" \
+            --title "Trellis DMS ${RELEASE_TAG} candidate" \
+            --notes-file "docs/releases/${release_version}-candidate.md" \
+            --prerelease \
+            --verify-tag
