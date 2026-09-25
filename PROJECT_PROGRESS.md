@@ -26,7 +26,7 @@
 - v0.7 的按需 Markdown 详情、只读 archive 浏览与懒加载、Settings/State 迁移和恢复流程已完成；发布清单区分了已通过的契约/静态门槛与仍待真实 Wayland/DMS host 验证的门槛。
 - v0.4 的精确 watcher 延迟仍未验证；v0.8 用户报告覆盖 topology、reload 和 multi-widget/multi-screen 的部分运行态检查，但本会话未独立复跑且无逐项日志或精确延迟数据。资源上限是实现边界，不是实测性能，因此 v0.4 发布门槛仍未关闭。
 - v0.8 core RC 有归档的 fixture/static 证据和用户报告的 DMS 1.6.2 核心检查；该运行态证据未由本会话独立复跑，性能/精确延迟仍未测量。
-- v0.9 Desktop、locale 与 Launcher 已作为可选项实现并纳入本地候选；相应 DMS host 检查仍待 task 1.0.2。
+- v0.9 Desktop、locale 与 Launcher 已作为可选项实现并纳入本地候选；DMS 1.6.2 主机日志发现 Launcher 因缺少 `qs.Widgets` 导入而未能加载，v0.9.3 已补上导入和回归断言，修正版仍须复验；Desktop 和 locale host 检查也仍待完成。
 
 # v0（规划基线与范围冻结）
 
@@ -1365,5 +1365,5 @@
 - [x] v0.6 pill/popout 已通过确定性 state-matrix、静态和 offscreen 门槛；真实 Wayland/DMS restart 限制已单列且未冒充通过。
 - [x] v0.7 Markdown、archive、settings 和 empty/error recovery 已通过契约/静态门槛；真实 Wayland/DMS host gates 按上方状态单列，未冒充运行态通过。
 - [ ] v0.8 fixture/static 核心矩阵与安全证据已归档，DMS 1.6.2 核心 RC 检查有用户报告；本会话未独立复跑，性能/精确延迟未测，因此包含性能回归的完整 RC 门槛仍未关闭。
-- [ ] v0.9 Desktop、locale 和 Launcher 的 DMS host 检查仍待 task 1.0.2；届时逐项通过或关闭/延期，且不成为核心启动依赖。
+- [ ] v0.9 Desktop、locale 和 Launcher 的 DMS host 检查仍待 task 1.0.2；Launcher 首次加载失败已定位并修复为缺少 `qs.Widgets` 导入，需复制修正版并复验，其他项逐项通过或关闭/延期，且不成为核心启动依赖。
 - [ ] v1.0 文档、权限、禁用/回滚路径和已知限制与实际行为一致。

@@ -50,9 +50,11 @@ The main session verified these executable-reported versions on 2026-09-25:
 | `qtpaths6 --query QT_VERSION` | Qt 6.11.2 | Installed Qt version only |
 | `niri --version` | niri 26.04 | CLI version only |
 
-This session found no running `dms` or `quickshell` process. It did not launch,
-install, restart, or replace DMS or the plugin. Consequently, every live host
-row below remains **UNVERIFIED**:
+The initial static-check environment had no running `dms` or `quickshell`
+process and did not launch, install, restart, or replace DMS or the plugin. In
+a later user-run DMS 1.6.2 restart, this session inspected the host journal and
+observed one Launcher load failure documented below. Other live host rows
+remain **UNVERIFIED**:
 
 | Target-host check | Result |
 |---|---|
@@ -62,15 +64,29 @@ row below remains **UNVERIFIED**:
 | Markdown/archive lazy loading and degraded/error recovery | UNVERIFIED |
 | Desktop placement/resize/scroll/disable | UNVERIFIED |
 | zh_CN ↔ English locale reload, fallback and layout | UNVERIFIED |
-| `!trellis` empty/query/no-match, project/task selection, popout and State persistence | UNVERIFIED |
+| `!trellis` empty/query/no-match, project/task selection, popout and State persistence | **FAIL (Launcher load)** — the journal reports `TrellisLauncher.qml:150:5: PluginGlobalVar is not a type`; search/selection/State behavior remains untested. |
 | One-daemon/shared-Snapshot behavior across retained surfaces and reload | UNVERIFIED |
 
-The installed CLI versions do not prove a running graphical session or any UI,
-IPC, persistence, timing, or lifecycle behavior. The prior v0.8 user-reported
-checks remain attributed to that report and do not cover all v0.9 surfaces.
-No optional surface failed a host test in this session because none could be
-run; Desktop, zh_CN, and Launcher therefore remain in the candidate with their
-approved individual disable/defer paths. No performance value was measured.
+### Observed host failure
+
+- **Evidence class:** independently observed host journal.
+- **Environment:** DMS 1.6.2, Quickshell 0.3.1; the user copied the candidate
+  to `~/.config/DankMaterialShell/plugins/TrellisDms` and restarted DMS.
+- **Result:** DMS reports `component error trellisDms launcher` at
+  `TrellisLauncher.qml:150:5`: `PluginGlobalVar is not a type`. The installed
+  time of failure, before this correction, all 13 installed files matched the
+  then-current repository byte-for-byte, ruling out a partial copy for that
+  run. The failure was in the candidate QML imports. DMS exposes
+  `PluginGlobalVar.qml` from `qs.Widgets`; the Launcher
+  omitted that import. A focused fix was made under the v0.9.3 Launcher task.
+  Launcher host acceptance must be rerun after the corrected file is
+  copied; this failure remains open until then.
+
+The installed CLI versions alone do not prove UI, IPC, persistence, timing, or
+lifecycle behavior. The prior v0.8 user-reported checks remain attributed to
+that report and do not cover all v0.9 surfaces. The Launcher load failure is
+the only newly observed P2 result; Desktop and zh_CN still need host checks.
+No performance value was measured.
 
 ## Release gate status
 
@@ -81,6 +97,7 @@ approved individual disable/defer paths. No performance value was measured.
   surface; final release status must remain pending until host evidence is
   recorded or individual optional items are disabled/deferred and core host
   acceptance is completed.
-- **Scope:** no Trellis data, user configuration, installed plugin, DMS runtime,
-  external registry, Agent configuration, hook, or daemon was changed by these
-  checks.
+- **Scope:** the user manually copied the candidate and restarted DMS before
+  this log inspection. This session did not modify Trellis data, user
+  configuration, the installed plugin, DMS runtime, external registry, Agent
+  configuration, hooks, or daemon.
