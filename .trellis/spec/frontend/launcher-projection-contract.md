@@ -30,6 +30,10 @@ their project ID when converted to the existing `pinnedTaskId` token.
   component that instantiates it must include `import qs.Widgets`; without this
   import, DMS cannot instantiate the Launcher and logs
   `PluginGlobalVar is not a type`.
+- A Launcher that declares `PluginGlobalVar {}` as a child must use a QML root
+  with a default child property, such as `Item`. A `QtObject` root has no
+  default property and DMS fails component creation with
+  `Cannot assign to non-existent default property`.
 - Empty query returns project rows only. A non-empty query matches project
   names first, then live task titles, using case-insensitive substring matching
   in Snapshot order. Do not search IDs, comments, paths, warnings, archive rows,
@@ -93,6 +97,8 @@ their project ID when converted to the existing `pinnedTaskId` token.
   checks remain distinct from pure/static verification.
 - The source contract test should assert that `TrellisLauncher.qml` imports
   `qs.Widgets` whenever it uses `PluginGlobalVar`.
+- The source contract test should assert that the Launcher root is `Item` when
+  it declares `PluginGlobalVar` as a child.
 
 ### 7. Wrong vs Correct
 

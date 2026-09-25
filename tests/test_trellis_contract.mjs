@@ -814,6 +814,8 @@ assert.equal(manifest.permissions.includes("network"), false);
 assert.deepEqual([...manifest.capabilities].sort(), ["daemon", "dankbar-widget", "desktop-widget", "launcher"]);
 assert.equal(manifest.version, "1.0.0",
   "the frozen v1.0 candidate must report its stable package version");
+assert.match(launcherSource, /^Item\s*\{/m,
+  "Launcher must use an Item root so PluginGlobalVar can be a child");
 assert.match(launcherSource, /^\s*import qs\.Widgets\s*$/m,
   "Launcher must import DMS widgets, including PluginGlobalVar");
 assert.match(widgetSource, /varName:\s*"snapshot"/);

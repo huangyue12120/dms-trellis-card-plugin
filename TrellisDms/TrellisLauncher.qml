@@ -5,7 +5,7 @@ import qs.Widgets
 import qs.Modules.Plugins
 import "lib/trellisprojection.js" as TrellisProjection
 
-QtObject {
+Item {
     id: root
 
     property var pluginService: null
