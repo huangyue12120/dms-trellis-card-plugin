@@ -265,3 +265,39 @@ Published the v0.8.0 candidate after contract and task checks. User reported the
 ### Status
 
 [OK] **Completed**
+
+
+## Session 9: DMS v1.0 candidate release preparation
+<!-- trellis-session: v=2 fp=c41b226b5441d980 -->
+
+**Date**: 2026-09-25
+**Task**: DMS v1.0 candidate release preparation
+**Branch**: `codex/dms-plugin-v081-state-matrix`
+
+### Summary
+
+Added repository release documentation, MIT license and a tagged GitHub pre-release workflow; documented the verified DMS registry submission path. Archived all seven active tasks administratively while preserving their pre-archive status and open host gates.
+
+### Main Changes
+
+- Added README, MIT license, candidate release notes, and a v1.0.0-rc.N packaging/pre-release workflow.
+- Recorded the current DMS registry PR requirements and outstanding host acceptance, screenshot, and support metadata.
+- Archived seven active Trellis task records; archived task metadata retains prior statuses and does not claim host acceptance.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `416f3f7` | chore: prepare DMS candidate release and archive tasks |
+
+### Testing
+
+- [OK] git diff --cached --check passed; no test suites were run.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Fast-forward local main to the reviewed branch history and push main; later complete DMS host acceptance and prepare the required public registry screenshot before listing submission.
