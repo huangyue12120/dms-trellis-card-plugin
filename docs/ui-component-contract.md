@@ -142,8 +142,12 @@ makePopoutProjection(snapshot, limits?, uiState?)
 ### Desktop instance settings
 
 - DMS loads this component for plugin-wide Settings and for a desktop widget
-  instance. A non-empty `instanceId` selects the instance context; only that
-  view is created, with DMS's display picker and position/size reset actions.
+  instance. Resolve the effective instance ID from `instanceData.id` first,
+  then `instanceId`; identify instance context from either ID, present
+  `instanceData`, or DMS's instance-scoped `pluginService` (which lacks either
+  plugin State API). Only the instance view is created, with DMS's display picker
+  and position/size reset actions. If instance context exists but no ID is
+  available, show a diagnostic and disable the instance controls.
 - Display preferences use `instanceData.config.displayPreferences`, default to
   `["all"]`, and save through the desktop instance config API. Preferences are
   independent for each desktop placement.
@@ -174,8 +178,10 @@ Use `SelectionSetting` with visible labels:
 - The complete safety statement in `ui-ux-spec.md` is visible above the list.
 - The picker adds a localized `Computer` quick-access entry at `/`, so users
   can deliberately navigate to mount paths such as `/run/media` and `/mnt`.
-  Opening or browsing the picker does not change `scanRoots`; only selecting a
-  directory invokes the existing trusted-root validation and save path.
+  Inject the entry after the modal's lazy content is available, and copy the
+  `quickAccessLocations` model by its `length` and indexed entries. Opening or
+  browsing the picker does not change `scanRoots`; only selecting a directory
+  invokes the existing trusted-root validation and save path.
 - The filesystem-root shortcut does not automatically trust `/` or scan any
   mount. Users still explicitly select the concrete folder they want to trust.
 

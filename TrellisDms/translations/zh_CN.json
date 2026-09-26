@@ -691,5 +691,8 @@
     },
     "Trellis DMS v1.0": {
         "Trellis DMS v1.0": "Trellis DMS v1.0"
+    },
+    "Desktop widget instance ID is unavailable. Close and reopen these settings.": {
+        "Desktop widget instance ID is unavailable. Close and reopen these settings.": "无法获取桌面部件实例 ID。请关闭并重新打开此设置面板。"
     }
 }

@@ -35,10 +35,13 @@ Plugin-data settings are `pillMode`, `showProgress`, `showArchive`,
 Desktop instance settings use these DMS 1.6.2 fields and APIs:
 
 ```text
-instanceId: string -> non-empty in a desktop instance card
+instanceId: string -> DMS desktop instance ID when supplied
+instanceData.id: string -> DMS desktop instance ID in the settings loader
+effective desktop instance ID -> instanceData.id, then instanceId
+desktop instance context -> effective ID, instanceData, or scoped pluginService
 instanceData.config.displayPreferences -> preference records or ["all"]
-SettingsData.updateDesktopWidgetInstanceConfig(instanceId, updates)
-SessionData.desktopWidgetInstancePositions[instanceId][screenKey]
+SettingsData.updateDesktopWidgetInstanceConfig(effectiveInstanceId, updates)
+SessionData.desktopWidgetInstancePositions[effectiveInstanceId][screenKey]
   -> { x?, y?, width?, height? }
 SessionData.set("desktopWidgetInstancePositions", positionsByInstance)
 ```
@@ -65,17 +68,21 @@ SessionData.set("desktopWidgetInstancePositions", positionsByInstance)
   roots, removes only the five UI State keys, and never calls
   `clearPluginState` or targets `discoveredProjects`.
 - DMS 1.6.2 loads the manifest settings component in both plugin-wide Settings
-  and desktop instance cards. Declare `instanceId` and `instanceData`; use a
-  non-empty `instanceId` to activate only the instance view. The instance path
-  must not load or migrate global plugin settings, read or write DMS Plugin
-  State, or save display preferences through the instance-scoped
-  `pluginService` adapter.
+  and desktop instance cards. Declare `instanceId` and `instanceData`; derive
+  the effective instance ID from `instanceData.id` first and `instanceId`
+  second. Activate only the instance view for either that ID, present
+  `instanceData`, or the DMS instance-scoped `pluginService` adapter (which
+  lacks either global Plugin State API). The instance path must not load or
+  migrate global plugin settings, read or write DMS Plugin State, or save
+  display preferences through the instance-scoped `pluginService` adapter. If
+  instance context exists without an effective ID, show a diagnostic instead
+  of global settings or inert controls.
 - Desktop display preferences default to `instanceData.config.displayPreferences`
   or `["all"]` and persist with
-  `SettingsData.updateDesktopWidgetInstanceConfig(instanceId, { displayPreferences })`.
+  `SettingsData.updateDesktopWidgetInstanceConfig(effectiveInstanceId, { displayPreferences })`.
   Each instance has its own config.
 - DMS 1.6.2 desktop geometry is stored in
-  `SessionData.desktopWidgetInstancePositions[instanceId][screenKey]`, not in
+  `SessionData.desktopWidgetInstancePositions[effectiveInstanceId][screenKey]`, not in
   `instanceData.config.positions`. Reset Position removes only `x` and `y`;
   Reset Size removes only `width` and `height` across that instance's screen
   entries, then persists the updated map with `SessionData.set`. Preserve other
@@ -84,6 +91,12 @@ SessionData.set("desktopWidgetInstancePositions", positionsByInstance)
   or browsing it must not change `scanRoots`; only selecting a concrete
   directory calls the existing trusted-root validation and save path. This does
   not authorize or scan `/` automatically.
+- DMS 1.6.2 lazily creates the file-browser content when the modal opens.
+  Inject custom quick-access entries after the content is available and copy
+  its `property var` model using `length` and indexed reads; do not assume the
+  exposed QML list passes JavaScript `Array.isArray` checks. Schedule the
+  injection after the modal opens as well as after its content loads, and make
+  insertion idempotent.
 - A collapsed project/group uses an empty QML `Repeater.model`; setting
   `Repeater.visible` alone does not reliably remove sibling delegates or their
   layout contribution.
@@ -106,7 +119,8 @@ SessionData.set("desktopWidgetInstancePositions", positionsByInstance)
 | State removal API without a loaded cache | Prime with `loadPluginState` before removing keys |
 | Restore defaults | Remove only known UI keys; preserve unknown keys and do not call `clearPluginState` |
 | Explicit `scanRoots: []` after reset | Disable discovery; allow the daemon's normal empty-scan cache replacement |
-| Desktop settings component has a non-empty `instanceId` | Create instance controls only; leave plugin-data migration and plugin State untouched |
+| Desktop settings component has `instanceData`, an effective instance ID, or the instance-scoped `pluginService` | Create instance controls only; leave plugin-data migration and plugin State untouched |
+| Desktop instance context exists but no effective ID is available | Show an ID-unavailable diagnostic; do not show global settings or inert controls |
 | Desktop instance lacks `displayPreferences` | Show the all-displays default and persist a change only to that instance config |
 | Reset Position / Reset Size clicked | Remove only the matching geometry fields from this instance's SessionData map; preserve other dimensions and instances |
 | Picker opened or navigated to `/`, `/run/media`, or `/mnt` | Keep `scanRoots` unchanged until a concrete directory is selected |

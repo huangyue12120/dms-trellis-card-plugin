@@ -218,6 +218,22 @@ When a CLI auto-detects a mode by probing a remote resource (e.g., checking if `
 
 **Real-world example**: Agent-session update hints fetched npm `latest` metadata with `response.read(4096)` and then parsed it as complete JSON. The `@mindfoldhq/trellis` package metadata exceeded 4 KB, so the JSON was truncated, parse failed silently, and the first session injection showed no update hint. Fix: read the complete response before parsing, and add a regression where `version` is followed by an 8 KB metadata tail.
 
+### Mistake 5: Assuming a Host-Loaded QML Component Has Its Context
+
+**Bad**: Check that a host API exposes a property, then assume every Loader
+passes that property to the plugin root and that a child `property var` behaves
+like a plain JavaScript array.
+
+**Good**: Trace the manifest path through the host settings wrapper to the
+loaded root object. Record which properties the wrapper sets and when. For
+lazy content, update it only after the Loader has produced its item; treat
+QML `property var` collections through their documented `length` and indexed
+entries, and make mutations idempotent.
+
+**Rule**: Static source assertions establish code shape, not host integration.
+For host-loaded settings and dialogs, include a target-host check for what is
+actually visible and usable before marking the feature accepted.
+
 ---
 
 ## Cross-Platform Template Consistency

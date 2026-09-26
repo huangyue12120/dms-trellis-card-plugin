@@ -21,18 +21,29 @@ PluginSettings {
     property string settingsWarning: ""
     property int refreshRequestSerial: 0
     readonly property int maxScanRoots: 16
-    readonly property bool isDesktopInstance: typeof root.instanceId === "string"
-        && root.instanceId.length > 0
+    readonly property string desktopInstanceId: {
+        var dataInstanceId = root.instanceData?.id;
+        if (typeof dataInstanceId === "string" && dataInstanceId.length > 0)
+            return dataInstanceId;
+        return typeof root.instanceId === "string" ? root.instanceId : "";
+    }
+    readonly property bool isInstanceScopedPluginService: root.pluginService !== null
+        && root.pluginService !== undefined
+        && (typeof root.pluginService.loadPluginState !== "function"
+            || typeof root.pluginService.savePluginState !== "function")
+    readonly property bool isDesktopInstance: root.desktopInstanceId.length > 0
+        || (root.instanceData !== null && root.instanceData !== undefined)
+        || root.isInstanceScopedPluginService
     readonly property var pillModeSettingControl: globalSettingsLoader.item
         ? globalSettingsLoader.item.pillModeSettingControl : null
 
     function resetDesktopInstanceGeometry(resetPosition, resetSize) {
-        if (!root.isDesktopInstance || !root.instanceId)
+        if (!root.isDesktopInstance || !root.desktopInstanceId)
             return;
 
         var positionsByInstance = JSON.parse(JSON.stringify(
             SessionData.desktopWidgetInstancePositions || {}));
-        var instancePositions = positionsByInstance[root.instanceId];
+        var instancePositions = positionsByInstance[root.desktopInstanceId];
         if (!instancePositions)
             return;
 
@@ -54,7 +65,7 @@ PluginSettings {
         }
 
         if (Object.keys(instancePositions).length === 0)
-            delete positionsByInstance[root.instanceId];
+            delete positionsByInstance[root.desktopInstanceId];
         SessionData.set("desktopWidgetInstancePositions", positionsByInstance);
     }
 
@@ -373,19 +384,33 @@ PluginSettings {
 
                 function addFilesystemRootQuickAccess() {
                     var browser = trustedFolderPicker.content;
-                    if (!browser || !Array.isArray(browser.quickAccessLocations))
-                        return;
-                    var locations = browser.quickAccessLocations.slice();
-                    if (locations.some(function(location) {
-                        return location && location.path === "/";
-                    }))
-                        return;
+                    if (!browser)
+                        return false;
+
+                    var currentLocations = browser.quickAccessLocations;
+                    if (!currentLocations || typeof currentLocations.length !== "number")
+                        return false;
+
+                    var locations = [];
+                    for (var i = 0; i < currentLocations.length; i++) {
+                        var location = currentLocations[i];
+                        if (location && location.path === "/")
+                            return true;
+                        locations.push(location);
+                    }
                     locations.unshift({
                         name: I18n.tr("Computer", "file browser quick access location"),
                         path: "/",
                         icon: "computer"
                     });
                     browser.quickAccessLocations = locations;
+                    return true;
+                }
+
+                function scheduleFilesystemRootQuickAccess() {
+                    Qt.callLater(function() {
+                        globalSettingsView.addFilesystemRootQuickAccess();
+                    });
                 }
 
                 FileBrowserModal {
@@ -396,7 +421,14 @@ PluginSettings {
                     browserType: "generic"
                     folderMode: true
                     showHiddenFiles: true
-                    onContentChanged: globalSettingsView.addFilesystemRootQuickAccess()
+                    onContentChanged: {
+                        if (visible)
+                            globalSettingsView.scheduleFilesystemRootQuickAccess();
+                    }
+                    onVisibleChanged: {
+                        if (visible)
+                            globalSettingsView.scheduleFilesystemRootQuickAccess();
+                    }
                     onFileSelected: path => {
                         root.addScanRoot(path);
                         trustedFolderPicker.close();
@@ -651,20 +683,33 @@ PluginSettings {
                 width: parent.width
                 spacing: Theme.spacingM
 
+                StyledText {
+                    visible: !root.desktopInstanceId
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Desktop widget instance ID is unavailable. Close and reopen these settings.")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.warning
+                    wrapMode: Text.WordWrap
+                }
+
                 SettingsDisplayPicker {
+                    visible: root.desktopInstanceId.length > 0
                     displayPreferences: root.instanceData?.config?.displayPreferences ?? ["all"]
                     onPreferencesChanged: preferences => {
-                        if (!root.instanceId)
+                        if (!root.desktopInstanceId)
                             return;
-                        SettingsData.updateDesktopWidgetInstanceConfig(root.instanceId, {
+                        SettingsData.updateDesktopWidgetInstanceConfig(root.desktopInstanceId, {
                             displayPreferences: preferences
                         });
                     }
                 }
 
-                SettingsDivider {}
+                SettingsDivider {
+                    visible: root.desktopInstanceId.length > 0
+                }
 
                 Item {
+                    visible: root.desktopInstanceId.length > 0
                     width: parent.width
                     height: resetRow.height + Theme.spacingM * 2
 
