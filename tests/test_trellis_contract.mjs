@@ -736,6 +736,15 @@ assert.match(pathsSource, /resolveTaskDirectory\(projectRoot,\s*expected,\s*cano
 assert.match(pathsSource, /ARCHIVE_MONTH_PATTERN\s*=\s*\/\^\\d\{4\}-/);
 assert.doesNotMatch(pathsSource, /\.trellis\/archive/);
 const daemonSource = fs.readFileSync(path.join(repoRoot, "TrellisDms/TrellisDaemon.qml"), "utf8");
+const liveTaskDiscoverySource = sourceSection(daemonSource,
+  '_queueProcess(scan, ["find", tasksRoot, "-mindepth", "1", "-maxdepth", "1", "-type", "d", "!", "-name", "archive", "-print"]',
+  "var sessionsRoot = TrellisPaths.runtimeSessionsPath(project.root);");
+assert.match(liveTaskDiscoverySource,
+  /\["find",\s*tasksRoot,\s*"-mindepth",\s*"1",\s*"-maxdepth",\s*"1",\s*"-type",\s*"d",\s*"!",\s*"-name",\s*"archive",\s*"-print"\]/,
+  "live task enumeration must exclude the reserved direct archive directory before applying the task cap");
+assert.match(liveTaskDiscoverySource,
+  /for \(var i = 0; i < lines\.lines\.length; i\+\+\)\s+_discoverTask\(scan, project, lines\.lines\[i\]\);/,
+  "normal live task candidates must retain the existing discovery and path validation flow");
 const widgetSource = fs.readFileSync(path.join(repoRoot, "TrellisDms/TrellisWidget.qml"), "utf8");
 const launcherSource = fs.readFileSync(path.join(repoRoot, "TrellisDms/TrellisLauncher.qml"), "utf8");
 const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "TrellisDms/plugin.json"), "utf8"));
@@ -951,6 +960,25 @@ assert.doesNotMatch(daemonSource, /\.trellis\/archive/);
 assert.doesNotMatch(daemonSource, /\b(?:sh|bash)\s+-c\b/);
 assert.doesNotMatch(daemonSource, /\b(?:writeAdapter|setText|save\s*\()/);
 const settingsSource = fs.readFileSync(path.join(repoRoot, "TrellisDms/TrellisSettings.qml"), "utf8");
+assert.match(settingsSource, /property string instanceId:\s*""/);
+assert.match(settingsSource, /property var instanceData:\s*null/);
+assert.match(settingsSource, /readonly property bool isDesktopInstance/);
+assert.match(settingsSource, /active:\s*!root\.isDesktopInstance/);
+assert.match(settingsSource, /active:\s*root\.isDesktopInstance/);
+assert.match(settingsSource, /SettingsDisplayPicker\s*\{/);
+assert.match(settingsSource, /displayPreferences:\s*root\.instanceData\?\.config\?\.displayPreferences\s*\?\?\s*\["all"\]/);
+assert.match(settingsSource, /SettingsData\.updateDesktopWidgetInstanceConfig\(root\.instanceId,\s*\{\s*displayPreferences:\s*preferences/s);
+assert.equal((settingsSource.match(/text:\s*I18n\.tr\("Reset (?:Position|Size)"\)/g) || []).length, 2);
+assert.match(settingsSource, /function resetDesktopInstanceGeometry\(resetPosition, resetSize\)/);
+for (const field of ["x", "y", "width", "height"])
+  assert.match(settingsSource, new RegExp(`delete screenPosition\\.${field};`));
+assert.match(settingsSource, /SessionData\.set\("desktopWidgetInstancePositions",\s*positionsByInstance\)/);
+assert.match(settingsSource, /root\.resetDesktopInstanceGeometry\(true,\s*false\)/);
+assert.match(settingsSource, /root\.resetDesktopInstanceGeometry\(false,\s*true\)/);
+assert.match(settingsSource, /enabled:\s*!root\.isDesktopInstance && root\.pluginService !== null/);
+for (const functionName of ["savePluginSetting", "loadUiSettings", "restoreDefaults",
+  "loadDiscoveryData", "requestRefresh"])
+  assert.match(settingsSource, new RegExp(`function ${functionName}\\([^)]*\\)\\s*\\{\\s*if \\(root\\.isDesktopInstance\\)`));
 assert.match(settingsSource, /settingKey:\s*"pillMode"/);
 assert.match(settingsSource, /loadValue\("displayMode",\s*null\)/);
 assert.match(settingsSource, /settingKey:\s*"showProgress"/);
@@ -961,6 +989,13 @@ for (const mode of ["auto", "task", "project", "counts", "icon", "full"])
   assert.match(settingsSource, new RegExp(`value:\\s*"${mode}"`));
 assert.match(settingsSource, /FileBrowserModal\s*\{/);
 assert.match(settingsSource, /folderMode:\s*true/);
+assert.match(settingsSource, /onContentChanged:\s*globalSettingsView\.addFilesystemRootQuickAccess\(\)/);
+assert.match(settingsSource, /name:\s*I18n\.tr\("Computer",\s*"file browser quick access location"\)/);
+assert.match(settingsSource, /path:\s*"\/"/);
+assert.match(settingsSource, /onFileSelected:\s*path\s*=>\s*\{\s*root\.addScanRoot\(path\)/);
+const quickAccessFunction = settingsSource.match(
+  /function addFilesystemRootQuickAccess\(\)[\s\S]*?\n                }/)[0];
+assert.doesNotMatch(quickAccessFunction, /addScanRoot|saveScanRoots/);
 assert.match(settingsSource, /loadValue\("scanRoots",\s*null\)/);
 assert.match(settingsSource, /savePluginSetting\("scanRoots",\s*unique\)/);
 assert.match(settingsSource, /maxScanRoots:\s*16/);

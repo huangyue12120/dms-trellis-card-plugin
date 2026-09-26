@@ -3,10 +3,11 @@
 ## 1. Scope / Trigger
 
 This contract applies when changing `TrellisSettings.qml`, the widget's DMS
-State preferences, or the visibility settings that shape the live/archive UI.
-The settings surface owns plugin-data writes and trusted-root controls; the
-widget owns local projection state and key-scoped State I/O. Neither surface
-reads or writes Trellis files.
+State preferences, global-versus-instance settings, or the visibility settings
+that shape the live/archive UI. The settings surface owns plugin-data writes,
+trusted-root controls, and DMS desktop instance configuration; the widget owns
+local projection state and key-scoped State I/O. Neither surface reads or
+writes Trellis files.
 
 ## 2. Signatures
 
@@ -31,6 +32,17 @@ Plugin-data settings are `pillMode`, `showProgress`, `showArchive`,
 `refreshToken`. `displayMode` is a read-only migration source when
 `pillMode` is absent.
 
+Desktop instance settings use these DMS 1.6.2 fields and APIs:
+
+```text
+instanceId: string -> non-empty in a desktop instance card
+instanceData.config.displayPreferences -> preference records or ["all"]
+SettingsData.updateDesktopWidgetInstanceConfig(instanceId, updates)
+SessionData.desktopWidgetInstancePositions[instanceId][screenKey]
+  -> { x?, y?, width?, height? }
+SessionData.set("desktopWidgetInstancePositions", positionsByInstance)
+```
+
 ## 3. Contracts
 
 - `pillMode` accepts the six existing v0.6 values. A missing `pillMode` may
@@ -52,6 +64,26 @@ Plugin-data settings are `pillMode`, `showProgress`, `showArchive`,
 - Restore defaults checks `hasPermission`, resets known plugin-data settings and
   roots, removes only the five UI State keys, and never calls
   `clearPluginState` or targets `discoveredProjects`.
+- DMS 1.6.2 loads the manifest settings component in both plugin-wide Settings
+  and desktop instance cards. Declare `instanceId` and `instanceData`; use a
+  non-empty `instanceId` to activate only the instance view. The instance path
+  must not load or migrate global plugin settings, read or write DMS Plugin
+  State, or save display preferences through the instance-scoped
+  `pluginService` adapter.
+- Desktop display preferences default to `instanceData.config.displayPreferences`
+  or `["all"]` and persist with
+  `SettingsData.updateDesktopWidgetInstanceConfig(instanceId, { displayPreferences })`.
+  Each instance has its own config.
+- DMS 1.6.2 desktop geometry is stored in
+  `SessionData.desktopWidgetInstancePositions[instanceId][screenKey]`, not in
+  `instanceData.config.positions`. Reset Position removes only `x` and `y`;
+  Reset Size removes only `width` and `height` across that instance's screen
+  entries, then persists the updated map with `SessionData.set`. Preserve other
+  screen entries, geometry fields, and instance IDs.
+- The trusted-folder picker may expose `/` as a navigation shortcut. Opening
+  or browsing it must not change `scanRoots`; only selecting a concrete
+  directory calls the existing trusted-root validation and save path. This does
+  not authorize or scan `/` automatically.
 - A collapsed project/group uses an empty QML `Repeater.model`; setting
   `Repeater.visible` alone does not reliably remove sibling delegates or their
   layout contribution.
@@ -74,6 +106,10 @@ Plugin-data settings are `pillMode`, `showProgress`, `showArchive`,
 | State removal API without a loaded cache | Prime with `loadPluginState` before removing keys |
 | Restore defaults | Remove only known UI keys; preserve unknown keys and do not call `clearPluginState` |
 | Explicit `scanRoots: []` after reset | Disable discovery; allow the daemon's normal empty-scan cache replacement |
+| Desktop settings component has a non-empty `instanceId` | Create instance controls only; leave plugin-data migration and plugin State untouched |
+| Desktop instance lacks `displayPreferences` | Show the all-displays default and persist a change only to that instance config |
+| Reset Position / Reset Size clicked | Remove only the matching geometry fields from this instance's SessionData map; preserve other dimensions and instances |
+| Picker opened or navigated to `/`, `/run/media`, or `/mnt` | Keep `scanRoots` unchanged until a concrete directory is selected |
 
 ## 5. Good / Base / Bad Cases
 
@@ -85,6 +121,14 @@ Plugin-data settings are `pillMode`, `showProgress`, `showArchive`,
 - Bad: treating `displayMode` as authoritative when `pillMode` exists,
   fabricating progress from task status, clearing the whole State namespace,
   or leaving collapsed Repeater delegates in the layout is forbidden.
+- Good: a desktop instance updates only its own `displayPreferences`; its
+  position and size reset buttons remove only `x/y` or `width/height` from
+  DMS's per-instance SessionData map.
+- Base: an instance with no saved display preference shows `["all"]`; a reset
+  with no saved geometry leaves the default centered placement and size.
+- Bad: using the instance-scoped `pluginService` fallback for global migration,
+  writing `positions: {}` into instance config as a geometry reset, or adding
+  `/` to `scanRoots` just because the picker navigated there is forbidden.
 
 ## 6. Tests Required
 
@@ -92,7 +136,9 @@ Plugin-data settings are `pillMode`, `showProgress`, `showArchive`,
   defaults, progress null/number gating, warning filtering, and State caps.
 - Static QML assertions cover permission checks, cache priming, key-scoped
   save/remove, plugin State synchronization, restore-defaults scope, archive
-  visibility, and empty Repeater models.
+  visibility, and empty Repeater models. They also cover global-versus-instance
+  Loader gating, instance display preference writes, targeted geometry field
+  removal, and picker navigation without trusted-root mutation.
 - State-matrix fixtures cover empty roots, no projects, invalid State, healthy
   warnings, degraded refresh, archive/detail failure, and narrow responsive
   layout.
@@ -115,4 +161,17 @@ Repeater { visible: projectCollapsed; model: project.groups }
 pluginService.loadPluginState(pluginId, "pinnedTaskId", "")
 pluginService.removePluginStateKey(pluginId, "pinnedTaskId")
 Repeater { model: projectCollapsed ? [] : project.groups }
+```
+
+For desktop instance controls, write display preferences through the DMS
+instance config API and reset geometry in the SessionData map:
+
+```qml
+SettingsData.updateDesktopWidgetInstanceConfig(instanceId, {
+    displayPreferences: preferences
+})
+
+// After cloning desktopWidgetInstancePositions, remove only the selected fields
+// from this instance's screen records, then persist through the keyed setter.
+SessionData.set("desktopWidgetInstancePositions", positionsByInstance)
 ```

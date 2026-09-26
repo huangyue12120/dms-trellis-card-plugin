@@ -3,6 +3,7 @@ import qs.Common
 import qs.Modals.FileBrowser
 import qs.Widgets
 import qs.Modules.Plugins
+import qs.Modules.Settings.Widgets
 import "lib/trellisdiscovery.js" as TrellisDiscovery
 import "lib/trellisprojection.js" as TrellisProjection
 import "lib/trellisWatch.js" as TrellisWatch
@@ -12,12 +13,61 @@ PluginSettings {
 
     pluginId: "trellisDms"
 
+    property string instanceId: ""
+    property var instanceData: null
     property var scanRoots: []
     property var rememberedProjects: []
     property bool usingLegacyRoot: false
     property string settingsWarning: ""
     property int refreshRequestSerial: 0
     readonly property int maxScanRoots: 16
+    readonly property bool isDesktopInstance: typeof root.instanceId === "string"
+        && root.instanceId.length > 0
+    readonly property var pillModeSettingControl: globalSettingsLoader.item
+        ? globalSettingsLoader.item.pillModeSettingControl : null
+
+    function resetDesktopInstanceGeometry(resetPosition, resetSize) {
+        if (!root.isDesktopInstance || !root.instanceId)
+            return;
+
+        var positionsByInstance = JSON.parse(JSON.stringify(
+            SessionData.desktopWidgetInstancePositions || {}));
+        var instancePositions = positionsByInstance[root.instanceId];
+        if (!instancePositions)
+            return;
+
+        var screenKeys = Object.keys(instancePositions);
+        for (var i = 0; i < screenKeys.length; i++) {
+            var screenPosition = instancePositions[screenKeys[i]];
+            if (!screenPosition || typeof screenPosition !== "object")
+                continue;
+            if (resetPosition) {
+                delete screenPosition.x;
+                delete screenPosition.y;
+            }
+            if (resetSize) {
+                delete screenPosition.width;
+                delete screenPosition.height;
+            }
+            if (Object.keys(screenPosition).length === 0)
+                delete instancePositions[screenKeys[i]];
+        }
+
+        if (Object.keys(instancePositions).length === 0)
+            delete positionsByInstance[root.instanceId];
+        SessionData.set("desktopWidgetInstancePositions", positionsByInstance);
+    }
+
+    function loadVariants() {
+        if (root.isDesktopInstance || !root.pluginService
+                || typeof root.pluginService.getPluginVariants !== "function"
+                || !root.pluginId) {
+            root.variants = [];
+        } else {
+            root.variants = root.pluginService.getPluginVariants(root.pluginId);
+        }
+        root.syncVariantsToModel();
+    }
 
     function localizedSettingsWarning(value) {
         switch (value) {
@@ -40,6 +90,8 @@ PluginSettings {
     }
 
     function savePluginSetting(key, value) {
+        if (root.isDesktopInstance)
+            return false;
         if (!root.pluginService || !root.hasPermission
                 || typeof root.pluginService.savePluginData !== "function") {
             root.settingsWarning = "Plugin settings are unavailable; the local choice was not saved."
@@ -58,14 +110,20 @@ PluginSettings {
     }
 
     function loadUiSettings() {
+        if (root.isDesktopInstance)
+            return;
+        var settingsView = root.globalSettingsLoader.item;
+        if (!settingsView || !root.pillModeSettingControl)
+            return;
         if (!root.pluginService
                 || typeof root.pluginService.loadPluginData !== "function") {
-            pillModeSetting.value = "auto";
+            root.pillModeSettingControl.value = "auto";
             root.settingsWarning = "Plugin settings are unavailable; safe defaults remain active."
                 .slice(0, 180);
             return;
         }
         try {
+            settingsView.reloadChildValues();
             var previousWarning = root.settingsWarning;
             var storedPillMode = root.loadValue("pillMode", null);
             var legacyDisplayMode = root.loadValue("displayMode", null);
@@ -76,18 +134,20 @@ PluginSettings {
             if (storedPillMode === null || storedPillMode === undefined
                         || storedPillMode !== normalized)
                 savedPillMode = root.savePluginSetting("pillMode", normalized);
-            pillModeSetting.value = normalized;
+            root.pillModeSettingControl.value = normalized;
             if (savedPillMode && previousWarning.indexOf("unavailable") === -1
                     && previousWarning.indexOf("could not") === -1)
                 root.settingsWarning = "";
         } catch (error) {
-            pillModeSetting.value = "auto";
+            root.pillModeSettingControl.value = "auto";
             root.settingsWarning = "Plugin settings could not be loaded; safe local defaults remain active."
                 .slice(0, 180);
         }
     }
 
     function restoreDefaults() {
+        if (root.isDesktopInstance)
+            return;
         if (!root.pluginService || !root.pluginId || !root.hasPermission
                 || typeof root.pluginService.savePluginData !== "function") {
             root.settingsWarning = "Settings are unavailable or not writable; defaults could not be saved."
@@ -142,6 +202,8 @@ PluginSettings {
     }
 
     function loadDiscoveryData() {
+        if (root.isDesktopInstance)
+            return;
         if (!root.pluginService
                 || typeof root.pluginService.loadPluginData !== "function") {
             root.settingsWarning = "Plugin settings are unavailable; safe local defaults remain active."
@@ -190,6 +252,8 @@ PluginSettings {
     }
 
     function saveScanRoots(roots) {
+        if (root.isDesktopInstance)
+            return;
         var unique = [];
         var values = Array.isArray(roots) ? roots : [];
         for (var i = 0; i < values.length; i++) {
@@ -204,6 +268,8 @@ PluginSettings {
     }
 
     function addScanRoot(path) {
+        if (root.isDesktopInstance)
+            return;
         var value = typeof path === "string" ? path.trim() : "";
         if (!value)
             return;
@@ -217,6 +283,8 @@ PluginSettings {
     }
 
     function requestRefresh() {
+        if (root.isDesktopInstance)
+            return false;
         if (!root.pluginService || !root.hasPermission
                 || typeof root.pluginService.savePluginData !== "function") {
             root.settingsWarning = "Refresh is unavailable because plugin settings are not writable."
@@ -238,6 +306,8 @@ PluginSettings {
     }
 
     Component.onCompleted: Qt.callLater(function() {
+        if (root.isDesktopInstance || !root.pluginService)
+            return;
         root.loadDiscoveryData();
         root.loadUiSettings();
     })
@@ -246,6 +316,8 @@ PluginSettings {
         target: root
 
         function onPluginServiceChanged() {
+            if (root.isDesktopInstance || !root.pluginService)
+                return;
             Qt.callLater(root.loadDiscoveryData);
             Qt.callLater(root.loadUiSettings);
         }
@@ -253,7 +325,7 @@ PluginSettings {
 
     Connections {
         target: root.pluginService
-        enabled: root.pluginService !== null
+        enabled: !root.isDesktopInstance && root.pluginService !== null
 
         function onPluginStateChanged(changedPluginId) {
             if (changedPluginId !== root.pluginId)
@@ -269,258 +341,361 @@ PluginSettings {
         }
 
         function onPluginDataChanged(changedPluginId) {
-            if (changedPluginId === root.pluginId) {
+            if (!root.isDesktopInstance && changedPluginId === root.pluginId) {
                 root.loadDiscoveryData();
                 root.loadUiSettings();
             }
         }
     }
 
-    FileBrowserModal {
-        id: trustedFolderPicker
+    Loader {
+        id: globalSettingsLoader
 
-        browserTitle: I18n.trFor("trellisDms", "Select a trusted Trellis scan folder")
-        browserIcon: "folder_open"
-        browserType: "generic"
-        folderMode: true
-        showHiddenFiles: true
-        onFileSelected: path => {
-            root.addScanRoot(path);
-            trustedFolderPicker.close();
-        }
-    }
-
-    StyledText {
+        active: !root.isDesktopInstance
+        visible: !root.isDesktopInstance
         width: parent.width
-        text: I18n.trFor("trellisDms", "Trellis DMS v1.0")
-        font.pixelSize: Theme.fontSizeLarge
-        font.weight: Font.Bold
-        color: Theme.surfaceText
-    }
+        sourceComponent: Component {
+            Column {
+                id: globalSettingsView
 
-    StyledText {
-        width: parent.width
-        text: I18n.trFor("trellisDms", "The interface language follows DMS's active locale. Untranslated text uses the English source.")
-        font.pixelSize: Theme.fontSizeSmall
-        color: Theme.surfaceVariantText
-        wrapMode: Text.WordWrap
-    }
-
-    SelectionSetting {
-        id: pillModeSetting
-
-        settingKey: "pillMode"
-        label: I18n.trFor("trellisDms", "Bar display mode")
-        description: I18n.trFor("trellisDms", "Automatic shows the only active task when there is exactly one; otherwise it uses compact counts. Vertical bars always use icons.")
-        options: [
-            { label: I18n.trFor("trellisDms", "Automatic (recommended)"), value: "auto" },
-            { label: I18n.trFor("trellisDms", "Active task"), value: "task" },
-            { label: I18n.trFor("trellisDms", "Project"), value: "project" },
-            { label: I18n.trFor("trellisDms", "Compact counts"), value: "counts" },
-            { label: I18n.trFor("trellisDms", "Icon only"), value: "icon" },
-            { label: I18n.trFor("trellisDms", "Full text"), value: "full" }
-        ]
-        // The empty initial value prevents this child from overwriting a
-        // legacy displayMode before loadUiSettings performs the migration.
-        defaultValue: ""
-    }
-
-    ToggleSetting {
-        settingKey: "showProgress"
-        label: I18n.trFor("trellisDms", "Show numeric progress")
-        description: I18n.trFor("trellisDms", "Show a progress line only when the live Snapshot contains a real numeric value; no value is fabricated.")
-        defaultValue: true
-    }
-
-    ToggleSetting {
-        settingKey: "showArchive"
-        label: I18n.trFor("trellisDms", "Show archive entry")
-        description: I18n.trFor("trellisDms", "Expose the historical archive browser separately from live tasks. Archive data stays read-only and lazy.")
-        defaultValue: true
-    }
-
-    ToggleSetting {
-        settingKey: "versionWarning"
-        label: I18n.trFor("trellisDms", "Show Trellis version warnings")
-        description: I18n.trFor("trellisDms", "Hide only compatibility warning presentation; the daemon keeps the version fact and diagnostics.")
-        defaultValue: true
-    }
-
-    StyledText {
-        width: parent.width
-        text: I18n.trFor("trellisDms", "Trusted scan folders")
-        font.pixelSize: Theme.fontSizeMedium
-        font.weight: Font.Medium
-        color: Theme.surfaceText
-    }
-
-    StyledText {
-        width: parent.width
-        text: I18n.trFor("trellisDms", "Choose up to 16 folders you trust. Trellis DMS normally searches inside these folders, up to 4 levels deep, for .trellis projects. If the selected folder is a project, .trellis, .trellis/tasks, or a live task folder, it checks at most 8 parent candidates and automatically promotes that selection to its containing Trellis project, so sibling and new direct tasks appear on the next configured topology refresh or after a manual refresh with Refresh Trellis data now. A completely new project outside these trusted folders still needs a one-time addition of a containing trusted folder; DMS does not infer the current Codex task or working directory globally. It never selects your entire home, mounted drives, /, or /proc automatically; a broad folder is scanned only if you explicitly add it. It never writes to Trellis project files. Successfully discovered projects are remembered in DMS state and revalidated on later rescans.")
-        font.pixelSize: Theme.fontSizeSmall
-        color: Theme.surfaceVariantText
-        wrapMode: Text.WordWrap
-    }
-
-    StyledText {
-        visible: root.usingLegacyRoot
-        width: parent.width
-        text: I18n.trFor("trellisDms", "Your existing Project or scan root is still active. Adding or removing a folder migrates this setting to the trusted-folder list.")
-        font.pixelSize: Theme.fontSizeSmall
-        color: Theme.warning
-        wrapMode: Text.WordWrap
-    }
-
-    Column {
-        width: parent.width
-        spacing: Theme.spacingS
-
-        Repeater {
-            model: root.scanRoots
-
-            StyledRect {
-                required property int index
-                required property string modelData
+                property var pillModeSettingControl: pillModeSetting
 
                 width: parent.width
-                height: 48
-                radius: Theme.cornerRadius
-                color: Theme.withAlpha(Theme.surfaceContainerHigh, Theme.popupTransparency)
-                border.width: 0
+                spacing: Theme.spacingM
 
-                DankIcon {
-                    id: rootFolderIcon
+                function reloadChildValues() {
+                    for (var i = 0; i < children.length; i++) {
+                        var child = children[i];
+                        if (child !== pillModeSetting && child.loadValue)
+                            child.loadValue();
+                    }
+                }
 
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.spacingM
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: "folder"
-                    size: Theme.iconSize
-                    color: Theme.surfaceVariantText
+                function addFilesystemRootQuickAccess() {
+                    var browser = trustedFolderPicker.content;
+                    if (!browser || !Array.isArray(browser.quickAccessLocations))
+                        return;
+                    var locations = browser.quickAccessLocations.slice();
+                    if (locations.some(function(location) {
+                        return location && location.path === "/";
+                    }))
+                        return;
+                    locations.unshift({
+                        name: I18n.tr("Computer", "file browser quick access location"),
+                        path: "/",
+                        icon: "computer"
+                    });
+                    browser.quickAccessLocations = locations;
+                }
+
+                FileBrowserModal {
+                    id: trustedFolderPicker
+
+                    browserTitle: I18n.trFor("trellisDms", "Select a trusted Trellis scan folder")
+                    browserIcon: "folder_open"
+                    browserType: "generic"
+                    folderMode: true
+                    showHiddenFiles: true
+                    onContentChanged: globalSettingsView.addFilesystemRootQuickAccess()
+                    onFileSelected: path => {
+                        root.addScanRoot(path);
+                        trustedFolderPicker.close();
+                    }
                 }
 
                 StyledText {
-                    anchors.left: rootFolderIcon.right
-                    anchors.leftMargin: Theme.spacingS
-                    anchors.right: removeRootButton.left
-                    anchors.rightMargin: Theme.spacingS
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: modelData
-                    font.pixelSize: Theme.fontSizeSmall
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Trellis DMS v1.0")
+                    font.pixelSize: Theme.fontSizeLarge
+                    font.weight: Font.Bold
                     color: Theme.surfaceText
-                    wrapMode: Text.NoWrap
-                    elide: Text.ElideMiddle
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "The interface language follows DMS's active locale. Untranslated text uses the English source.")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                SelectionSetting {
+                    id: pillModeSetting
+
+                    settingKey: "pillMode"
+                    label: I18n.trFor("trellisDms", "Bar display mode")
+                    description: I18n.trFor("trellisDms", "Automatic shows the only active task when there is exactly one; otherwise it uses compact counts. Vertical bars always use icons.")
+                    options: [
+                        { label: I18n.trFor("trellisDms", "Automatic (recommended)"), value: "auto" },
+                        { label: I18n.trFor("trellisDms", "Active task"), value: "task" },
+                        { label: I18n.trFor("trellisDms", "Project"), value: "project" },
+                        { label: I18n.trFor("trellisDms", "Compact counts"), value: "counts" },
+                        { label: I18n.trFor("trellisDms", "Icon only"), value: "icon" },
+                        { label: I18n.trFor("trellisDms", "Full text"), value: "full" }
+                    ]
+                    // The empty initial value prevents this child from overwriting a
+                    // legacy displayMode before loadUiSettings performs the migration.
+                    defaultValue: ""
+                }
+
+                ToggleSetting {
+                    settingKey: "showProgress"
+                    label: I18n.trFor("trellisDms", "Show numeric progress")
+                    description: I18n.trFor("trellisDms", "Show a progress line only when the live Snapshot contains a real numeric value; no value is fabricated.")
+                    defaultValue: true
+                }
+
+                ToggleSetting {
+                    settingKey: "showArchive"
+                    label: I18n.trFor("trellisDms", "Show archive entry")
+                    description: I18n.trFor("trellisDms", "Expose the historical archive browser separately from live tasks. Archive data stays read-only and lazy.")
+                    defaultValue: true
+                }
+
+                ToggleSetting {
+                    settingKey: "versionWarning"
+                    label: I18n.trFor("trellisDms", "Show Trellis version warnings")
+                    description: I18n.trFor("trellisDms", "Hide only compatibility warning presentation; the daemon keeps the version fact and diagnostics.")
+                    defaultValue: true
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Trusted scan folders")
+                    font.pixelSize: Theme.fontSizeMedium
+                    font.weight: Font.Medium
+                    color: Theme.surfaceText
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Choose up to 16 folders you trust. Trellis DMS normally searches inside these folders, up to 4 levels deep, for .trellis projects. If the selected folder is a project, .trellis, .trellis/tasks, or a live task folder, it checks at most 8 parent candidates and automatically promotes that selection to its containing Trellis project, so sibling and new direct tasks appear on the next configured topology refresh or after a manual refresh with Refresh Trellis data now. A completely new project outside these trusted folders still needs a one-time addition of a containing trusted folder; DMS does not infer the current Codex task or working directory globally. It never selects your entire home, mounted drives, /, or /proc automatically; a broad folder is scanned only if you explicitly add it. It never writes to Trellis project files. Successfully discovered projects are remembered in DMS state and revalidated on later rescans.")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    visible: root.usingLegacyRoot
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Your existing Project or scan root is still active. Adding or removing a folder migrates this setting to the trusted-folder list.")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.warning
+                    wrapMode: Text.WordWrap
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: Theme.spacingS
+
+                    Repeater {
+                        model: root.scanRoots
+
+                        StyledRect {
+                            required property int index
+                            required property string modelData
+
+                            width: parent.width
+                            height: 48
+                            radius: Theme.cornerRadius
+                            color: Theme.withAlpha(Theme.surfaceContainerHigh, Theme.popupTransparency)
+                            border.width: 0
+
+                            DankIcon {
+                                id: rootFolderIcon
+
+                                anchors.left: parent.left
+                                anchors.leftMargin: Theme.spacingM
+                                anchors.verticalCenter: parent.verticalCenter
+                                name: "folder"
+                                size: Theme.iconSize
+                                color: Theme.surfaceVariantText
+                            }
+
+                            StyledText {
+                                anchors.left: rootFolderIcon.right
+                                anchors.leftMargin: Theme.spacingS
+                                anchors.right: removeRootButton.left
+                                anchors.rightMargin: Theme.spacingS
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: modelData
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.surfaceText
+                                wrapMode: Text.NoWrap
+                                elide: Text.ElideMiddle
+                            }
+
+                            DankButton {
+                                id: removeRootButton
+
+                                anchors.right: parent.right
+                                anchors.rightMargin: Theme.spacingS
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 88
+                                height: 36
+                                text: I18n.trFor("trellisDms", "Remove")
+                                iconName: "remove_circle"
+                                onClicked: root.removeScanRoot(index)
+                            }
+                        }
+                    }
+
+                    StyledText {
+                        visible: root.scanRoots.length === 0
+                        width: parent.width
+                        text: I18n.trFor("trellisDms", "No trusted folders. Discovery is disabled.")
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.surfaceVariantText
+                        wrapMode: Text.WordWrap
+                    }
+
+                    DankButton {
+                        width: parent.width
+                        text: I18n.trFor("trellisDms", "Add trusted folder")
+                        iconName: "create_new_folder"
+                        enabled: root.scanRoots.length < root.maxScanRoots
+                        onClicked: trustedFolderPicker.open()
+                    }
+                }
+
+                Column {
+                    visible: root.rememberedProjects.length > 0
+                    width: parent.width
+                    spacing: Theme.spacingS
+
+                    StyledText {
+                        width: parent.width
+                        text: I18n.trFor("trellisDms", "Remembered projects")
+                        font.pixelSize: Theme.fontSizeMedium
+                        font.weight: Font.Medium
+                        color: Theme.surfaceText
+                    }
+
+                    StyledText {
+                        width: parent.width
+                        text: I18n.trFor("trellisDms", "This is a read-only cache from the last successful scan and never expands the trusted folders above. A selected task folder is automatically promoted to its containing project; sibling and new direct tasks appear after the next configured topology refresh or the manual Refresh Trellis data now action. A project outside trusted folders still requires a one-time trusted-folder addition, and DMS has no knowledge of Codex's current working directory.")
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.surfaceVariantText
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Repeater {
+                        model: root.rememberedProjects.slice(0, 8)
+
+                        StyledText {
+                            required property var modelData
+
+                            width: parent.width
+                            text: modelData.name + "\n" + modelData.root
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceVariantText
+                            wrapMode: Text.WrapAnywhere
+                        }
+                    }
+
+                    StyledText {
+                        visible: root.rememberedProjects.length > 8
+                        width: parent.width
+                        text: I18n.trFor("trellisDms", "%1 more remembered projects")
+                            .arg(root.rememberedProjects.length - 8)
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.surfaceVariantText
+                    }
+                }
+
+                SliderSetting {
+                    settingKey: "topologyInterval"
+                    label: I18n.trFor("trellisDms", "Topology rescan interval")
+                    description: I18n.trFor("trellisDms", "How often new or moved Trellis files are discovered. The safe range is 15-300 seconds.")
+                    defaultValue: TrellisWatch.topologyIntervalDefaults().defaultValue
+                    minimum: TrellisWatch.topologyIntervalDefaults().minimum
+                    maximum: TrellisWatch.topologyIntervalDefaults().maximum
+                    unit: "s"
+                    leftIcon: "sync"
                 }
 
                 DankButton {
-                    id: removeRootButton
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Refresh Trellis data now")
+                    iconName: "refresh"
+                    onClicked: root.requestRefresh()
+                }
 
-                    anchors.right: parent.right
-                    anchors.rightMargin: Theme.spacingS
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 88
-                    height: 36
-                    text: I18n.trFor("trellisDms", "Remove")
-                    iconName: "remove_circle"
-                    onClicked: root.removeScanRoot(index)
+                DankButton {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Restore defaults")
+                    iconName: "restart_alt"
+                    onClicked: root.restoreDefaults()
+                }
+
+                StyledText {
+                    visible: root.settingsWarning !== ""
+                    width: parent.width
+                    text: root.localizedSettingsWarning(root.settingsWarning)
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.warning
+                    wrapMode: Text.WordWrap
                 }
             }
         }
-
-        StyledText {
-            visible: root.scanRoots.length === 0
-            width: parent.width
-            text: I18n.trFor("trellisDms", "No trusted folders. Discovery is disabled.")
-            font.pixelSize: Theme.fontSizeSmall
-            color: Theme.surfaceVariantText
-            wrapMode: Text.WordWrap
-        }
-
-        DankButton {
-            width: parent.width
-            text: I18n.trFor("trellisDms", "Add trusted folder")
-            iconName: "create_new_folder"
-            enabled: root.scanRoots.length < root.maxScanRoots
-            onClicked: trustedFolderPicker.open()
-        }
     }
 
-    Column {
-        visible: root.rememberedProjects.length > 0
+    Loader {
+        id: desktopSettingsLoader
+
+        active: root.isDesktopInstance
+        visible: root.isDesktopInstance
         width: parent.width
-        spacing: Theme.spacingS
-
-        StyledText {
-            width: parent.width
-            text: I18n.trFor("trellisDms", "Remembered projects")
-            font.pixelSize: Theme.fontSizeMedium
-            font.weight: Font.Medium
-            color: Theme.surfaceText
-        }
-
-        StyledText {
-            width: parent.width
-            text: I18n.trFor("trellisDms", "This is a read-only cache from the last successful scan and never expands the trusted folders above. A selected task folder is automatically promoted to its containing project; sibling and new direct tasks appear after the next configured topology refresh or the manual Refresh Trellis data now action. A project outside trusted folders still requires a one-time trusted-folder addition, and DMS has no knowledge of Codex's current working directory.")
-            font.pixelSize: Theme.fontSizeSmall
-            color: Theme.surfaceVariantText
-            wrapMode: Text.WordWrap
-        }
-
-        Repeater {
-            model: root.rememberedProjects.slice(0, 8)
-
-            StyledText {
-                required property var modelData
-
+        sourceComponent: Component {
+            Column {
                 width: parent.width
-                text: modelData.name + "\n" + modelData.root
-                font.pixelSize: Theme.fontSizeSmall
-                color: Theme.surfaceVariantText
-                wrapMode: Text.WrapAnywhere
+                spacing: Theme.spacingM
+
+                SettingsDisplayPicker {
+                    displayPreferences: root.instanceData?.config?.displayPreferences ?? ["all"]
+                    onPreferencesChanged: preferences => {
+                        if (!root.instanceId)
+                            return;
+                        SettingsData.updateDesktopWidgetInstanceConfig(root.instanceId, {
+                            displayPreferences: preferences
+                        });
+                    }
+                }
+
+                SettingsDivider {}
+
+                Item {
+                    width: parent.width
+                    height: resetRow.height + Theme.spacingM * 2
+
+                    Row {
+                        id: resetRow
+                        x: Theme.spacingM
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: Theme.spacingM
+
+                        DankButton {
+                            text: I18n.tr("Reset Position")
+                            backgroundColor: Theme.surfaceHover
+                            textColor: Theme.surfaceText
+                            buttonHeight: 36
+                            onClicked: {
+                                root.resetDesktopInstanceGeometry(true, false);
+                            }
+                        }
+
+                        DankButton {
+                            text: I18n.tr("Reset Size")
+                            backgroundColor: Theme.surfaceHover
+                            textColor: Theme.surfaceText
+                            buttonHeight: 36
+                            onClicked: {
+                                root.resetDesktopInstanceGeometry(false, true);
+                            }
+                        }
+                    }
+                }
             }
         }
-
-        StyledText {
-            visible: root.rememberedProjects.length > 8
-            width: parent.width
-            text: I18n.trFor("trellisDms", "%1 more remembered projects")
-                .arg(root.rememberedProjects.length - 8)
-            font.pixelSize: Theme.fontSizeSmall
-            color: Theme.surfaceVariantText
-        }
-    }
-
-    SliderSetting {
-        settingKey: "topologyInterval"
-        label: I18n.trFor("trellisDms", "Topology rescan interval")
-        description: I18n.trFor("trellisDms", "How often new or moved Trellis files are discovered. The safe range is 15-300 seconds.")
-        defaultValue: TrellisWatch.topologyIntervalDefaults().defaultValue
-        minimum: TrellisWatch.topologyIntervalDefaults().minimum
-        maximum: TrellisWatch.topologyIntervalDefaults().maximum
-        unit: "s"
-        leftIcon: "sync"
-    }
-
-    DankButton {
-        width: parent.width
-        text: I18n.trFor("trellisDms", "Refresh Trellis data now")
-        iconName: "refresh"
-        onClicked: root.requestRefresh()
-    }
-
-    DankButton {
-        width: parent.width
-        text: I18n.trFor("trellisDms", "Restore defaults")
-        iconName: "restart_alt"
-        onClicked: root.restoreDefaults()
-    }
-
-    StyledText {
-        visible: root.settingsWarning !== ""
-        width: parent.width
-        text: root.localizedSettingsWarning(root.settingsWarning)
-        font.pixelSize: Theme.fontSizeSmall
-        color: Theme.warning
-        wrapMode: Text.WordWrap
     }
 }

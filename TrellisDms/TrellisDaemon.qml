@@ -1230,7 +1230,7 @@ PluginComponent {
             if (!archiveResolved.ok)
                 _pushProjectWarning(scan, project, _warning("archive_path_rejected", "archive directory path rejected", { reason: archiveResolved.reason }));
         });
-        _queueProcess(scan, ["find", tasksRoot, "-mindepth", "1", "-maxdepth", "1", "-type", "d", "-print"], function (output, exitCode) {
+        _queueProcess(scan, ["find", tasksRoot, "-mindepth", "1", "-maxdepth", "1", "-type", "d", "!", "-name", "archive", "-print"], function (output, exitCode) {
             if (exitCode !== 0) {
                 scan.degraded = true;
                 _pushWarning(scan, _warning("task_discovery_failed", "could not discover live task directories", {

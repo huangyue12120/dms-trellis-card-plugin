@@ -139,6 +139,20 @@ makePopoutProjection(snapshot, limits?, uiState?)
 
 ## `TrellisSettings.qml`
 
+### Desktop instance settings
+
+- DMS loads this component for plugin-wide Settings and for a desktop widget
+  instance. A non-empty `instanceId` selects the instance context; only that
+  view is created, with DMS's display picker and position/size reset actions.
+- Display preferences use `instanceData.config.displayPreferences`, default to
+  `["all"]`, and save through the desktop instance config API. Preferences are
+  independent for each desktop placement.
+- Position and size reset actions clear only their corresponding saved geometry
+  fields for that instance in DMS `SessionData`.
+- Instance context does not load or migrate plugin-wide settings, read or write
+  DMS plugin State, restore global defaults, or save through the instance-scoped
+  `pluginService`. Plugin-wide Settings retain the Trellis controls below.
+
 ### Display mode
 
 Use `SelectionSetting` with visible labels:
@@ -158,6 +172,12 @@ Use `SelectionSetting` with visible labels:
   settings refresh.
 - Empty means discovery disabled; it never means home/root scan.
 - The complete safety statement in `ui-ux-spec.md` is visible above the list.
+- The picker adds a localized `Computer` quick-access entry at `/`, so users
+  can deliberately navigate to mount paths such as `/run/media` and `/mnt`.
+  Opening or browsing the picker does not change `scanRoots`; only selecting a
+  directory invokes the existing trusted-root validation and save path.
+- The filesystem-root shortcut does not automatically trust `/` or scan any
+  mount. Users still explicitly select the concrete folder they want to trust.
 
 ### Remembered projects
 

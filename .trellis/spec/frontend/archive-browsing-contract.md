@@ -31,6 +31,10 @@ validated month and directory identity.
 - The only trusted root is `.trellis/tasks/archive`.
 - Months must match `YYYY-MM`; tasks must be direct canonical children of a
   validated month. No `.trellis/archive` fallback is allowed.
+- Live-task enumeration inspects only direct children of `.trellis/tasks` and
+  excludes the direct child named `archive` before applying the live-task cap.
+  `resolveTaskDir` still rejects archive paths by default; only the dedicated
+  archive flow opts into archive resolution.
 - Indexing is explicit and lazy. Only the selected page's direct task children
   have `task.json` read, with finite command, JSON, warning, month, directory,
   and page caps.
@@ -49,6 +53,7 @@ validated month and directory identity.
 | Permission/list failure | `archive_permission` |
 | Non-month entry or nested/non-directory task | `archive_layout_unknown` |
 | Traversal, symlink escape, or wrong direct child | `archive_month_invalid` / `archive_task_rejected` |
+| Archive directory encountered by live-task enumeration | Exclude it before the live-task cap; do not pass it to `resolveTaskDir` |
 | Invalid page/size or finite cap reached | Normalize and emit `archive_limit` |
 | Missing, malformed, or oversized task JSON | Bounded unreadable row / `archive_task_read_failed` or `archive_limit` |
 | Stale task identity/detail callback | `archive_detail_stale`; old generation is ignored |
@@ -75,7 +80,8 @@ bounded selector.
   multiple months, empty months, and non-month entries.
 - Static checks assert exactly one live Snapshot publisher, argv-only archive
   commands, read-only readers, no `.trellis/archive`, no archive Snapshot/live
-  controls, request/generation guards, and the maximum-page `hasMore` guard.
+  controls, exclusion of the reserved archive child before the live-task cap,
+  request/generation guards, and the maximum-page `hasMore` guard.
 - Runtime DMS/Wayland archive scrolling, focus, detail loading, and native
   Markdown rendering are evidence gates; when unavailable, record them as
   unverified rather than inferring runtime success from static tests.
@@ -89,4 +95,15 @@ var hasMore = truncated || candidates.length > offset + pageSize;
 // Correct: the bounded selector is terminal at the maximum page.
 var hasMore = page < archiveLimits.pageMaximum
     && (truncated || candidates.length > offset + pageSize);
+```
+
+For live discovery, exclude the reserved direct archive child in the bounded
+directory enumeration itself; keep the path helper's default rejection:
+
+```qml
+// Correct for find limited to direct task-root children.
+["find", tasksRoot, "-mindepth", "1", "-maxdepth", "1",
+ "-type", "d", "!", "-name", "archive", "-print"]
+
+// resolveTaskDir still rejects archive paths unless allowArchive is explicit.
 ```

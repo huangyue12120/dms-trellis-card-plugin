@@ -1239,9 +1239,11 @@
 
 # v1.0（稳定发布）
 
-## 当前候选状态（2026-09-25）
+## 当前候选状态（2026-09-26）
 
 本地冻结候选为 `1.0.0`，目标 DMS 为 `>=1.6.2`，权限保持现有集合；Desktop、zh_CN 和 `!trellis` Launcher 仍是可选候选项。task 1.0.2 的最终验收尚未完成：v0.2 共享 Snapshot 生命周期、v0.4 精确 watcher 延迟以及独立确认的 topology 行为、v0.9 三个 surface 的 host 检查仍待验证。v0.8 用户报告覆盖部分核心 DMS 检查并有 fixture/static 证据支持；性能限制未实测。本地候选不代表最终发布就绪。
+
+2026-09-26 的 DMS 修正已完成代码实现与 Node 契约检查：Desktop 实例设置恢复逐实例显示选择和位置/尺寸重置；可信文件夹选择器可从文件系统根目录显式浏览到挂载目录，并且只在选择后添加可信路径；实时任务枚举在候选上限前排除保留的 `.trellis/tasks/archive`。DMS 1.6.2 GUI 验收仍未运行，包含实例隔离与持久化、重置效果、`/run/media`/`/mnt` 导航、archive 警告消失和无效路径继续拒绝。Codex 当前任务/工作目录自动发现仍不在范围内；v1.0.2 host gate 继续开放。
 
 ## 版本目标
 
@@ -1301,6 +1303,7 @@
 - 复跑全状态矩阵、path-safety、watcher/topology、Markdown/archive、settings 和性能检查。
 - 在 Fedora 44 + Wayland + niri + DMS 1.6.2 验证多 bar/multi-display（若环境可用）、popout、reload 和禁用清理。
 - 分别验收保留的可选项：Desktop 的加载、摆放、resize 与禁用后核心不回归；zh_CN 的 locale 切换、重载、文案覆盖和英文 fallback；Launcher 的空/无匹配搜索、项目/任务选择、popout、State 持久化和多 surface reload。逐项记录证据等级与结果。
+- Desktop 的 host 检查还要覆盖实例显示偏好独立持久化、位置/尺寸分别重置、全局设置不被实例卡写入、挂载目录显式选择，以及存在 archive 目录时实时任务 warning 不误报；确认无效/越界 live-task 路径仍会被拒绝。
 - 单项失败时仅从候选包移除该项：Desktop 移除 `components.desktop` 与 `desktop-widget` capability；zh_CN 从候选包移除 `translations/zh_CN.json` 并保留英文源文案；Launcher 移除 `components.launcher`、根级 `trigger` 与 `launcher` capability。注明延期项并重跑 P0/P1 核心验收。
 - 检查 v1.0 默认不需要 trellis-card、CodeIsland daemon、Agent hooks、网络或 Trellis 写权限。
 
@@ -1367,5 +1370,5 @@
 - [x] v0.6 pill/popout 已通过确定性 state-matrix、静态和 offscreen 门槛；真实 Wayland/DMS restart 限制已单列且未冒充通过。
 - [x] v0.7 Markdown、archive、settings 和 empty/error recovery 已通过契约/静态门槛；真实 Wayland/DMS host gates 按上方状态单列，未冒充运行态通过。
 - [ ] v0.8 fixture/static 核心矩阵与安全证据已归档，DMS 1.6.2 核心 RC 检查有用户报告；本会话未独立复跑，性能/精确延迟未测，因此包含性能回归的完整 RC 门槛仍未关闭。
-- [ ] v0.9 Desktop、locale 和 Launcher 的 DMS host 检查仍未验证，状态记录在归档的 v1.0.2 acceptance evidence 中；Launcher 的导入和根对象错误已修复，最新启动日志显示 bar/daemon 已加载，但需在 DMS Launcher UI 中输入触发词完成复验；其他项逐项通过或关闭/延期，且不成为核心启动依赖。
+- [ ] v0.9 Desktop、locale 和 Launcher 的 DMS host 检查仍未验证，状态记录在归档的 v1.0.2 acceptance evidence 中；Desktop 实例显示/重置、挂载目录选择和 archive warning 的静态实现及 Node 契约检查已通过，GUI 运行验收仍待完成；Launcher 的导入和根对象错误已修复，最新启动日志显示 bar/daemon 已加载，但需在 DMS Launcher UI 中输入触发词完成复验；其他项逐项通过或关闭/延期，且不成为核心启动依赖。
 - [x] v1.0 候选文档、权限、禁用/回滚路径和已知限制已与 manifest 和验收证据对齐；host acceptance 仍是独立未关闭的发布门槛。
