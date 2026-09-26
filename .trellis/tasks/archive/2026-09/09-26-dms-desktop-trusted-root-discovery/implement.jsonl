@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/settings-state-contract.md", "reason": "Preserve global plugin settings and keep DMS instance settings scoped to each desktop placement."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Keep trusted-root discovery bounded, canonical, argv-only, and separate from remembered-project state."}
+{"file": ".trellis/spec/frontend/archive-browsing-contract.md", "reason": "Keep historical archive discovery separate from live task snapshots."}
+{"file": ".trellis/spec/frontend/desktop-projection-contract.md", "reason": "Preserve the shared Snapshot contract for the Desktop surface."}
+{"file": "docs/ui-component-contract.md", "reason": "Use the approved DMS 1.6.2 Desktop surface and rendering contract."}
+{"file": "docs/ui-state-matrix.md", "reason": "Retain defined empty, warning, and desktop-surface behavior."}

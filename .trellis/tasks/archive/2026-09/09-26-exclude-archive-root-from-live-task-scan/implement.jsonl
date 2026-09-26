@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Retain canonical live-task path validation and rejection boundaries."}
+{"file": ".trellis/spec/frontend/archive-browsing-contract.md", "reason": "Keep archive-specific discovery separate from live-task enumeration."}
+{"file": ".trellis/spec/frontend/state-matrix-contract.md", "reason": "Preserve Snapshot task and warning semantics."}

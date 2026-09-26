@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Check invalid and escaping task paths remain rejected."}
+{"file": ".trellis/spec/frontend/archive-browsing-contract.md", "reason": "Check archive browsing remains intact and read-only."}
+{"file": ".trellis/spec/frontend/state-matrix-contract.md", "reason": "Check valid task rows and warning projections remain stable."}
+{"file": ".trellis/spec/frontend/settings-state-contract.md", "reason": "Review global-versus-instance isolation, mounted folder selection, and DMS geometry reset while integrating sibling changes."}

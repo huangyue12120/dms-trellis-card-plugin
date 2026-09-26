@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/settings-state-contract.md", "reason": "Check instance/global persistence boundaries and existing settings recovery behavior."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Check root authorization and canonical path safety remain unchanged."}
+{"file": ".trellis/spec/frontend/archive-browsing-contract.md", "reason": "Check archived data remains read-only and outside live task discovery."}
+{"file": ".trellis/spec/frontend/desktop-projection-contract.md", "reason": "Check Desktop still projects the shared Snapshot."}
+{"file": "docs/ui-component-contract.md", "reason": "Review DMS Desktop compatibility and component behavior."}
+{"file": "docs/ui-state-matrix.md", "reason": "Review warning and empty-state regressions."}

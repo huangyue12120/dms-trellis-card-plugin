@@ -1,0 +1,29 @@
+{
+  "id": "dms-desktop-trusted-root-discovery",
+  "name": "dms-desktop-trusted-root-discovery",
+  "title": "DMS v1.0 desktop settings and discovery corrections",
+  "description": "Restore desktop instance display settings, remove the archive-root task warning, and make explicitly trusted mounted Trellis folders reachable.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "huangyue12120",
+  "assignee": "huangyue12120",
+  "createdAt": "2026-09-26",
+  "completedAt": "2026-09-26",
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "09-26-desktop-settings-and-mounted-folder-picker",
+    "09-26-exclude-archive-root-from-live-task-scan"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/settings-state-contract.md", "reason": "Keep global plugin data and DMS per-instance display config separate."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Preserve explicit trusted roots, caps, canonicalization, and read-only project access."}
+{"file": ".trellis/spec/frontend/desktop-projection-contract.md", "reason": "Keep the new settings limited to placement configuration, not Snapshot behavior."}
+{"file": "docs/ui-component-contract.md", "reason": "Follow the DMS 1.6.2 Desktop component contract."}
+{"file": "docs/ui-state-matrix.md", "reason": "Preserve plugin settings and empty-root behavior."}

@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/settings-state-contract.md", "reason": "Review instance isolation, global settings persistence, and reset scope."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Review that picker access never grants or scans roots implicitly."}
+{"file": ".trellis/spec/frontend/desktop-projection-contract.md", "reason": "Check Desktop surface behavior remains shared and read-only."}
+{"file": "docs/ui-component-contract.md", "reason": "Check DMS display selection and Desktop settings acceptance."}
+{"file": "docs/ui-state-matrix.md", "reason": "Check empty trusted-root behavior is unchanged."}
