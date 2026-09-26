@@ -301,3 +301,41 @@ Added repository release documentation, MIT license and a tagged GitHub pre-rele
 ### Next Steps
 
 - Fast-forward local main to the reviewed branch history and push main; later complete DMS host acceptance and prepare the required public registry screenshot before listing submission.
+
+
+## Session 10: DMS desktop settings and mounted folder picker
+<!-- trellis-session: v=2 fp=c9aa26389b58724a -->
+
+**Date**: 2026-09-26
+**Task**: DMS desktop settings and mounted folder picker
+**Branch**: `main`
+
+### Summary
+
+Fixed desktop instance settings context and mounted-folder picker injection. User confirmed the display settings and /run/media and /mnt navigation after copying the updated QML and translation and restarting DMS. The archive-root warning was already gone. Contract checks passed; detailed persistence and remaining v1.0 host gates are recorded as unverified.
+
+### Main Changes
+
+- Resolve desktop instance IDs from DMS instance metadata and isolate instance settings from plugin-wide settings.
+- Inject the filesystem-root quick-access entry after lazy browser content is available; keep trust explicit.
+- Record user-reported DMS acceptance and remaining unverified host checks.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `333c97e` | fix: restore desktop settings and mounted folder picker |
+
+### Testing
+
+- [OK] node tests/test_trellis_contract.mjs: passed
+- [OK] node --check tests/test_trellis_contract.mjs: passed
+- [OK] JSON parse and git diff --check: passed
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Continue the remaining v1.0 DMS runtime gate checks recorded in PROJECT_PROGRESS.md.

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
-- **Last Active**: 2026-09-25
+- **Total Sessions**: 10
+- **Last Active**: 2026-09-26
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~303 | Active |
+| `journal-1.md` | ~341 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-09-26 | DMS desktop settings and mounted folder picker | `333c97e` | `main` |
 | 9 | 2026-09-25 | DMS v1.0 candidate release preparation | `416f3f7` | `codex/dms-plugin-v081-state-matrix` |
 | 8 | 2026-09-24 | Complete DMS v0.8.0 release candidate | `53d3085` | `codex/dms-plugin-v081-state-matrix` |
 | 7 | 2026-09-23 | Complete Trellis DMS v0.7 | - | `-` |
