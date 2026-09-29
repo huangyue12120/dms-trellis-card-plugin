@@ -34,16 +34,19 @@ The pure module signatures are:
 normalizeRoots(value) -> { roots: string[], warnings: Warning[] }
 resolveTaskDir(projectRoot, candidate, canonicalCandidate, options)
   -> { ok, taskDir, taskJsonPath, kind } | { ok: false, reason }
-makeSnapshot(projectInputs, warnings, generatedAt) -> Snapshot
+makeSnapshot(projectInputs, warnings, generatedAt, runtimeMetadata?) -> Snapshot
 ```
 
-`Snapshot` contains `schemaVersion: 1`, `projects[]`, nullable
+`Snapshot` contains `schemaVersion: 2`, `projects[]`, nullable
 `primaryProjectId`/`primaryTaskId`, and `warnings[]`. Each project contains
 `tasks[]`, `sessions[]`, `activeTaskIds[]`, `archiveSummary` with
 `loaded: false`, and `errors[]`. Each task keeps `storedStatus`,
 `runtimeState`, `displayState`, `priority`, relations, `activeSessionCount`,
 `progress: null`, `recentlyChanged: false`, and validated internal paths. Raw
-task JSON and Markdown contents never cross the global-var boundary.
+task JSON and Markdown contents never cross the global-var boundary. Schema 2
+adds daemon-owned scan/read freshness; projections still accept schema 1 with
+freshness unavailable. `generatedAt` remains publication time, and freshness
+is never inferred from file modification times.
 
 The daemon increments a generation for every scan, destroys old readers and
 processes, and publishes only the current generation. The widget consumes the

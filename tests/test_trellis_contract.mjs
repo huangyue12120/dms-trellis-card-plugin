@@ -863,6 +863,12 @@ const flushKnownReloadSource = sourceSection(daemonSource,
   "function _flushKnownReload(", "function _installWatchers(");
 const finishScanSource = sourceSection(daemonSource,
   "function _maybeFinish(", "function _armTopologyTimer(");
+const publishSnapshotSource = sourceSection(daemonSource,
+  "function _publishSnapshot(", "function _rememberProjects(");
+const projectCoreReadSource = sourceSection(daemonSource,
+  "function _projectCoreInputsComplete(", "function _previousProjectReadAt(");
+const projectWarningSource = sourceSection(daemonSource,
+  "function _pushProjectWarning(", "function _destroyOwned(");
 const destructionSource = sourceSection(daemonSource,
   "Component.onDestruction:", "\n    }\n}");
 assert.match(processQueueSource, /if \(!scan \|\| !_isCurrent\(scan\.generation\)\)\s*return/);
@@ -911,7 +917,24 @@ assert.match(applyKnownReloadSource, /metadata\.kind === "task"[\s\S]*?task\.rea
 assert.match(applyKnownReloadSource, /metadata\.kind === "session"[\s\S]*?session\.value = parsedSession\.value[\s\S]*?_resolveSessionPointer\(reload, project, session, false\)/);
 assert.match(finishKnownReloadSource, /!_isCurrent\(reload\.generation\)/);
 assert.match(finishKnownReloadSource, /_publishSnapshot\(root\.currentInputs, root\.currentWarnings\)/);
+assert.match(finishKnownReloadSource, /root\.snapshotIsCurrent = !root\.lastGoodFallbackActive/,
+  "a known-file reload must preserve the current scan's fallback state");
+assert.doesNotMatch(finishKnownReloadSource, /root\.lastGoodFallbackActive\s*=\s*false/,
+  "known-file reloads cannot clear a topology fallback");
 assert.match(daemonSource, /function _publishSnapshot\([\s\S]*?TrellisParser\.makeSnapshot\([\s\S]*?setGlobalVar\(root\.pluginId, "snapshot", snapshot\)/);
+assert.match(daemonSource, /property string scanStartedAt/);
+assert.match(daemonSource, /property string lastSuccessfulDiscoveryAt/);
+assert.match(daemonSource, /property bool snapshotIsCurrent/);
+assert.match(daemonSource, /property bool lastGoodFallbackActive/);
+assert.match(startScanSource, /root\.scanStartedAt = new Date\(\)\.toISOString\(\)/);
+assert.match(projectWarningSource, /warning\.projectId = project\.id \|\| project\.root/);
+assert.match(projectCoreReadSource, /task\.readError[\s\S]*?session\.readError/);
+assert.match(projectCoreReadSource, /Array\.isArray\(task\.value\)/);
+assert.match(publishSnapshotSource, /TrellisParser\.makeSnapshot\([\s\S]*?root\.scanStartedAt[\s\S]*?root\.lastGoodFallbackActive/);
+assert.match(finishScanSource, /if \(!scan\.degraded && scan\.roots\.length\)[\s\S]*?root\.lastSuccessfulDiscoveryAt = new Date\(\)\.toISOString\(\)/);
+assert.match(finishScanSource, /root\.snapshotIsCurrent = !fallbackActive/);
+assert.doesNotMatch(finishKnownReloadSource, /root\.lastSuccessfulDiscoveryAt\s*=/,
+  "known-file reloads update project reads but are not topology discoveries");
 assert.match(destructionSource, /root\.scanGeneration \+= 1;[\s\S]*?root\.activeScan = null;[\s\S]*?_cancelDetailRead\(false\);[\s\S]*?_destroyOwned\(\)/);
 const boundedDetailReadSource = sourceSection(daemonSource,
   "function _readBoundedDetailFile(", "function _detailResponse(");
@@ -1860,8 +1883,17 @@ assert.equal(oversizedJson.ok, false);
 assert.equal(oversizedJson.error, "size_limit");
 
 const snapshot = parser.makeSnapshot([projectInput],
-  [{ code: "fixture", message: "ok" }], "2026-09-21T00:00:00.000Z");
-assert.equal(snapshot.schemaVersion, 1);
+  [{ code: "fixture", message: "ok" }], "2026-09-21T00:00:00.000Z", {
+    scanStartedAt: "2026-09-21T00:00:01.000Z",
+    lastSuccessfulDiscoveryAt: "2026-09-21T00:00:00.500Z",
+    snapshotIsCurrent: true,
+    lastGoodFallbackActive: false
+  });
+assert.equal(snapshot.schemaVersion, 2);
+assert.equal(snapshot.runtime.scanStartedAt, "2026-09-21T00:00:01.000Z");
+assert.equal(snapshot.runtime.lastSuccessfulDiscoveryAt, "2026-09-21T00:00:00.500Z");
+assert.equal(snapshot.runtime.snapshotIsCurrent, true);
+assert.equal(snapshot.runtime.lastGoodFallbackActive, false);
 assert.equal(snapshot.primaryTaskId, null);
 assert.equal(snapshot.projects[0].archiveSummary.loaded, false);
 assert.equal(snapshot.projects[0].tasks.length, 4);
@@ -1878,6 +1910,12 @@ assert.equal(projectedTasks.find(task => task.id === "live").state, "active");
 assert.equal(projectedTasks.find(task => task.id === "child").state, "unknown");
 assert.equal(projectedTasks.find(task => task.id === "planning-task").state, "planning");
 assert.equal(projectedTasks.find(task => task.id === "broken").state, "error");
+assert.ok(snapshot.warnings.filter(warning => warning.code !== "fixture")
+  .every(warning => warning.projectId === projectRoot),
+  "parser warnings must retain project context after flattening");
+assert.ok(snapshot.projects[0].tasks.find(task => task.id === "broken")
+  .errors.every(error => error.projectId === projectRoot),
+"task errors must carry the same project context as their warning projection");
 assert.equal(projection.makePillProjection(snapshot, "auto").label, "Live task");
 assert.equal(JSON.stringify(project).includes("August finished"), false);
 assert.equal(JSON.stringify(project).includes("September finished"), false);
@@ -1892,6 +1930,218 @@ const warningBoundSnapshot = parser.makeSnapshot(Array.from({ length: 300 }, (_,
   warnings: [{ code: `warning-${index}`, message: "bounded" }]
 })), [], "2026-09-21T00:00:00.000Z");
 assert.equal(warningBoundSnapshot.warnings.length, 256);
+
+const healthSnapshot = parser.makeSnapshot([
+  {
+    id: "private-id-alpha",
+    root: "/private/projects/alpha",
+    name: "Alpha",
+    lastSuccessfulReadAt: "2026-09-21T00:01:00.000Z",
+    taskRecords: [{ dirName: "healthy", value: { id: "healthy", title: "Alpha task" } }],
+    sessionRecords: [],
+    warnings: []
+  },
+  {
+    id: "private-id-beta",
+    root: "/private/projects/beta",
+    name: "Beta",
+    taskRecords: [{ dirName: "broken", value: null, readError: "malformed_json" }],
+    sessionRecords: [],
+    warnings: [
+      { code: "task_discovery_failed", message: "failed under /private/projects/beta" },
+      { code: "task_discovery_failed", message: "still failed under /private/projects/beta" },
+      { code: "session_discovery_failed", message: "failed under /private/projects/beta" },
+      { code: "task_data_invalid", message: "private /private/projects/beta/task.json" },
+      { code: "discovery_limit", message: "private discovery cap warning" }
+    ]
+  }
+], [{
+  code: "last_good_snapshot",
+  message: "retained data from /private/projects/beta"
+}, {
+  code: "future_warning",
+  message: "private diagnostic text /private/projects/beta"
+}], "2026-09-21T00:02:00.000Z", {
+  scanStartedAt: "2026-09-21T00:02:00.000Z",
+  lastSuccessfulDiscoveryAt: "2026-09-21T00:01:00.000Z",
+  snapshotIsCurrent: false,
+  lastGoodFallbackActive: true
+});
+const healthSnapshotBefore = JSON.stringify(healthSnapshot);
+const health = projection.makeHealthProjection(healthSnapshot);
+assert.equal(health.ready, true);
+assert.equal(health.freshness.available, true);
+assert.equal(health.freshness.scanStartedAt, "2026-09-21T00:02:00.000Z");
+assert.equal(health.freshness.lastSuccessfulDiscoveryAt, "2026-09-21T00:01:00.000Z");
+assert.equal(health.freshness.snapshotIsCurrent, false);
+assert.equal(health.freshness.lastGoodFallbackActive, true);
+assert.equal(health.fallbackActive, true);
+assert.equal(health.projects.length, 2);
+assert.equal(health.projects[0].status, "healthy",
+  "a degraded project must not mark another project degraded");
+assert.equal(health.projects[0].lastSuccessfulReadAt, "2026-09-21T00:01:00.000Z");
+assert.equal(health.projects[1].status, "degraded");
+assert.equal(health.incidents.filter(incident => incident.rootCause === "task_discovery").length, 1,
+  "repeated warnings from the same task-discovery cause must group together");
+assert.equal(health.incidents.find(incident => incident.rootCause === "task_discovery").count, 2);
+assert.ok(health.incidents.some(incident => incident.rootCause === "session_discovery"),
+  "an independent session-discovery cause must remain a separate incident");
+assert.ok(health.incidents.some(incident => incident.warningCodes.includes("discovery_limit")),
+  "bounded discovery caps must produce an incident");
+assert.ok(health.incidents.some(incident => incident.warningCodes.includes("task_read_failed")
+  && incident.warningCodes.includes("task_data_invalid")),
+"task read/data errors from the same input cause must retain both raw codes");
+assert.ok(!health.incidents.some(incident => incident.warningCodes.includes("last_good_snapshot")),
+  "last-good state is shown by freshness and must not add another incident");
+assert.equal(health.rawWarningCount, healthSnapshot.warnings.length);
+assert.equal(health.rawErrorCount, 2);
+assert.equal(JSON.stringify(healthSnapshot), healthSnapshotBefore,
+  "Health projection must not mutate its Snapshot input");
+const fallbackAfterKnownReload = parser.makeSnapshot([{
+  id: "private-id-beta",
+  root: "/private/projects/beta",
+  name: "Beta",
+  lastSuccessfulReadAt: "2026-09-21T00:02:45.000Z",
+  taskRecords: [{ dirName: "reloaded", value: { id: "reloaded", title: "Reloaded task" } }],
+  sessionRecords: [],
+  warnings: []
+}], [{
+  code: "last_good_snapshot",
+  message: "retained after a degraded topology scan"
+}], "2026-09-21T00:03:00.000Z", {
+  scanStartedAt: "2026-09-21T00:02:00.000Z",
+  lastSuccessfulDiscoveryAt: "2026-09-21T00:01:00.000Z",
+  snapshotIsCurrent: false,
+  lastGoodFallbackActive: true
+});
+const fallbackAfterKnownReloadHealth = projection.makeHealthProjection(fallbackAfterKnownReload);
+assert.equal(fallbackAfterKnownReloadHealth.freshness.lastSuccessfulDiscoveryAt,
+  "2026-09-21T00:01:00.000Z",
+  "known-file reloads update project reads without claiming a topology discovery");
+assert.equal(fallbackAfterKnownReloadHealth.freshness.snapshotIsCurrent, false);
+assert.equal(fallbackAfterKnownReloadHealth.freshness.lastGoodFallbackActive, true);
+assert.equal(fallbackAfterKnownReloadHealth.fallbackActive, true);
+assert.equal(fallbackAfterKnownReloadHealth.projects[0].lastSuccessfulReadAt,
+  "2026-09-21T00:02:45.000Z",
+  "a successful known-file read may advance the project's own read timestamp");
+const healthJson = JSON.stringify(health);
+for (const privateValue of ["private-id-alpha", "private-id-beta", "/private/projects",
+  "private diagnostic text", "Alpha task"])
+assert.equal(healthJson.includes(privateValue), false,
+    `Health projection must not expose raw identifier or diagnostic body: ${privateValue}`);
+
+const compatibilityHealth = projection.makeHealthProjection(parser.makeSnapshot([{
+  id: "private-compatibility-id",
+  root: "/private/compatibility",
+  name: "Compatibility",
+  taskRecords: [],
+  sessionRecords: [],
+  warnings: [{ code: "version_unverified", message: "unsupported version" },
+    { code: "version_reload_failed", message: "version read failed" }]
+}], [], "2026-09-21T00:02:30.000Z", {
+  scanStartedAt: "2026-09-21T00:02:30.000Z",
+  lastSuccessfulDiscoveryAt: "2026-09-21T00:02:00.000Z",
+  snapshotIsCurrent: true,
+  lastGoodFallbackActive: false
+}));
+assert.equal(compatibilityHealth.projects[0].status, "warning",
+  "version compatibility warnings must not degrade readable live task/session facts");
+
+const archiveHealth = projection.makeHealthProjection(healthSnapshot, {
+  kind: "archive-page",
+  status: "error",
+  projectId: "private-id-alpha",
+  warnings: [{ code: "archive_page_failed", message: "/private/projects/alpha/private detail" }],
+  content: "SECRET MARKDOWN BODY",
+  tasks: [{ title: "SECRET ARCHIVE TASK" }]
+});
+const archiveIncident = archiveHealth.incidents.find(incident => incident.scope === "archive");
+assert.ok(archiveIncident);
+assert.equal(archiveIncident.projectIndex, 0);
+assert.equal(archiveHealth.projects[0].status, "warning",
+  "archive-only failures must not describe live task/session data as degraded");
+assert.equal(archiveHealth.projects[0].archiveIncidentCount, 1);
+assert.equal(JSON.stringify(archiveHealth).includes("SECRET"), false,
+  "archive content and rows must stay outside Health projection");
+const markdownFailureHealth = projection.makeHealthProjection({
+  schemaVersion: 1,
+  projects: [],
+  warnings: []
+}, {
+  kind: "markdown",
+  status: "error",
+  warnings: [{ code: "markdown_read_failed" }]
+});
+assert.equal(markdownFailureHealth.incidentCount, 0,
+  "Markdown detail errors must not be treated as archive incidents");
+
+const recoveredSnapshot = parser.makeSnapshot([{
+  id: "private-id-beta",
+  root: "/private/projects/beta",
+  name: "Beta",
+  lastSuccessfulReadAt: "2026-09-21T00:03:00.000Z",
+  taskRecords: [{ dirName: "recovered", value: { id: "recovered", title: "Recovered" } }],
+  sessionRecords: [],
+  warnings: []
+}], [], "2026-09-21T00:03:00.000Z", {
+  scanStartedAt: "2026-09-21T00:03:00.000Z",
+  lastSuccessfulDiscoveryAt: "2026-09-21T00:03:00.000Z",
+  snapshotIsCurrent: true,
+  lastGoodFallbackActive: false
+});
+const recoveredHealth = projection.makeHealthProjection(recoveredSnapshot, {
+  kind: "archive-page",
+  status: "ready",
+  projectId: "private-id-alpha",
+  warnings: []
+});
+assert.equal(recoveredHealth.incidentCount, 0,
+  "a later coherent scan and successful archive response must clear transient incidents");
+assert.equal(recoveredHealth.projects[0].status, "healthy");
+
+const legacyHealthClean = projection.makeHealthProjection({
+  schemaVersion: 1,
+  generatedAt: "2026-09-21T00:00:00.000Z",
+  projects: [{
+    id: "private-legacy-id",
+    root: "/private/legacy",
+    name: "Legacy",
+    tasks: [],
+    sessions: []
+  }],
+  warnings: []
+});
+assert.equal(legacyHealthClean.freshness.available, false);
+assert.equal(legacyHealthClean.freshness.scanStartedAt, "");
+assert.equal(legacyHealthClean.freshness.lastSuccessfulDiscoveryAt, "");
+assert.equal(legacyHealthClean.freshness.snapshotIsCurrent, null);
+assert.equal(legacyHealthClean.freshness.lastGoodFallbackActive, null);
+assert.equal(legacyHealthClean.fallbackActive, false);
+assert.equal(legacyHealthClean.projects[0].lastSuccessfulReadAt, "");
+const legacyHealthFallback = projection.makeHealthProjection({
+  schemaVersion: 1,
+  generatedAt: "2026-09-21T00:00:00.000Z",
+  projects: [],
+  warnings: [{ code: "last_good_snapshot", message: "old Snapshot retained" }]
+});
+assert.equal(legacyHealthFallback.freshness.available, false);
+assert.equal(legacyHealthFallback.freshness.lastGoodFallbackActive, true);
+assert.equal(legacyHealthFallback.fallbackActive, true,
+  "schema-v1 fallback warning must remain visible without inventing other metadata");
+assert.equal(legacyHealthFallback.incidentCount, 0);
+const separateRootHealth = projection.makeHealthProjection(parser.makeSnapshot([], [
+  { code: "project_discovery_failed", root: "/private/root-one" },
+  { code: "project_discovery_failed", root: "/private/root-two" }
+], "2026-09-21T00:04:00.000Z", {
+  scanStartedAt: "2026-09-21T00:04:00.000Z",
+  lastSuccessfulDiscoveryAt: "",
+  snapshotIsCurrent: true,
+  lastGoodFallbackActive: false
+}));
+assert.equal(separateRootHealth.incidentCount, 2,
+  "root incidents from separate configured roots must not collapse together");
+assert.ok(!JSON.stringify(separateRootHealth).includes("/private/root"),
+  "root paths must remain internal to the Health projection");
 
 assert.equal(fs.readFileSync(archivedSeptemberJson, "utf8"), archivedBefore);
 assert.equal(fs.statSync(archivedSeptemberJson).mtimeMs, archivedMtimeBefore);

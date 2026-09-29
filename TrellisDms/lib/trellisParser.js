@@ -88,6 +88,21 @@ function _recordError(record, code, message) {
     record.errors = errors;
 }
 
+function _attachProjectContext(warnings, projectId) {
+    var scoped = [];
+    var source = _array(warnings);
+    for (var i = 0; i < source.length; i++) {
+        var warning = source[i];
+        if (!warning || typeof warning !== "object")
+            continue;
+        var copy = Object.assign({}, warning);
+        if (!_string(copy.projectId))
+            copy.projectId = projectId;
+        scoped.push(copy);
+    }
+    return scoped;
+}
+
 function _taskBase(input) {
     var source = input && input.value && typeof input.value === "object" ? input.value : {};
     var dirName = _string(input && input.dirName).trim();
@@ -268,6 +283,8 @@ function buildProjectSnapshot(input) {
     input = input || {};
     var warnings = _array(input.warnings).slice();
     var errors = _array(input.errors).slice();
+    var root = _string(input.root);
+    var projectId = _string(input.id) || root || "unknown";
     var taskInputs = _array(input.taskRecords);
     var tasks = [];
 
@@ -328,13 +345,16 @@ function buildProjectSnapshot(input) {
             tasks[t].displayState = tasks[t].storedStatus;
     }
 
-    var root = _string(input.root);
-    var projectId = _string(input.id) || root || "unknown";
+    warnings = _attachProjectContext(warnings, projectId);
+    errors = _attachProjectContext(errors, projectId);
+    for (var taskIndex = 0; taskIndex < tasks.length; taskIndex++)
+        tasks[taskIndex].errors = _attachProjectContext(tasks[taskIndex].errors, projectId);
     var project = {
         id: projectId,
         name: _string(input.name) || (root ? root.split(/[\\/]/).filter(Boolean).pop() : "unknown"),
         root: root,
         trellisVersion: _string(input.trellisVersion) || null,
+        lastSuccessfulReadAt: _timestamp(input.lastSuccessfulReadAt) || "",
         tasks: tasks,
         sessions: sessions,
         activeTaskIds: activeTaskIds,
@@ -350,7 +370,7 @@ function buildProjectSnapshot(input) {
     };
 }
 
-function buildSnapshot(projectInputs, globalWarnings, generatedAt) {
+function buildSnapshot(projectInputs, globalWarnings, generatedAt, runtimeMetadata) {
     var projects = [];
     var warnings = _array(globalWarnings).slice();
     var inputs = _array(projectInputs);
@@ -360,9 +380,19 @@ function buildSnapshot(projectInputs, globalWarnings, generatedAt) {
         warnings = warnings.concat(result.warnings);
     }
     warnings = warnings.slice(0, MAX_WARNINGS);
+    var runtime = runtimeMetadata && typeof runtimeMetadata === "object"
+        ? runtimeMetadata : {};
     return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         generatedAt: _string(generatedAt) || new Date().toISOString(),
+        runtime: {
+            scanStartedAt: _timestamp(runtime.scanStartedAt) || "",
+            lastSuccessfulDiscoveryAt: _timestamp(runtime.lastSuccessfulDiscoveryAt) || "",
+            snapshotIsCurrent: typeof runtime.snapshotIsCurrent === "boolean"
+                ? runtime.snapshotIsCurrent : false,
+            lastGoodFallbackActive: typeof runtime.lastGoodFallbackActive === "boolean"
+                ? runtime.lastGoodFallbackActive : false
+        },
         projects: projects,
         primaryProjectId: null,
         primaryTaskId: null,

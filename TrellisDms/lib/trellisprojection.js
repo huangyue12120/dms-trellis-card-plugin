@@ -20,6 +20,8 @@ var MAX_COLLAPSED_TOKEN_LENGTH = 1024;
 var MAX_LAUNCHER_RESULTS = 20;
 var MAX_LAUNCHER_QUERY_LENGTH = 256;
 var MAX_LAUNCHER_ACTION_LENGTH = 4096;
+var MAX_HEALTH_INCIDENTS = 256;
+var MAX_HEALTH_WARNING_CODES = 16;
 var ARCHIVE_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 var TASK_GROUPS = [
     { key: "active", label: "Active" },
@@ -362,7 +364,8 @@ function selectPrimary(snapshot, uiState) {
 }
 
 function _snapshotFacts(snapshot) {
-    var ready = !!snapshot && snapshot.schemaVersion === 1
+    var ready = !!snapshot && (snapshot.schemaVersion === 1
+        || snapshot.schemaVersion === 2)
         && Array.isArray(snapshot.projects) && Array.isArray(snapshot.warnings);
     var projects = ready ? snapshot.projects : [];
     var warnings = ready ? snapshot.warnings : [];
@@ -393,6 +396,378 @@ function _snapshotFacts(snapshot) {
         taskCount: taskCount,
         warningCount: warnings.length,
         activeTasks: activeTasks
+    };
+}
+
+function _healthText(value, fallback, maximum) {
+    var text = typeof value === "string" ? value : "";
+    text = text.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+    if (!text)
+        text = fallback || "";
+    if (text.length > maximum)
+        text = text.slice(0, Math.max(0, maximum - 1)) + "…";
+    return text;
+}
+
+function _healthProjectIndex(projects, projectId, rootPath) {
+    for (var i = 0; i < projects.length; i++) {
+        var project = projects[i] || {};
+        if (projectId && (project.id === projectId || project.root === projectId))
+            return i;
+    }
+    if (rootPath) {
+        for (var j = 0; j < projects.length; j++) {
+            var candidate = _string(projects[j] && projects[j].root);
+            if (candidate && candidate === rootPath)
+                return j;
+        }
+    }
+    return -1;
+}
+
+function _healthWarningDescriptor(code, requestedScope) {
+    var source = typeof code === "string" ? code : "";
+    var descriptor = {
+        category: "other",
+        rootCause: source || "unknown_warning",
+        scope: requestedScope || "project",
+        severity: "warning",
+        title: "Additional diagnostic",
+        impact: "A diagnostic was reported.",
+        fallbackBehavior: "Current task and session facts remain available."
+    };
+    if (source === "last_good_snapshot" || source === "root_empty")
+        return null;
+    if (source === "task_discovery_failed") {
+        descriptor.category = "discovery";
+        descriptor.rootCause = "task_discovery";
+        descriptor.severity = "degraded";
+        descriptor.title = "Live task discovery failed";
+        descriptor.impact = "Some live task records may be missing.";
+        descriptor.fallbackBehavior = "Previously published task facts are retained when available.";
+    } else if (source === "session_discovery_failed") {
+        descriptor.category = "discovery";
+        descriptor.rootCause = "session_discovery";
+        descriptor.severity = "degraded";
+        descriptor.title = "Session discovery failed";
+        descriptor.impact = "Some active session pointers may be missing.";
+        descriptor.fallbackBehavior = "Previously published session facts are retained when available.";
+    } else if (["root_unavailable", "root_canonicalization", "project_discovery_failed",
+                "project_path_invalid", "project_outside_root", "malformed_discovery_line"].indexOf(source) !== -1) {
+        descriptor.category = "discovery";
+        descriptor.rootCause = "root_discovery";
+        descriptor.scope = "root";
+        descriptor.severity = "degraded";
+        descriptor.title = "Project discovery failed";
+        descriptor.impact = "Projects under a configured root may be missing.";
+        descriptor.fallbackBehavior = "The previous complete Snapshot is retained when available.";
+    } else if (["task_read_failed", "task_data_invalid", "task_reload_failed",
+                "task_json_unavailable", "task_json_rejected", "task_path_invalid",
+                "task_path_rejected"].indexOf(source) !== -1) {
+        descriptor.category = "live_read";
+        descriptor.rootCause = "task_input";
+        descriptor.scope = "project";
+        descriptor.severity = "degraded";
+        descriptor.title = "Live task data is incomplete";
+        descriptor.impact = "One or more live task records could not be used.";
+        descriptor.fallbackBehavior = "Readable task records remain available; failed reads are reported.";
+    } else if (["session_read_failed", "session_data_invalid", "malformed_pointer",
+                "stale_pointer", "session_reload_failed", "session_path_invalid",
+                "session_path_rejected", "task_not_loaded"].indexOf(source) !== -1) {
+        descriptor.category = "live_read";
+        descriptor.rootCause = "session_input";
+        descriptor.scope = "project";
+        descriptor.severity = "degraded";
+        descriptor.title = "Session data is incomplete";
+        descriptor.impact = "One or more session pointers could not be used.";
+        descriptor.fallbackBehavior = "Readable task and session facts remain available.";
+    } else if (["malformed_json", "size_limit"].indexOf(source) !== -1) {
+        descriptor.category = "malformed_data";
+        descriptor.rootCause = source;
+        descriptor.scope = "project";
+        descriptor.severity = "degraded";
+        descriptor.title = "Trellis data could not be parsed";
+        descriptor.impact = "One or more source records could not be used.";
+        descriptor.fallbackBehavior = "Other readable task and session facts remain available.";
+    } else if (source.indexOf("archive_") === 0) {
+        descriptor.category = "archive_read";
+        descriptor.rootCause = "archive_input";
+        descriptor.scope = "archive";
+        descriptor.severity = "degraded";
+        descriptor.title = "Archive data is unavailable";
+        descriptor.impact = "Historical archive facts may be incomplete.";
+        descriptor.fallbackBehavior = "Live task and session facts remain available.";
+    } else if (["project_limit", "scan_root_limit", "watcher_limit", "reload_limit",
+                "archive_limit", "command_output_limit", "discovery_limit",
+                "task_limit", "session_limit"].indexOf(source) !== -1) {
+        descriptor.category = "discovery_limit";
+        descriptor.rootCause = source;
+        descriptor.severity = "degraded";
+        descriptor.title = "A discovery limit was reached";
+        descriptor.impact = "Some records or roots may be omitted.";
+        descriptor.fallbackBehavior = "The published data remains bounded and readable.";
+        if (source === "archive_limit") {
+            descriptor.scope = "archive";
+            descriptor.fallbackBehavior = "Live task and session facts remain available.";
+        } else if (source === "project_limit" || source === "scan_root_limit") {
+            descriptor.scope = "root";
+        }
+    } else if (["process_create_failed", "reader_create_failed",
+                "reload_project_missing"].indexOf(source) !== -1) {
+        descriptor.category = "discovery";
+        descriptor.rootCause = source;
+        descriptor.scope = requestedScope || "root";
+        descriptor.severity = "degraded";
+        descriptor.title = "A discovery or reload operation failed";
+        descriptor.impact = "Some source facts may not reflect the latest scan.";
+        descriptor.fallbackBehavior = "Previously published facts remain visible when available.";
+    } else if (source.indexOf("version_") === 0) {
+        descriptor.category = "compatibility";
+        descriptor.rootCause = "version_compatibility";
+        descriptor.scope = "project";
+        descriptor.title = "Trellis version could not be verified";
+        descriptor.impact = "Compatibility could not be confirmed.";
+        descriptor.fallbackBehavior = "Readable live task and session facts remain available.";
+    } else if (source === "no_projects_found" || source === "topology_interval") {
+        descriptor.category = "configuration";
+        descriptor.rootCause = source;
+        descriptor.severity = "warning";
+        descriptor.title = source === "no_projects_found"
+            ? "No projects were discovered" : "Scan interval was adjusted";
+        descriptor.impact = source === "no_projects_found"
+            ? "No Trellis project was found under the configured root." : "The configured scan interval was outside the supported range.";
+    }
+    return descriptor;
+}
+
+function _healthTimestamp(value) {
+    if (value === "")
+        return "";
+    if (typeof value !== "string" || value.length > MAX_SESSION_TIMESTAMP_LENGTH
+            || !isFinite(Date.parse(value)))
+        return null;
+    return value;
+}
+
+function _hasWarningCode(warnings, code) {
+    var source = _array(warnings);
+    for (var i = 0; i < source.length; i++) {
+        if (source[i] && source[i].code === code)
+            return true;
+    }
+    return false;
+}
+
+function makeHealthProjection(snapshot, detailResponse) {
+    var facts = _snapshotFacts(snapshot);
+    var sourceProjects = facts.projects;
+    var runtime = facts.ready && snapshot.schemaVersion === 2
+        && snapshot.runtime && typeof snapshot.runtime === "object"
+        ? snapshot.runtime : null;
+    var scanStartedAt = runtime ? _healthTimestamp(runtime.scanStartedAt) : null;
+    var lastSuccessfulDiscoveryAt = runtime
+        ? _healthTimestamp(runtime.lastSuccessfulDiscoveryAt) : null;
+    var runtimeAvailable = !!runtime && scanStartedAt !== null
+        && lastSuccessfulDiscoveryAt !== null
+        && typeof runtime.snapshotIsCurrent === "boolean"
+        && typeof runtime.lastGoodFallbackActive === "boolean";
+    var fallbackFromWarning = facts.ready
+        && _hasWarningCode(facts.warnings, "last_good_snapshot");
+    var fallbackActive = runtimeAvailable
+        ? runtime.lastGoodFallbackActive : fallbackFromWarning;
+    var freshness = {
+        available: runtimeAvailable,
+        scanStartedAt: runtimeAvailable ? scanStartedAt : "",
+        lastSuccessfulDiscoveryAt: runtimeAvailable ? lastSuccessfulDiscoveryAt : "",
+        snapshotIsCurrent: runtimeAvailable ? runtime.snapshotIsCurrent : null,
+        lastGoodFallbackActive: runtimeAvailable ? runtime.lastGoodFallbackActive
+            : (fallbackFromWarning ? true : null)
+    };
+    var groups = [];
+    var rawWarningCount = facts.warnings.length;
+    var rawErrorCount = 0;
+
+    function addWarning(warning, detailProjectId, detailScope) {
+        if (!warning || typeof warning !== "object")
+            return;
+        var code = _healthText(warning.code, "unknown_warning", 64);
+        var descriptor = _healthWarningDescriptor(code, detailScope || warning.scope);
+        if (!descriptor)
+            return;
+        var projectId = _string(detailProjectId) || _string(warning.projectId);
+        var rootPath = _string(warning.root);
+        var projectIndex = _healthProjectIndex(sourceProjects, projectId, rootPath);
+        var scope = descriptor.scope;
+        if (projectIndex >= 0 && ["process_create_failed", "reader_create_failed",
+                "watcher_limit", "watcher_create_failed", "reload_limit"].indexOf(code) !== -1)
+            scope = "project";
+        if (scope === "project" && projectIndex < 0 && rootPath)
+            scope = "root";
+        else if (scope === "project" && projectIndex < 0)
+            scope = "snapshot";
+        var identity = scope === "root" && rootPath
+            ? "root:" + rootPath
+            : (projectIndex >= 0
+            ? "project:" + _string(sourceProjects[projectIndex].id || sourceProjects[projectIndex].root)
+            : (rootPath ? "root:" + rootPath : "snapshot"));
+        var groupKey = identity + "|" + scope + "|" + descriptor.rootCause;
+        var group = null;
+        for (var i = 0; i < groups.length; i++) {
+            if (groups[i].groupKey === groupKey) {
+                group = groups[i];
+                break;
+            }
+        }
+        if (!group) {
+            if (groups.length >= MAX_HEALTH_INCIDENTS)
+                return;
+            var projectName = projectIndex >= 0
+                ? _healthText(sourceProjects[projectIndex].name, "Project", MAX_PROJECT_NAME_LENGTH)
+                : (scope === "root" ? "Configured root" : "Snapshot");
+            group = {
+                groupKey: groupKey,
+                rootPath: rootPath,
+                projectIndex: projectIndex,
+                projectName: projectName,
+                category: descriptor.category,
+                rootCause: descriptor.rootCause,
+                scope: scope,
+                severity: descriptor.severity,
+                title: descriptor.title,
+                impact: descriptor.impact,
+                fallbackBehavior: descriptor.fallbackBehavior,
+                warningCodes: [],
+                count: 0
+            };
+            groups.push(group);
+        }
+        group.count += 1;
+        if (group.warningCodes.indexOf(code) === -1
+                && group.warningCodes.length < MAX_HEALTH_WARNING_CODES)
+            group.warningCodes.push(code);
+    }
+
+    for (var p = 0; p < sourceProjects.length; p++) {
+        var sourceProject = sourceProjects[p] || {};
+        var projectErrors = _array(sourceProject.errors);
+        rawErrorCount += projectErrors.length;
+        for (var pe = 0; pe < projectErrors.length; pe++)
+            addWarning(projectErrors[pe], sourceProject.id, "project");
+        var tasks = _array(sourceProject.tasks);
+        for (var t = 0; t < tasks.length; t++) {
+            var taskErrors = _array(tasks[t] && tasks[t].errors);
+            rawErrorCount += taskErrors.length;
+        }
+        var sessions = _array(sourceProject.sessions);
+        for (var s = 0; s < sessions.length; s++) {
+            if (sessions[s] && sessions[s].error)
+                rawErrorCount += 1;
+        }
+    }
+    for (var w = 0; w < facts.warnings.length; w++)
+        addWarning(facts.warnings[w]);
+
+    var archiveKinds = ["archive-index", "archive-page", "archive-task"];
+    if (detailResponse && typeof detailResponse === "object"
+            && archiveKinds.indexOf(detailResponse.kind) !== -1) {
+        var detailWarnings = _array(detailResponse.warnings);
+        rawWarningCount += detailWarnings.length;
+        if (detailResponse.status === "error" && !detailWarnings.length) {
+            addWarning({ code: "archive_detail_failed", scope: "archive" },
+                detailResponse.projectId, "archive");
+            rawWarningCount += 1;
+        } else {
+            for (var dw = 0; dw < detailWarnings.length; dw++) {
+                var detailWarning = detailWarnings[dw] || {};
+                addWarning({ code: detailWarning.code, scope: "archive" },
+                    detailResponse.projectId, "archive");
+            }
+        }
+    }
+
+    var projectHealth = [];
+    for (var ph = 0; ph < sourceProjects.length; ph++) {
+        var project = sourceProjects[ph] || {};
+        projectHealth.push({
+            projectIndex: ph,
+            name: _healthText(project.name, "Project", MAX_PROJECT_NAME_LENGTH),
+            status: "healthy",
+            incidentCount: 0,
+            archiveIncidentCount: 0,
+            lastSuccessfulReadAt: _healthTimestamp(project.lastSuccessfulReadAt) || ""
+        });
+    }
+    var incidents = [];
+    for (var g = 0; g < groups.length; g++) {
+        var current = groups[g];
+        var incident = {
+            id: "incident-" + (g + 1),
+            projectIndex: current.projectIndex >= 0 ? current.projectIndex : null,
+            projectName: current.projectName,
+            scope: current.scope,
+            category: current.category,
+            rootCause: current.rootCause,
+            severity: current.severity,
+            title: current.title,
+            impact: current.impact,
+            fallbackBehavior: current.fallbackBehavior,
+            warningCodes: current.warningCodes.slice(),
+            count: current.count
+        };
+        incidents.push(incident);
+        if (current.projectIndex >= 0) {
+            var health = projectHealth[current.projectIndex];
+            health.incidentCount += 1;
+            if (current.scope === "archive")
+                health.archiveIncidentCount += 1;
+            if (current.severity === "degraded" && current.scope !== "archive")
+                health.status = "degraded";
+            else if (health.status === "healthy")
+                health.status = "warning";
+        } else if (current.scope === "root" && current.rootPath) {
+            for (var rp = 0; rp < sourceProjects.length; rp++) {
+                var projectRoot = _string(sourceProjects[rp] && sourceProjects[rp].root);
+                var rootPrefix = current.rootPath.replace(/[\\/]$/, "") + "/";
+                if (projectRoot && (projectRoot === current.rootPath
+                        || projectRoot.indexOf(rootPrefix) === 0)) {
+                    projectHealth[rp].incidentCount += 1;
+                    projectHealth[rp].status = "degraded";
+                }
+            }
+        }
+    }
+
+    var rawWarningCodes = [];
+    for (var rw = 0; rw < facts.warnings.length; rw++) {
+        var rawCode = _healthText(facts.warnings[rw] && facts.warnings[rw].code,
+            "unknown_warning", 64);
+        if (rawWarningCodes.indexOf(rawCode) === -1 && rawWarningCodes.length < MAX_HEALTH_WARNING_CODES)
+            rawWarningCodes.push(rawCode);
+    }
+    if (detailResponse && typeof detailResponse === "object"
+            && archiveKinds.indexOf(detailResponse.kind) !== -1) {
+        var detailCodeWarnings = _array(detailResponse.warnings);
+        for (var dc = 0; dc < detailCodeWarnings.length; dc++) {
+            var detailCode = _healthText(detailCodeWarnings[dc] && detailCodeWarnings[dc].code,
+                "unknown_warning", 64);
+            if (rawWarningCodes.indexOf(detailCode) === -1
+                    && rawWarningCodes.length < MAX_HEALTH_WARNING_CODES)
+                rawWarningCodes.push(detailCode);
+        }
+    }
+    return {
+        ready: facts.ready,
+        freshness: freshness,
+        fallbackActive: fallbackActive,
+        fallbackMessage: fallbackActive
+            ? "Showing the last complete Snapshot; discovery is still degraded." : "",
+        projectCount: sourceProjects.length,
+        projects: projectHealth,
+        incidents: incidents,
+        incidentCount: incidents.length,
+        rawWarningCount: rawWarningCount,
+        rawErrorCount: rawErrorCount,
+        rawWarningCodes: rawWarningCodes
     };
 }
 

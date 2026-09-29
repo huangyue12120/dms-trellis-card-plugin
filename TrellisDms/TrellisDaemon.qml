@@ -51,6 +51,10 @@ PluginComponent {
     property var lastGoodInputs: null
     property var lastGoodSnapshot: null
     property string lastGoodRootsKey: ""
+    property string scanStartedAt: ""
+    property string lastSuccessfulDiscoveryAt: ""
+    property bool snapshotIsCurrent: false
+    property bool lastGoodFallbackActive: false
     property var warningLedger: ({})
     property var warningLedgerOrder: []
     property int topologyIntervalSeconds: topologyIntervalDefault
@@ -301,6 +305,9 @@ PluginComponent {
     function _pushProjectWarning(scan, project, warning) {
         if (!project || !warning)
             return;
+        warning = Object.assign({}, warning);
+        if (!warning.projectId)
+            warning.projectId = project.id || project.root || "unknown";
         if (!project.warnings)
             project.warnings = [];
         var accepted = _allowWarning(warning);
@@ -1111,7 +1118,7 @@ PluginComponent {
         process.running = true;
     }
 
-    function _queueFile(scan, path, callback) {
+    function _queueFile(scan, path, callback, project, coreInput) {
         if (!scan || !_isCurrent(scan.generation))
             return;
         scan.pending += 1;
@@ -1131,7 +1138,12 @@ PluginComponent {
         });
         if (!reader) {
             scan.pending -= 1;
-            _pushWarning(scan, _warning("reader_create_failed", "could not create file reader", { path: path }));
+            if (coreInput && project)
+                project.coreReadFailed = true;
+            _pushWarning(scan, _warning("reader_create_failed", "could not create file reader", {
+                path: path,
+                projectId: project ? (project.id || project.root) : ""
+            }));
             _maybeFinish(scan);
             return;
         }
@@ -1160,7 +1172,11 @@ PluginComponent {
 
     function _newProject(scan, projectRoot, trellisDir) {
         if (scan.projects.length >= root.maxProjects) {
-            _pushWarning(scan, _warning("project_limit", "project discovery cap reached"));
+            scan.degraded = true;
+            _pushWarning(scan, _warning("project_limit", "project discovery cap reached", {
+                root: projectRoot,
+                scope: "root"
+            }));
             return null;
         }
         for (var i = 0; i < scan.projects.length; i++) {
@@ -1178,6 +1194,7 @@ PluginComponent {
             sessionRecords: [],
             warnings: [],
             errors: [],
+            coreReadFailed: false,
             taskDirs: [],
             sessionKeys: [],
             discoveryStarted: false
@@ -1214,7 +1231,7 @@ PluginComponent {
                 } else {
                     _pushProjectWarning(scan, project, _warning("version_invalid", "Trellis version is missing or malformed"));
                 }
-            });
+            }, project, false);
         });
 
         var tasksRoot = TrellisPaths.tasksRootPath(project.root);
@@ -1233,12 +1250,18 @@ PluginComponent {
         _queueProcess(scan, ["find", tasksRoot, "-mindepth", "1", "-maxdepth", "1", "-type", "d", "!", "-name", "archive", "-print"], function (output, exitCode) {
             if (exitCode !== 0) {
                 scan.degraded = true;
+                project.coreReadFailed = true;
                 _pushWarning(scan, _warning("task_discovery_failed", "could not discover live task directories", {
-                    root: project.root
+                    root: project.root,
+                    projectId: project.id
                 }));
                 return;
             }
             var lines = _boundedLines(output, root.maxTasksPerProject);
+            if (lines.warnings.length) {
+                project.coreReadFailed = true;
+                scan.degraded = true;
+            }
             for (var warningIndex = 0; warningIndex < lines.warnings.length; warningIndex++)
                 _pushProjectWarning(scan, project, lines.warnings[warningIndex]);
             for (var i = 0; i < lines.lines.length; i++)
@@ -1249,12 +1272,18 @@ PluginComponent {
         _queueProcess(scan, ["find", sessionsRoot, "-mindepth", "1", "-maxdepth", "1", "-type", "f", "-name", "*.json", "-print"], function (output, exitCode) {
             if (exitCode !== 0) {
                 scan.degraded = true;
+                project.coreReadFailed = true;
                 _pushWarning(scan, _warning("session_discovery_failed", "could not discover session pointers", {
-                    root: project.root
+                    root: project.root,
+                    projectId: project.id
                 }));
                 return;
             }
             var lines = _boundedLines(output, root.maxSessionsPerProject);
+            if (lines.warnings.length) {
+                project.coreReadFailed = true;
+                scan.degraded = true;
+            }
             for (var warningIndex = 0; warningIndex < lines.warnings.length; warningIndex++)
                 _pushProjectWarning(scan, project, lines.warnings[warningIndex]);
             for (var i = 0; i < lines.lines.length; i++)
@@ -1265,11 +1294,13 @@ PluginComponent {
     function _discoverTask(scan, project, candidate) {
         _canonicalize(scan, candidate, function (canonicalDir, error) {
             if (!canonicalDir) {
+                project.coreReadFailed = true;
                 _pushProjectWarning(scan, project, _warning("task_path_invalid", "task directory could not be canonicalized", { reason: error }));
                 return;
             }
             var resolved = TrellisPaths.resolveTaskDir(project.root, candidate, canonicalDir, {});
             if (!resolved.ok) {
+                project.coreReadFailed = true;
                 _pushProjectWarning(scan, project, _warning("task_path_rejected", "task directory rejected", { reason: resolved.reason }));
                 return;
             }
@@ -1278,11 +1309,13 @@ PluginComponent {
             project.taskDirs.push(resolved.taskDir);
             _canonicalize(scan, resolved.taskJsonPath, function (canonicalJson, jsonError) {
                 if (!canonicalJson) {
+                    project.coreReadFailed = true;
                     _pushProjectWarning(scan, project, _warning("task_json_unavailable", "task.json could not be canonicalized", { reason: jsonError }));
                     return;
                 }
                 var jsonResolved = TrellisPaths.resolveTaskJson(resolved, canonicalJson);
                 if (!jsonResolved.ok) {
+                    project.coreReadFailed = true;
                     _pushProjectWarning(scan, project, _warning("task_json_rejected", "task.json path rejected", { reason: jsonResolved.reason }));
                     return;
                 }
@@ -1302,7 +1335,7 @@ PluginComponent {
                             record.readError = parsed.error;
                     }
                     project.taskRecords.push(record);
-                });
+                }, project, true);
             });
         });
     }
@@ -1310,11 +1343,13 @@ PluginComponent {
     function _discoverSession(scan, project, candidate, sessionsRoot) {
         _canonicalize(scan, candidate, function (canonicalPath, error) {
             if (!canonicalPath) {
+                project.coreReadFailed = true;
                 _pushProjectWarning(scan, project, _warning("session_path_invalid", "session pointer could not be canonicalized", { reason: error }));
                 return;
             }
             var resolved = TrellisPaths.resolveSessionFile(project.root, sessionsRoot, candidate, canonicalPath);
             if (!resolved.ok) {
+                project.coreReadFailed = true;
                 _pushProjectWarning(scan, project, _warning("session_path_rejected", "session file rejected", { reason: resolved.reason }));
                 return;
             }
@@ -1341,7 +1376,7 @@ PluginComponent {
                 }
                 record.value = parsed.value;
                 _resolveSessionPointer(scan, project, record);
-            });
+            }, project, true);
         });
     }
 
@@ -1438,7 +1473,9 @@ PluginComponent {
     function _discoverRoot(scan, configuredRoot, canonicalRoot) {
         if (!TrellisPaths.isWithin(canonicalRoot, configuredRoot, true)) {
             scan.degraded = true;
-            _pushWarning(scan, _warning("root_canonicalization", "canonical root escaped its configured root"));
+            _pushWarning(scan, _warning("root_canonicalization", "canonical root escaped its configured root", {
+                root: configuredRoot
+            }));
             return;
         }
         _discoverAncestorProject(scan, canonicalRoot);
@@ -1449,18 +1486,28 @@ PluginComponent {
                 return;
             }
             var lines = _boundedLines(output, root.maxProjects);
+            if (lines.warnings.length)
+                scan.degraded = true;
             for (var w = 0; w < lines.warnings.length; w++)
-                _pushWarning(scan, lines.warnings[w]);
+                _pushWarning(scan, Object.assign({}, lines.warnings[w], {
+                    root: configuredRoot,
+                    scope: "root"
+                }));
             for (var i = 0; i < lines.lines.length; i++) {
                 let candidate = lines.lines[i];
                 _canonicalize(scan, candidate, function (canonicalTrellis, error) {
                     if (!canonicalTrellis) {
-                        _pushWarning(scan, _warning("project_path_invalid", "discovered .trellis path could not be canonicalized", { reason: error }));
+                        _pushWarning(scan, _warning("project_path_invalid", "discovered .trellis path could not be canonicalized", {
+                            root: canonicalRoot,
+                            reason: error
+                        }));
                         return;
                     }
                     var projectRoot = TrellisPaths.parentPath(canonicalTrellis);
                     if (!TrellisPaths.isWithin(projectRoot, canonicalRoot, true)) {
-                        _pushWarning(scan, _warning("project_outside_root", "discovered project is outside configured root"));
+                        _pushWarning(scan, _warning("project_outside_root", "discovered project is outside configured root", {
+                            root: canonicalRoot
+                        }));
                         return;
                     }
                     var project = _newProject(scan, projectRoot, canonicalTrellis);
@@ -1480,7 +1527,8 @@ PluginComponent {
         root.pendingKnownPaths = result.pending;
         if (result.dropped) {
             root.pendingKnownWarnings.push(_warning("reload_limit", "known-file reload queue cap reached", {
-                path: path
+                path: path,
+                projectId: root.knownFileRegistry[path].projectId
             }));
             if (root.pendingKnownWarnings.length > root.maxWarnings)
                 root.pendingKnownWarnings.shift();
@@ -1506,6 +1554,44 @@ PluginComponent {
         return null;
     }
 
+    function _projectCoreInputsComplete(project) {
+        if (!project || project.coreReadFailed)
+            return false;
+        var taskRecords = project.taskRecords || [];
+        for (var t = 0; t < taskRecords.length; t++) {
+            var task = taskRecords[t] || {};
+            if (task.readError || !task.value || typeof task.value !== "object"
+                    || Array.isArray(task.value))
+                return false;
+        }
+        var sessionRecords = project.sessionRecords || [];
+        for (var s = 0; s < sessionRecords.length; s++) {
+            var session = sessionRecords[s] || {};
+            if (session.readError || !session.value || typeof session.value !== "object"
+                    || Array.isArray(session.value))
+                return false;
+        }
+        return true;
+    }
+
+    function _previousProjectReadAt(project) {
+        var candidates = root.currentInputs || [];
+        for (var i = 0; i < candidates.length; i++) {
+            if (candidates[i] && (candidates[i].id === project.id
+                    || candidates[i].root === project.root)
+                    && candidates[i].lastSuccessfulReadAt)
+                return candidates[i].lastSuccessfulReadAt;
+        }
+        candidates = root.lastGoodInputs || [];
+        for (var j = 0; j < candidates.length; j++) {
+            if (candidates[j] && (candidates[j].id === project.id
+                    || candidates[j].root === project.root)
+                    && candidates[j].lastSuccessfulReadAt)
+                return candidates[j].lastSuccessfulReadAt;
+        }
+        return "";
+    }
+
     function _clearVersionWarnings(project) {
         if (!project || !project.warnings)
             return;
@@ -1529,7 +1615,8 @@ PluginComponent {
         var project = _findProjectInput(reload.inputs, metadata.projectId);
         if (!project) {
             _pushWarning(reload, _warning("reload_project_missing", "known-file project is no longer loaded", {
-                path: path
+                path: path,
+                projectId: metadata.projectId
             }));
             return;
         }
@@ -1538,7 +1625,8 @@ PluginComponent {
             if (error) {
                 _pushWarning(reload, _warning("version_reload_failed", "could not reload .trellis/.version", {
                     path: path,
-                    reason: error
+                    reason: error,
+                    projectId: metadata.projectId
                 }));
                 return;
             }
@@ -1566,7 +1654,8 @@ PluginComponent {
                 task.readError = error;
                 _pushWarning(reload, _warning("task_reload_failed", "task.json reload failed; last valid value retained", {
                     path: path,
-                    reason: error
+                    reason: error,
+                    projectId: metadata.projectId
                 }));
                 return;
             }
@@ -1575,12 +1664,24 @@ PluginComponent {
                 task.readError = parsedTask.error;
                 _pushWarning(reload, _warning("task_reload_failed", "task.json is malformed; last valid value retained", {
                     path: path,
-                    reason: parsedTask.error
+                    reason: parsedTask.error,
+                    projectId: metadata.projectId
+                }));
+                return;
+            }
+            if (!parsedTask.value || typeof parsedTask.value !== "object"
+                    || Array.isArray(parsedTask.value)) {
+                task.readError = "task_data_invalid";
+                _pushWarning(reload, _warning("task_reload_failed", "task.json is malformed; last valid value retained", {
+                    path: path,
+                    reason: "task_data_invalid",
+                    projectId: metadata.projectId
                 }));
                 return;
             }
             task.value = parsedTask.value;
             task.readError = null;
+            project.coreReadChanged = true;
             return;
         }
 
@@ -1592,7 +1693,8 @@ PluginComponent {
                 session.readError = error;
                 _pushWarning(reload, _warning("session_reload_failed", "session pointer reload failed; last valid value retained", {
                     path: path,
-                    reason: error
+                    reason: error,
+                    projectId: metadata.projectId
                 }));
                 return;
             }
@@ -1601,7 +1703,8 @@ PluginComponent {
                 session.readError = parsedSession.error;
                 _pushWarning(reload, _warning("session_reload_failed", "session pointer is malformed; last valid value retained", {
                     path: path,
-                    reason: parsedSession.error
+                    reason: parsedSession.error,
+                    projectId: metadata.projectId
                 }));
                 return;
             }
@@ -1609,11 +1712,18 @@ PluginComponent {
             session.readError = null;
             session.resolution = null;
             _resolveSessionPointer(reload, project, session, false);
+            project.coreReadChanged = true;
         }
     }
 
     function _publishSnapshot(inputs, warnings) {
-        var snapshot = TrellisParser.makeSnapshot(inputs || [], warnings || [], new Date().toISOString());
+        var publishedAt = new Date().toISOString();
+        var snapshot = TrellisParser.makeSnapshot(inputs || [], warnings || [], publishedAt, {
+            scanStartedAt: root.scanStartedAt,
+            lastSuccessfulDiscoveryAt: root.lastSuccessfulDiscoveryAt,
+            snapshotIsCurrent: root.snapshotIsCurrent,
+            lastGoodFallbackActive: root.lastGoodFallbackActive
+        });
         if (root.pluginService)
             root.pluginService.setGlobalVar(root.pluginId, "snapshot", snapshot);
         root.lastGoodSnapshot = snapshot;
@@ -1648,9 +1758,21 @@ PluginComponent {
         var extraWarnings = reload.warnings || [];
         for (var i = 0; i < extraWarnings.length && warnings.length < root.maxWarnings; i++)
             warnings.push(extraWarnings[i]);
+        var readAt = new Date().toISOString();
+        for (var p = 0; p < reload.inputs.length; p++) {
+            var project = reload.inputs[p];
+            if (project && project.coreReadChanged) {
+                if (_projectCoreInputsComplete(project))
+                    project.lastSuccessfulReadAt = readAt;
+                project.coreReadChanged = false;
+            }
+        }
         root.currentInputs = reload.inputs;
         root.currentWarnings = warnings;
         root.lastGoodInputs = _cloneValue(reload.inputs);
+        // A known-file reload cannot establish that topology discovery recovered.
+        // Keep the scan-level fallback state until a later topology scan publishes.
+        root.snapshotIsCurrent = !root.lastGoodFallbackActive;
         _publishSnapshot(root.currentInputs, root.currentWarnings);
         if (Object.keys(root.pendingKnownPaths || {}).length)
             knownReloadTimer.restart();
@@ -1703,7 +1825,8 @@ PluginComponent {
                 return;
             if (watcherCount >= root.maxKnownWatchers) {
                 _pushWarning(scan, _warning("watcher_limit", "known-file watcher cap reached", {
-                    path: path
+                    path: path,
+                    projectId: metadata.projectId
                 }));
                 return;
             }
@@ -1715,7 +1838,8 @@ PluginComponent {
             });
             if (!watcher) {
                 _pushWarning(scan, _warning("watcher_create_failed", "could not create known-file watcher", {
-                    path: path
+                    path: path,
+                    projectId: metadata.projectId
                 }));
                 return;
             }
@@ -1768,12 +1892,17 @@ PluginComponent {
         var inputs = [];
         for (var i = 0; i < scan.projects.length; i++) {
             var project = scan.projects[i];
+            var lastSuccessfulReadAt = _previousProjectReadAt(project);
+            if (_projectCoreInputsComplete(project))
+                lastSuccessfulReadAt = new Date().toISOString();
             inputs.push({
                 id: project.id,
                 name: project.name,
                 root: project.root,
                 versionPath: project.versionPath,
                 trellisVersion: project.trellisVersion,
+                lastSuccessfulReadAt: lastSuccessfulReadAt,
+                coreReadFailed: project.coreReadFailed,
                 taskRecords: project.taskRecords,
                 sessionRecords: project.sessionRecords,
                 warnings: project.warnings,
@@ -1782,12 +1911,18 @@ PluginComponent {
         }
 
         var rootsKey = scan.roots.join("|");
+        var fallbackActive = false;
         if (scan.degraded && scan.roots.length && root.lastGoodInputs
                 && root.lastGoodRootsKey === rootsKey) {
             inputs = _cloneValue(root.lastGoodInputs);
+            fallbackActive = true;
             _pushWarning(scan, _warning("last_good_snapshot", "discovery was degraded; last valid Trellis snapshot retained"));
         }
         root.currentInputs = inputs;
+        root.lastGoodFallbackActive = fallbackActive;
+        root.snapshotIsCurrent = !fallbackActive;
+        if (!scan.degraded && scan.roots.length)
+            root.lastSuccessfulDiscoveryAt = new Date().toISOString();
         if (!scan.degraded || !root.lastGoodInputs) {
             root.lastGoodInputs = _cloneValue(inputs);
             root.lastGoodRootsKey = rootsKey;
@@ -1811,6 +1946,7 @@ PluginComponent {
     function startScan(reason) {
         root.scanGeneration += 1;
         _destroyOwned();
+        root.scanStartedAt = new Date().toISOString();
         var generation = root.scanGeneration;
         var settings = pluginData || {};
         root.observedRefreshToken = settings.refreshToken;
@@ -1838,11 +1974,11 @@ PluginComponent {
             pending: 0,
             published: false,
             queueing: true,
-            degraded: false,
             projects: [],
             warnings: normalized.warnings ? normalized.warnings.slice() : [],
             roots: normalized.roots || [],
-            reason: reason || "initial"
+            reason: reason || "initial",
+            degraded: rootInput.truncated > 0
         };
         root.activeScan = scan;
         if (!scan.roots.length) {
@@ -1855,7 +1991,10 @@ PluginComponent {
             _canonicalize(scan, configuredRoot, function (canonicalRoot, error) {
                 if (!canonicalRoot) {
                     scan.degraded = true;
-                    _pushWarning(scan, _warning("root_unavailable", "configured root could not be canonicalized", { reason: error }));
+                    _pushWarning(scan, _warning("root_unavailable", "configured root could not be canonicalized", {
+                        root: configuredRoot,
+                        reason: error
+                    }));
                     return;
                 }
                 // From this point onward the canonical root is the containment
