@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell.Io
 import qs.Common
 import qs.Modals.FileBrowser
 import qs.Widgets
@@ -370,9 +371,105 @@ PluginSettings {
                 id: globalSettingsView
 
                 property var pillModeSettingControl: pillModeSetting
+                property var diagnosticsMetadata: {
+                    var plugins = PluginService.availablePlugins || ({});
+                    var metadata = plugins[root.pluginId] || null;
+                    var components = metadata && metadata.components
+                        && typeof metadata.components === "object"
+                        ? Object.keys(metadata.components) : [];
+                    if (metadata && typeof metadata.settings === "string"
+                            && metadata.settings.length > 0)
+                        components.push("settings");
+                    var loaded = typeof PluginService.isPluginLoaded === "function"
+                        ? PluginService.isPluginLoaded(root.pluginId) : null;
+                    return {
+                        pluginVersion: metadata ? metadata.version : "",
+                        pluginLoaded: loaded,
+                        capabilities: metadata ? metadata.capabilities : [],
+                        surfaces: components,
+                        qtVersion: Qt.version,
+                        dmsVersion: "",
+                        quickshellVersion: ""
+                    };
+                }
+                property var diagnostics: TrellisProjection.makeDiagnosticsProjection(
+                    diagnosticsSnapshotVar.value, diagnosticsDetailResponseVar.value,
+                    diagnosticsMetadata)
+                property string diagnosticsCopyStatus: ""
 
                 width: parent.width
                 spacing: Theme.spacingM
+
+                function diagnosticsSnapshotState() {
+                    switch (diagnostics.snapshotState) {
+                    case "current":
+                        return I18n.trFor("trellisDms", "Snapshot is current");
+                    case "stale":
+                        return I18n.trFor("trellisDms", "Snapshot may be stale");
+                    case "last_good_fallback":
+                        return I18n.trFor("trellisDms", "Showing the last-good Snapshot");
+                    case "freshness_unavailable":
+                        return I18n.trFor("trellisDms", "Snapshot freshness is unavailable");
+                    default:
+                        return I18n.trFor("trellisDms", "Snapshot is unavailable");
+                    }
+                }
+
+                function diagnosticsHealthLabel(status) {
+                    switch (status) {
+                    case "healthy": return I18n.trFor("trellisDms", "Healthy");
+                    case "warning": return I18n.trFor("trellisDms", "Warning");
+                    case "degraded": return I18n.trFor("trellisDms", "Degraded");
+                    default: return I18n.trFor("trellisDms", "Unknown");
+                    }
+                }
+
+                function diagnosticsLoadedLabel(value) {
+                    if (value === true)
+                        return I18n.trFor("trellisDms", "Loaded");
+                    if (value === false)
+                        return I18n.trFor("trellisDms", "Not loaded");
+                    return I18n.trFor("trellisDms", "Unavailable");
+                }
+
+                function copyDiagnostics() {
+                    if (diagnosticsClipboardProcess.running)
+                        return;
+                    var report = diagnostics.report;
+                    if (typeof report !== "string" || report.length === 0
+                            || report.length > 8192) {
+                        diagnosticsCopyStatus = "failed";
+                        return;
+                    }
+                    diagnosticsCopyStatus = "pending";
+                    diagnosticsClipboardProcess.command = ["dms", "cl", "copy", report];
+                    diagnosticsClipboardProcess.running = true;
+                }
+
+                PluginGlobalVar {
+                    id: diagnosticsSnapshotVar
+                    varName: "snapshot"
+                    defaultValue: null
+                    onValueChanged: globalSettingsView.diagnosticsCopyStatus = ""
+                }
+
+                PluginGlobalVar {
+                    id: diagnosticsDetailResponseVar
+                    varName: "detailResponse"
+                    defaultValue: null
+                    onValueChanged: globalSettingsView.diagnosticsCopyStatus = ""
+                }
+
+                Process {
+                    id: diagnosticsClipboardProcess
+
+                    command: []
+                    running: false
+                    onExited: function (exitCode) {
+                        globalSettingsView.diagnosticsCopyStatus = exitCode === 0
+                            ? "copied" : "failed";
+                    }
+                }
 
                 function reloadChildValues() {
                     for (var i = 0; i < children.length; i++) {
@@ -666,6 +763,258 @@ PluginSettings {
                     text: root.localizedSettingsWarning(root.settingsWarning)
                     font.pixelSize: Theme.fontSizeSmall
                     color: Theme.warning
+                    wrapMode: Text.WordWrap
+                }
+
+                SettingsDivider {}
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "About / Diagnostics")
+                    font.pixelSize: Theme.fontSizeLarge
+                    font.weight: Font.Bold
+                    color: Theme.surfaceText
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Read-only status from the shared Snapshot. Copy creates a redacted summary only after you click.")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Copied text uses project ordinals and stable codes; it excludes project names, IDs, paths, task text, and session contents.")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Plugin version: %1")
+                        .arg(globalSettingsView.diagnostics.pluginVersion)
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Host versions · DMS: %1 · Quickshell: %2 · Qt: %3")
+                        .arg(globalSettingsView.diagnostics.dmsVersion)
+                        .arg(globalSettingsView.diagnostics.quickshellVersion)
+                        .arg(globalSettingsView.diagnostics.qtVersion)
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Plugin status: %1")
+                        .arg(globalSettingsView.diagnosticsLoadedLabel(
+                            globalSettingsView.diagnostics.pluginLoaded))
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Declared capabilities: %1")
+                        .arg(globalSettingsView.diagnostics.capabilities.length
+                            ? globalSettingsView.diagnostics.capabilities.join(", ")
+                            : I18n.trFor("trellisDms", "Unavailable"))
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Declared surfaces: %1")
+                        .arg(globalSettingsView.diagnostics.surfaces.length
+                            ? globalSettingsView.diagnostics.surfaces.join(", ")
+                            : I18n.trFor("trellisDms", "Unavailable"))
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: globalSettingsView.diagnosticsSnapshotState()
+                        + I18n.trFor("trellisDms", " · Schema %1")
+                            .arg(globalSettingsView.diagnostics.schemaVersion === null
+                                ? I18n.trFor("trellisDms", "Unavailable")
+                                : globalSettingsView.diagnostics.schemaVersion)
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Font.Medium
+                    color: globalSettingsView.diagnostics.snapshotState === "last_good_fallback"
+                        || globalSettingsView.diagnostics.snapshotState === "stale"
+                        ? Theme.warning : Theme.surfaceText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Snapshot published: %1")
+                        .arg(globalSettingsView.diagnostics.generatedAt)
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Last scan started: %1")
+                        .arg(globalSettingsView.diagnostics.scanStartedAt)
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Last successful scan: %1")
+                        .arg(globalSettingsView.diagnostics.lastSuccessfulDiscoveryAt)
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Snapshot counts: %1 projects · %2 tasks · %3 sessions")
+                        .arg(globalSettingsView.diagnostics.projectCount)
+                        .arg(globalSettingsView.diagnostics.taskCount)
+                        .arg(globalSettingsView.diagnostics.sessionCount)
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Diagnostics counts: %1 warnings · %2 errors · %3 incidents")
+                        .arg(globalSettingsView.diagnostics.rawWarningCount)
+                        .arg(globalSettingsView.diagnostics.rawErrorCount)
+                        .arg(globalSettingsView.diagnostics.incidentCount)
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    visible: globalSettingsView.diagnostics.rawWarningCodes.length > 0
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Raw warning codes: %1")
+                        .arg(globalSettingsView.diagnostics.rawWarningCodes.join(", "))
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    visible: globalSettingsView.diagnostics.snapshotIncidentCodes.length > 0
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Snapshot incident codes: %1")
+                        .arg(globalSettingsView.diagnostics.snapshotIncidentCodes.join(", "))
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: Theme.spacingS
+
+                    Repeater {
+                        model: globalSettingsView.diagnostics.projects
+
+                        Column {
+                            required property var modelData
+
+                            width: parent.width
+                            spacing: Theme.spacingXS
+
+                            StyledText {
+                                width: parent.width
+                                text: modelData.name + I18n.trFor("trellisDms", " · Trellis version: %1")
+                                    .arg(modelData.trellisVersion)
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Font.Medium
+                                color: Theme.surfaceText
+                                wrapMode: Text.WordWrap
+                            }
+
+                            StyledText {
+                                width: parent.width
+                                text: I18n.trFor("trellisDms", "Health: %1 · %2 incidents · %3 archive incidents")
+                                    .arg(globalSettingsView.diagnosticsHealthLabel(modelData.status))
+                                    .arg(modelData.incidentCount)
+                                    .arg(modelData.archiveIncidentCount)
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: modelData.status === "degraded" ? Theme.warning
+                                    : Theme.surfaceVariantText
+                                wrapMode: Text.WordWrap
+                            }
+
+                            StyledText {
+                                visible: modelData.incidentCodes.length > 0
+                                width: parent.width
+                                text: I18n.trFor("trellisDms", "Incident codes: %1")
+                                    .arg(modelData.incidentCodes.join(", "))
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.surfaceVariantText
+                                wrapMode: Text.WordWrap
+                            }
+
+                            StyledText {
+                                visible: modelData.incidentCodesTruncated
+                                width: parent.width
+                                text: I18n.trFor("trellisDms", "Additional incident codes omitted from this summary.")
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.surfaceVariantText
+                                wrapMode: Text.WordWrap
+                            }
+
+                            StyledText {
+                                width: parent.width
+                                text: I18n.trFor("trellisDms", "Last successful project read: %1")
+                                    .arg(modelData.lastSuccessfulReadAt)
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.surfaceVariantText
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+                    }
+                }
+
+                DankButton {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Copy redacted diagnostics")
+                    iconName: "content_copy"
+                    enabled: !diagnosticsClipboardProcess.running
+                    onClicked: globalSettingsView.copyDiagnostics()
+                }
+
+                StyledText {
+                    visible: globalSettingsView.diagnosticsCopyStatus !== ""
+                    width: parent.width
+                    text: {
+                        switch (globalSettingsView.diagnosticsCopyStatus) {
+                        case "pending": return I18n.trFor("trellisDms", "Copying diagnostics…");
+                        case "copied": return I18n.trFor("trellisDms", "Diagnostics copied.");
+                        default: return I18n.trFor("trellisDms", "Could not copy diagnostics.");
+                        }
+                    }
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: globalSettingsView.diagnosticsCopyStatus === "failed"
+                        ? Theme.warning : Theme.surfaceVariantText
                     wrapMode: Text.WordWrap
                 }
             }

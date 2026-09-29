@@ -644,6 +644,117 @@
     "Restore defaults": {
         "Restore defaults": "恢复默认设置"
     },
+    "About / Diagnostics": {
+        "About / Diagnostics": "关于 / 诊断"
+    },
+    "Read-only status from the shared Snapshot. Copy creates a redacted summary only after you click.": {
+        "Read-only status from the shared Snapshot. Copy creates a redacted summary only after you click.": "此处只读展示共享快照状态。点击复制后才会生成已脱敏的摘要。"
+    },
+    "Copied text uses project ordinals and stable codes; it excludes project names, IDs, paths, task text, and session contents.": {
+        "Copied text uses project ordinals and stable codes; it excludes project names, IDs, paths, task text, and session contents.": "复制内容使用项目序号和稳定代码；不包含项目名称、ID、路径、任务文本或会话内容。"
+    },
+    "Plugin version: %1": {
+        "Plugin version: %1": "插件版本：%1"
+    },
+    "Host versions · DMS: %1 · Quickshell: %2 · Qt: %3": {
+        "Host versions · DMS: %1 · Quickshell: %2 · Qt: %3": "主机版本 · DMS：%1 · Quickshell：%2 · Qt：%3"
+    },
+    "Plugin status: %1": {
+        "Plugin status: %1": "插件状态：%1"
+    },
+    "Declared capabilities: %1": {
+        "Declared capabilities: %1": "已声明的能力：%1"
+    },
+    "Declared surfaces: %1": {
+        "Declared surfaces: %1": "已声明的界面：%1"
+    },
+    "Snapshot is current": {
+        "Snapshot is current": "快照为最新状态"
+    },
+    "Snapshot may be stale": {
+        "Snapshot may be stale": "快照可能已过期"
+    },
+    "Showing the last-good Snapshot": {
+        "Showing the last-good Snapshot": "正在显示最近一次成功的快照"
+    },
+    "Snapshot freshness is unavailable": {
+        "Snapshot freshness is unavailable": "快照时效信息不可用"
+    },
+    "Snapshot is unavailable": {
+        "Snapshot is unavailable": "快照不可用"
+    },
+    " · Schema %1": {
+        " · Schema %1": " · 架构版本 %1"
+    },
+    "Snapshot published: %1": {
+        "Snapshot published: %1": "快照发布时间：%1"
+    },
+    "Last scan started: %1": {
+        "Last scan started: %1": "最近一次扫描开始时间：%1"
+    },
+    "Last successful scan: %1": {
+        "Last successful scan: %1": "最近一次成功扫描：%1"
+    },
+    "Snapshot counts: %1 projects · %2 tasks · %3 sessions": {
+        "Snapshot counts: %1 projects · %2 tasks · %3 sessions": "快照统计：%1 个项目 · %2 个任务 · %3 个会话"
+    },
+    "Diagnostics counts: %1 warnings · %2 errors · %3 incidents": {
+        "Diagnostics counts: %1 warnings · %2 errors · %3 incidents": "诊断统计：%1 条警告 · %2 个错误 · %3 项事件"
+    },
+    "Raw warning codes: %1": {
+        "Raw warning codes: %1": "原始警告代码：%1"
+    },
+    "Snapshot incident codes: %1": {
+        "Snapshot incident codes: %1": "快照事件代码：%1"
+    },
+    "Healthy": {
+        "Healthy": "正常"
+    },
+    "Warning": {
+        "Warning": "警告"
+    },
+    "Degraded": {
+        "Degraded": "降级"
+    },
+    "Unknown": {
+        "Unknown": "未知"
+    },
+    "Unavailable": {
+        "Unavailable": "不可用"
+    },
+    "Loaded": {
+        "Loaded": "已加载"
+    },
+    "Not loaded": {
+        "Not loaded": "未加载"
+    },
+    " · Trellis version: %1": {
+        " · Trellis version: %1": " · Trellis 版本：%1"
+    },
+    "Health: %1 · %2 incidents · %3 archive incidents": {
+        "Health: %1 · %2 incidents · %3 archive incidents": "健康状态：%1 · %2 项事件 · 其中归档事件 %3 项"
+    },
+    "Incident codes: %1": {
+        "Incident codes: %1": "事件代码：%1"
+    },
+    "Additional incident codes omitted from this summary.": {
+        "Additional incident codes omitted from this summary.": "摘要中省略了其他事件代码。"
+    },
+    "Last successful project read: %1": {
+        "Last successful project read: %1": "最近一次成功读取项目：%1"
+    },
+    "Copy redacted diagnostics": {
+        "Copy redacted diagnostics": "复制脱敏诊断信息"
+    },
+    "Copying diagnostics…": {
+        "Copying diagnostics…": "正在复制诊断信息…"
+    },
+    "Diagnostics copied.": {
+        "Diagnostics copied.": "已复制诊断信息。"
+    },
+    "Could not copy diagnostics.": {
+        "Could not copy diagnostics.": "无法复制诊断信息。"
+    },
     "%1 more warnings · see the bar popout": {
         "%1 more warnings · see the bar popout": "另有 %1 条警告；请查看状态栏弹出面板"
     },

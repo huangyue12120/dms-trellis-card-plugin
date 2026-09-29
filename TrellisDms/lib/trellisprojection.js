@@ -22,6 +22,35 @@ var MAX_LAUNCHER_QUERY_LENGTH = 256;
 var MAX_LAUNCHER_ACTION_LENGTH = 4096;
 var MAX_HEALTH_INCIDENTS = 256;
 var MAX_HEALTH_WARNING_CODES = 16;
+// Copied diagnostics are constructed only from these bounded public facts.
+var MAX_DIAGNOSTICS_REPORT_LENGTH = 8192;
+var MAX_DIAGNOSTIC_PROJECT_CODES = 8;
+var DIAGNOSTIC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
+var DIAGNOSTIC_CAPABILITIES = ["daemon", "dankbar-widget", "desktop-widget", "launcher"];
+var DIAGNOSTIC_SURFACES = ["daemon", "widget", "desktop", "launcher", "settings"];
+var DIAGNOSTIC_WARNING_CODES = [
+    "archive_detail_failed", "archive_detail_stale", "archive_index_failed",
+    "archive_layout_unknown", "archive_limit", "archive_month_invalid",
+    "archive_page_failed", "archive_path_rejected", "archive_permission",
+    "archive_project_missing", "archive_request_invalid", "archive_task_read_failed",
+    "archive_task_rejected",
+    "archive_unavailable", "command_output_limit", "discovery_limit",
+    "last_good_snapshot",
+    "malformed_discovery_line", "malformed_json", "malformed_pointer", "no_projects_found",
+    "process_create_failed", "project_discovery_failed", "project_limit",
+    "project_outside_root", "project_path_invalid", "reader_create_failed",
+    "reload_limit", "reload_project_missing", "relation_conflict", "root_canonicalization",
+    "root_duplicate", "root_empty", "root_unavailable", "scan_root_limit",
+    "session_data_invalid", "session_discovery_failed", "session_path_invalid",
+    "session_path_rejected", "session_read_failed", "session_reload_failed",
+    "session_limit", "size_limit", "stale_pointer", "task_data_invalid",
+    "task_discovery_failed", "task_json_missing", "task_json_rejected",
+    "task_json_unavailable", "task_limit", "task_not_loaded", "task_path_invalid",
+    "task_path_rejected", "task_read_failed", "task_reload_failed",
+    "topology_interval", "unknown_relation", "version_invalid",
+    "version_path_rejected", "version_reload_failed", "version_unavailable",
+    "version_unverified", "watcher_create_failed", "watcher_limit"
+];
 var ARCHIVE_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 var TASK_GROUPS = [
     { key: "active", label: "Active" },
@@ -768,6 +797,241 @@ function makeHealthProjection(snapshot, detailResponse) {
         rawWarningCount: rawWarningCount,
         rawErrorCount: rawErrorCount,
         rawWarningCodes: rawWarningCodes
+    };
+}
+
+function _diagnosticVersion(value) {
+    if (typeof value !== "string")
+        return "unavailable";
+    var version = value.trim();
+    return /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/.test(version)
+        ? version : "unavailable";
+}
+
+function _diagnosticList(value, allowedValues, maximum) {
+    var source = _array(value);
+    var result = [];
+    for (var i = 0; i < source.length && result.length < maximum; i++) {
+        var item = source[i];
+        if (typeof item === "string" && allowedValues.indexOf(item) !== -1
+                && result.indexOf(item) === -1)
+            result.push(item);
+    }
+    return result;
+}
+
+function _diagnosticTimestamp(value) {
+    if (typeof value !== "string")
+        return "unavailable";
+    var timestamp = value.trim();
+    return timestamp.length <= MAX_SESSION_TIMESTAMP_LENGTH
+            && DIAGNOSTIC_TIMESTAMP_PATTERN.test(timestamp)
+            && isFinite(Date.parse(timestamp))
+        ? timestamp : "unavailable";
+}
+
+function _diagnosticBoolean(value) {
+    return typeof value === "boolean" ? (value ? "true" : "false") : "unavailable";
+}
+
+function _diagnosticIncidentCodes(incidents, projectIndex) {
+    var source = _array(incidents);
+    var codes = [];
+    for (var i = 0; i < source.length; i++) {
+        var incident = source[i];
+        if (!incident || incident.projectIndex !== projectIndex)
+            continue;
+        var warningCodes = _array(incident.warningCodes);
+        for (var j = 0; j < warningCodes.length; j++) {
+            var code = DIAGNOSTIC_WARNING_CODES.indexOf(warningCodes[j]) !== -1
+                ? warningCodes[j] : "unknown_warning";
+            if (codes.indexOf(code) === -1 && codes.length < MAX_DIAGNOSTIC_PROJECT_CODES)
+                codes.push(code);
+        }
+    }
+    return codes;
+}
+
+function _diagnosticIncidentCodesTruncated(incidents, projectIndex) {
+    var source = _array(incidents);
+    var codes = [];
+    for (var i = 0; i < source.length; i++) {
+        var incident = source[i];
+        if (!incident || incident.projectIndex !== projectIndex)
+            continue;
+        var warningCodes = _array(incident.warningCodes);
+        for (var j = 0; j < warningCodes.length; j++) {
+            var code = DIAGNOSTIC_WARNING_CODES.indexOf(warningCodes[j]) !== -1
+                ? warningCodes[j] : "unknown_warning";
+            if (codes.indexOf(code) === -1)
+                codes.push(code);
+            if (codes.length > MAX_DIAGNOSTIC_PROJECT_CODES)
+                return true;
+        }
+    }
+    return false;
+}
+
+function _diagnosticWarningCodes(value) {
+    var source = _array(value);
+    var codes = [];
+    for (var i = 0; i < source.length && codes.length < MAX_HEALTH_WARNING_CODES; i++) {
+        var code = DIAGNOSTIC_WARNING_CODES.indexOf(source[i]) !== -1
+            ? source[i] : "unknown_warning";
+        if (codes.indexOf(code) === -1)
+            codes.push(code);
+    }
+    return codes;
+}
+
+function makeDiagnosticsProjection(snapshot, detailResponse, metadata) {
+    var facts = _snapshotFacts(snapshot);
+    var sourceMetadata = metadata && typeof metadata === "object" ? metadata : {};
+    var health = makeHealthProjection(snapshot, detailResponse);
+    var pluginVersion = _diagnosticVersion(sourceMetadata.pluginVersion);
+    var qtVersion = _diagnosticVersion(sourceMetadata.qtVersion);
+    var pluginLoaded = typeof sourceMetadata.pluginLoaded === "boolean"
+        ? sourceMetadata.pluginLoaded : null;
+    var capabilities = _diagnosticList(sourceMetadata.capabilities,
+        DIAGNOSTIC_CAPABILITIES, DIAGNOSTIC_CAPABILITIES.length);
+    var surfaces = _diagnosticList(sourceMetadata.surfaces,
+        DIAGNOSTIC_SURFACES, DIAGNOSTIC_SURFACES.length);
+    var projectCount = facts.projectCount;
+    var taskCount = 0;
+    var sessionCount = 0;
+    var projects = [];
+
+    for (var p = 0; p < facts.projects.length; p++) {
+        var sourceProject = facts.projects[p] || {};
+        var sourceTasks = _array(sourceProject.tasks);
+        var sourceSessions = _array(sourceProject.sessions);
+        taskCount += sourceTasks.length;
+        sessionCount += sourceSessions.length;
+        var projectHealth = health.projects[p] || {};
+        projects.push({
+            index: p,
+            name: _healthText(sourceProject.name, "Project", MAX_PROJECT_NAME_LENGTH),
+            trellisVersion: _diagnosticVersion(sourceProject.trellisVersion),
+            status: ["healthy", "warning", "degraded"].indexOf(projectHealth.status) !== -1
+                ? projectHealth.status : "unknown",
+            incidentCount: _number(projectHealth.incidentCount),
+            archiveIncidentCount: _number(projectHealth.archiveIncidentCount),
+            lastSuccessfulReadAt: _diagnosticTimestamp(projectHealth.lastSuccessfulReadAt),
+            incidentCodes: _diagnosticIncidentCodes(health.incidents, p),
+            incidentCodesTruncated: _diagnosticIncidentCodesTruncated(health.incidents, p)
+        });
+    }
+
+    var snapshotState = "unavailable";
+    if (facts.ready) {
+        if (health.fallbackActive)
+            snapshotState = "last_good_fallback";
+        else if (!health.freshness.available)
+            snapshotState = "freshness_unavailable";
+        else
+            snapshotState = health.freshness.snapshotIsCurrent ? "current" : "stale";
+    }
+
+    var safeSchemaVersion = facts.ready ? snapshot.schemaVersion : null;
+    var generatedAt = facts.ready ? _diagnosticTimestamp(snapshot.generatedAt) : "unavailable";
+    var scanStartedAt = _diagnosticTimestamp(health.freshness.scanStartedAt);
+    var lastSuccessfulDiscoveryAt = _diagnosticTimestamp(
+        health.freshness.lastSuccessfulDiscoveryAt);
+    var snapshotIsCurrent = _diagnosticBoolean(health.freshness.snapshotIsCurrent);
+    var lastGoodFallbackActive = _diagnosticBoolean(
+        health.freshness.lastGoodFallbackActive);
+    var safeLoaded = pluginLoaded === null ? "unavailable" : (pluginLoaded ? "true" : "false");
+    var unscopedCodes = _diagnosticIncidentCodes(health.incidents, null);
+    var rawWarningCodes = _diagnosticWarningCodes(health.rawWarningCodes);
+    var reportLines = [];
+    var reportLength = 0;
+    var reportTruncated = false;
+
+    function addReportLine(value) {
+        var line = value.toString().replace(/[\r\n\u0000-\u001f\u007f]/g, " ");
+        if (reportLength + line.length + 1 > MAX_DIAGNOSTICS_REPORT_LENGTH - 24) {
+            reportTruncated = true;
+            return false;
+        }
+        reportLines.push(line);
+        reportLength += line.length + 1;
+        return true;
+    }
+
+    addReportLine("trellis_dms_diagnostics=1");
+    addReportLine("plugin.version=" + pluginVersion);
+    addReportLine("plugin.loaded=" + safeLoaded);
+    addReportLine("plugin.capabilities=" + (capabilities.length ? capabilities.join(",") : "unavailable"));
+    addReportLine("plugin.surfaces=" + (surfaces.length ? surfaces.join(",") : "unavailable"));
+    addReportLine("host.dms=unavailable");
+    addReportLine("host.quickshell=unavailable");
+    addReportLine("host.qt=" + qtVersion);
+    addReportLine("snapshot.source=daemon");
+    addReportLine("snapshot.state=" + snapshotState);
+    addReportLine("snapshot.schema_version=" + (safeSchemaVersion === null
+        ? "unavailable" : safeSchemaVersion));
+    addReportLine("snapshot.generated_at=" + generatedAt);
+    addReportLine("snapshot.scan_started_at=" + scanStartedAt);
+    addReportLine("snapshot.last_successful_discovery_at=" + lastSuccessfulDiscoveryAt);
+    addReportLine("snapshot.is_current=" + snapshotIsCurrent);
+    addReportLine("snapshot.last_good_fallback_active=" + lastGoodFallbackActive);
+    addReportLine("counts.projects=" + projectCount);
+    addReportLine("counts.tasks=" + taskCount);
+    addReportLine("counts.sessions=" + sessionCount);
+    addReportLine("counts.raw_warnings=" + health.rawWarningCount);
+    addReportLine("counts.raw_errors=" + health.rawErrorCount);
+    addReportLine("counts.incidents=" + health.incidentCount);
+    addReportLine("snapshot.warning_codes="
+        + (rawWarningCodes.length ? rawWarningCodes.join(",") : "none"));
+
+    for (var i = 0; i < projects.length; i++) {
+        var ordinal = i + 1;
+        var safeVersion = projects[i].trellisVersion;
+        var projectReadAt = projects[i].lastSuccessfulReadAt;
+        var codes = projects[i].incidentCodes;
+        if (!addReportLine("project." + ordinal + ".trellis_version=" + safeVersion)
+                || !addReportLine("project." + ordinal + ".last_successful_read_at="
+                    + projectReadAt)
+                || !addReportLine("project." + ordinal + ".incident_codes="
+                    + (codes.length ? codes.join(",") : "none"))
+                || !addReportLine("project." + ordinal + ".incident_codes_omitted="
+                    + (projects[i].incidentCodesTruncated ? "true" : "false")))
+            break;
+    }
+    if (unscopedCodes.length) {
+        addReportLine("snapshot.incident_codes=" + unscopedCodes.join(","));
+        addReportLine("snapshot.incident_codes_omitted="
+            + (_diagnosticIncidentCodesTruncated(health.incidents, null) ? "true" : "false"));
+    }
+    if (reportTruncated)
+        reportLines.push("report.truncated=true");
+
+    return {
+        ready: facts.ready,
+        pluginVersion: pluginVersion,
+        dmsVersion: "unavailable",
+        quickshellVersion: "unavailable",
+        qtVersion: qtVersion,
+        pluginLoaded: pluginLoaded,
+        capabilities: capabilities,
+        surfaces: surfaces,
+        snapshotState: snapshotState,
+        schemaVersion: safeSchemaVersion,
+        generatedAt: generatedAt,
+        scanStartedAt: scanStartedAt,
+        lastSuccessfulDiscoveryAt: lastSuccessfulDiscoveryAt,
+        snapshotIsCurrent: snapshotIsCurrent,
+        lastGoodFallbackActive: lastGoodFallbackActive,
+        projectCount: projectCount,
+        taskCount: taskCount,
+        sessionCount: sessionCount,
+        rawWarningCount: health.rawWarningCount,
+        rawErrorCount: health.rawErrorCount,
+        incidentCount: health.incidentCount,
+        rawWarningCodes: rawWarningCodes,
+        snapshotIncidentCodes: unscopedCodes,
+        projects: projects,
+        report: reportLines.join("\n").slice(0, MAX_DIAGNOSTICS_REPORT_LENGTH)
     };
 }
 

@@ -1048,6 +1048,31 @@ assert.match(settingsSource, /one-time addition of a containing trusted folder/)
 assert.match(settingsSource, /does not infer the current Codex task or working directory globally/);
 assert.match(settingsSource, /has no knowledge of Codex's current working directory/);
 assert.match(settingsSource, /Discovery is disabled/);
+const globalSettingsStart = settingsSource.indexOf("id: globalSettingsLoader");
+const desktopSettingsStart = settingsSource.indexOf("id: desktopSettingsLoader");
+const globalSettingsSource = settingsSource.slice(globalSettingsStart, desktopSettingsStart);
+assert.match(globalSettingsSource, /id: diagnosticsSnapshotVar[\s\S]*?varName:\s*"snapshot"/);
+assert.match(globalSettingsSource, /id: diagnosticsDetailResponseVar[\s\S]*?varName:\s*"detailResponse"/);
+assert.match(globalSettingsSource, /TrellisProjection\.makeDiagnosticsProjection\(/);
+assert.match(globalSettingsSource, /PluginService\.availablePlugins/);
+assert.match(globalSettingsSource, /Qt\.version/);
+assert.match(globalSettingsSource, /dmsVersion:\s*""[\s\S]*?quickshellVersion:\s*""/);
+assert.match(globalSettingsSource, /text:\s*I18n\.trFor\("trellisDms",\s*"About \/ Diagnostics"\)/);
+assert.match(globalSettingsSource, /function copyDiagnostics\(\)[\s\S]*?command\s*=\s*\["dms",\s*"cl",\s*"copy",\s*report\][\s\S]*?running\s*=\s*true/);
+assert.match(globalSettingsSource, /onClicked:\s*globalSettingsView\.copyDiagnostics\(\)/);
+assert.match(globalSettingsSource, /exitCode === 0[\s\S]*?"copied"\s*:\s*"failed"/);
+assert.doesNotMatch(globalSettingsSource, /\["(?:sh|bash)",\s*"-c"/);
+assert.doesNotMatch(globalSettingsSource, /JSON\.stringify\(\s*diagnostics(?:Snapshot|Detail)/);
+assert.doesNotMatch(settingsSource.slice(desktopSettingsStart), /About \/ Diagnostics/,
+  "About / Diagnostics belongs only to plugin-wide Settings");
+const diagnosticsSourceStart = globalSettingsSource.indexOf("function diagnosticsSnapshotState");
+const diagnosticsStrings = Array.from(globalSettingsSource.slice(diagnosticsSourceStart)
+  .matchAll(/I18n\.trFor\("trellisDms",\s*"([^"]+)"\)/g), (match) => match[1]);
+const zhCatalog = JSON.parse(fs.readFileSync(
+  path.join(repoRoot, "TrellisDms/translations/zh_CN.json"), "utf8"));
+for (const sourceString of diagnosticsStrings)
+  assert.ok(zhCatalog[sourceString] && zhCatalog[sourceString][sourceString],
+    `About / Diagnostics string must have a Chinese translation: ${sourceString}`);
 assert.match(settingsSource, /settingKey:\s*"topologyInterval"/);
 assert.match(settingsSource, /TrellisWatch\.topologyIntervalDefaults\(\)\.minimum/);
 assert.match(settingsSource, /TrellisWatch\.topologyIntervalDefaults\(\)\.maximum/);
@@ -2142,6 +2167,121 @@ assert.equal(separateRootHealth.incidentCount, 2,
   "root incidents from separate configured roots must not collapse together");
 assert.ok(!JSON.stringify(separateRootHealth).includes("/private/root"),
   "root paths must remain internal to the Health projection");
+
+const diagnosticsSnapshot = {
+  schemaVersion: 2,
+  generatedAt: "2026-09-21T00:10:00.000Z",
+  runtime: {
+    scanStartedAt: "2026-09-21T00:09:30.000Z",
+    lastSuccessfulDiscoveryAt: "2026-09-21T00:09:00.000Z",
+    snapshotIsCurrent: true,
+    lastGoodFallbackActive: false
+  },
+  projects: [
+    {
+      id: "private-alpha-id",
+      root: "/home/alice/projects/alpha",
+      name: "Alpha /home/alice/PROJECT_NAME_SECRET",
+      trellisVersion: "0.6.17",
+      lastSuccessfulReadAt: "2026-09-21T00:08:00.000Z",
+      tasks: [{ id: "private-alpha-task-id", title: "TASK_MARKDOWN_SECRET", errors: [] }],
+      sessions: [{ id: "private-alpha-session-id", content: "SESSION_CONTENT_SECRET" }],
+      errors: []
+    },
+    {
+      id: "private-beta-id",
+      root: "/home/alice/projects/beta",
+      name: "Beta PROJECT_NAME_SECRET",
+      trellisVersion: "/home/alice/version-path-secret",
+      lastSuccessfulReadAt: "2026-09-21T00:08:30.000Z",
+      tasks: [{ id: "private-beta-task-id", title: "BETA_TASK_SECRET", errors: [] }],
+      sessions: [],
+      errors: [{ code: "task_read_failed", message: "ERROR_MESSAGE_SECRET /home/alice" }]
+    }
+  ],
+  warnings: [
+    { code: "/home/alice/WARNING_CODE_SECRET", projectId: "private-alpha-id",
+      message: "WARNING_MESSAGE_SECRET /home/alice/projects/alpha" },
+    { code: "task_discovery_failed", projectId: "private-beta-id",
+      message: "BETA_WARNING_SECRET /home/alice/projects/beta" }
+  ]
+};
+const diagnosticsSnapshotBefore = JSON.stringify(diagnosticsSnapshot);
+const diagnosticsProjection = projection.makeDiagnosticsProjection(diagnosticsSnapshot, {
+  kind: "archive-task",
+  status: "error",
+  projectId: "private-alpha-id",
+  warnings: [{ code: "archive_task_read_failed", message: "ARCHIVE_WARNING_SECRET" }],
+  content: "ARCHIVE_MARKDOWN_SECRET /home/alice",
+  tasks: [{ title: "ARCHIVE_TASK_SECRET" }]
+}, {
+  pluginVersion: "1.1.0",
+  pluginLoaded: true,
+  capabilities: ["daemon", "desktop-widget", "/home/alice/secret-capability"],
+  surfaces: ["widget", "launcher", "private/path"],
+  dmsVersion: "9.9.9-unverified",
+  quickshellVersion: "9.9.9-unverified",
+  qtVersion: "6.8.2"
+});
+assert.equal(diagnosticsProjection.ready, true);
+assert.equal(diagnosticsProjection.snapshotState, "current");
+assert.equal(diagnosticsProjection.projectCount, 2);
+assert.equal(diagnosticsProjection.taskCount, 2);
+assert.equal(diagnosticsProjection.sessionCount, 1);
+assert.equal(diagnosticsProjection.projects[0].trellisVersion, "0.6.17");
+assert.equal(diagnosticsProjection.projects[1].trellisVersion, "unavailable",
+  "unsafe version strings must stay unavailable");
+assert.deepEqual(Array.from(diagnosticsProjection.capabilities), ["daemon", "desktop-widget"]);
+assert.deepEqual(Array.from(diagnosticsProjection.surfaces), ["widget", "launcher"]);
+assert.equal(diagnosticsProjection.dmsVersion, "unavailable");
+assert.equal(diagnosticsProjection.quickshellVersion, "unavailable");
+assert.equal(diagnosticsProjection.qtVersion, "6.8.2");
+assert.ok(diagnosticsProjection.report.includes("host.dms=unavailable"));
+assert.ok(diagnosticsProjection.report.includes("host.quickshell=unavailable"));
+assert.ok(diagnosticsProjection.report.includes("host.qt=6.8.2"));
+assert.ok(diagnosticsProjection.report.includes("project.1.incident_codes=unknown_warning,archive_task_read_failed"));
+assert.ok(diagnosticsProjection.report.includes("project.2.incident_codes=task_read_failed,task_discovery_failed"));
+assert.ok(diagnosticsProjection.report.includes("counts.raw_warnings=3"));
+assert.ok(diagnosticsProjection.report.includes("counts.raw_errors=1"));
+assert.ok(diagnosticsProjection.report.length <= 8192);
+for (const privateValue of ["alice", "private-alpha-id", "private-beta-id", "private-alpha-task-id",
+  "private-alpha-session-id", "PROJECT_NAME_SECRET", "TASK_MARKDOWN_SECRET", "SESSION_CONTENT_SECRET",
+  "WARNING_CODE_SECRET", "WARNING_MESSAGE_SECRET", "ERROR_MESSAGE_SECRET", "ARCHIVE_WARNING_SECRET",
+  "ARCHIVE_MARKDOWN_SECRET", "ARCHIVE_TASK_SECRET", "BETA_WARNING_SECRET", "secret-capability",
+  "private/path", "version-path-secret"])
+  assert.equal(diagnosticsProjection.report.includes(privateValue), false,
+    `copied diagnostics must exclude private source data: ${privateValue}`);
+assert.equal(JSON.stringify(diagnosticsSnapshot), diagnosticsSnapshotBefore,
+  "diagnostics projection must not mutate the shared Snapshot");
+const unsafeTimestampDiagnostics = projection.makeDiagnosticsProjection(Object.assign({},
+  diagnosticsSnapshot, { generatedAt: "2026-09-21T00:10:00.000Z /home/alice/time-secret" }),
+null, { qtVersion: "6.8.2" });
+assert.ok(unsafeTimestampDiagnostics.report.includes("snapshot.generated_at=unavailable"));
+assert.equal(unsafeTimestampDiagnostics.report.includes("time-secret"), false,
+  "timestamps must be validated before entering copied diagnostics");
+
+const fallbackDiagnostics = projection.makeDiagnosticsProjection(healthSnapshot, null, {
+  pluginVersion: "1.1.0",
+  pluginLoaded: true,
+  capabilities: ["daemon"],
+  surfaces: ["settings"],
+  qtVersion: "6.8.2"
+});
+assert.equal(fallbackDiagnostics.ready, true,
+  "diagnostics remain available while a last-good Snapshot is active");
+assert.equal(fallbackDiagnostics.snapshotState, "last_good_fallback");
+assert.ok(fallbackDiagnostics.report.includes("snapshot.state=last_good_fallback"));
+
+const legacyDiagnostics = projection.makeDiagnosticsProjection({
+  schemaVersion: 1,
+  generatedAt: "2026-09-21T00:00:00.000Z",
+  projects: [],
+  warnings: []
+}, null, { dmsVersion: "", quickshellVersion: "", qtVersion: "" });
+assert.equal(legacyDiagnostics.snapshotState, "freshness_unavailable");
+assert.ok(legacyDiagnostics.report.includes("snapshot.state=freshness_unavailable"));
+assert.ok(legacyDiagnostics.report.includes("snapshot.last_successful_discovery_at=unavailable"));
+assert.ok(legacyDiagnostics.report.includes("host.dms=unavailable"));
 
 assert.equal(fs.readFileSync(archivedSeptemberJson, "utf8"), archivedBefore);
 assert.equal(fs.statSync(archivedSeptemberJson).mtimeMs, archivedMtimeBefore);

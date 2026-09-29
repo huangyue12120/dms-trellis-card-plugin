@@ -11,6 +11,7 @@ Use this contract when changing the path from Trellis task/session inputs throug
     makePillProjection(snapshot, configuredMode, uiState?) -> PillProjection
     makePopoutProjection(snapshot, limits?, uiState?) -> PopoutProjection
     makeHealthProjection(snapshot, detailResponse?) -> HealthProjection
+    makeDiagnosticsProjection(snapshot, detailResponse?, metadata?) -> DiagnosticsProjection
 
 ## 3. Contracts
 
@@ -68,3 +69,109 @@ Use this contract when changing the path from Trellis task/session inputs throug
     snapshot = makeSnapshot([projectInput], warnings, generatedAt)
     pill = makePillProjection(snapshot, mode)
     popout = makePopoutProjection(snapshot)
+
+## Diagnostics Projection and Redacted Export Contract
+
+### 1. Scope / Trigger
+
+Use this contract when changing the plugin-wide About / Diagnostics panel or
+the text copied from it. Diagnostics is a read-only projection of the shared
+Snapshot and structured archive `detailResponse`; it does not discover or read
+Trellis data itself.
+
+### 2. Signatures
+
+```text
+makeDiagnosticsProjection(snapshot, detailResponse?, metadata?)
+  -> { ready, pluginVersion, dmsVersion, quickshellVersion, qtVersion,
+       pluginLoaded, capabilities[], surfaces[], snapshotState, schemaVersion,
+       generatedAt, scanStartedAt, lastSuccessfulDiscoveryAt,
+       snapshotIsCurrent, lastGoodFallbackActive,
+       projectCount, taskCount, sessionCount, rawWarningCount, rawErrorCount,
+       incidentCount, projects[], report }
+
+projects[] -> { index, name, trellisVersion, status, incidentCount,
+                archiveIncidentCount, lastSuccessfulReadAt,
+                incidentCodes[], incidentCodesTruncated }
+
+Copy action -> Process.command = ["dms", "cl", "copy", report]
+```
+
+### 3. Contracts
+
+- Render About / Diagnostics only in the plugin-wide Settings Loader. It may
+  show project display names and bounded incident codes; desktop instance
+  Settings do not load this panel.
+- Consume the shared `snapshot` and structured `detailResponse` globals plus
+  plugin metadata and Qt's version fact. Show DMS/Quickshell/Qt or Trellis
+  versions as `unavailable` when they cannot be read reliably; never infer or
+  launch a process to guess them.
+- The copied report is an explicit, bounded allowlist: plugin/host facts,
+  declared capabilities and surfaces, Snapshot state/schema/freshness,
+  project/task/session/raw-warning/raw-error/incident counts, and per-project
+  ordinal, Trellis version, last successful read time, and stable incident
+  codes. Keep the report at or below 8192 characters.
+- Validate version and timestamp formats; accept capability, surface, and
+  warning codes only from fixed allowlists. Replace unknown warning codes with
+  `unknown_warning`. Preserve project-to-incident attribution through stable
+  Snapshot array ordinals.
+- Never serialize Snapshot or `detailResponse`. Exclude project names and IDs,
+  roots, paths, usernames, environment variables, raw warning text, archive
+  content, task Markdown, session contents, and arbitrary metadata.
+- A last-good Snapshot remains diagnosable and reports its fallback state.
+  The projection must not mutate the shared Snapshot or read source files.
+- Start `dms cl copy <text>` only after a user clicks Copy, using an argv array.
+  Show bounded pending/success/failure feedback; never copy or upload
+  automatically. Add no watcher, timer, permission, persistent write, or
+  network behavior for diagnostics.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| Snapshot unavailable or schema unsupported | Show an unavailable Snapshot state and a bounded report; do not infer project facts |
+| Schema-1 Snapshot | Keep counts and project health; report freshness as unavailable |
+| Last-good fallback active | Keep Diagnostics available and identify fallback state |
+| Host/Trellis version missing or unsafe | Display `unavailable`; do not guess or preserve arbitrary strings |
+| Unknown capability, surface, or warning code | Omit unknown capability/surface; map warning code to `unknown_warning` |
+| Project name, ID, root, raw warning, or archive detail contains a secret/path | Keep UI attribution as appropriate; copied report contains none of those values |
+| Report reaches its output cap | Keep aggregate counts, truncate project detail, and mark truncation |
+| Copy clicked while process is running | Do not start a duplicate process |
+| Clipboard command exits nonzero | Show bounded failure feedback; do not claim the report was copied |
+
+### 5. Good / Base / Bad Cases
+
+- Good: two projects retain separate health and incident-code ordinals in the
+  report while malicious names, IDs, roots, warning text, and archive content
+  remain absent.
+- Base: an empty but valid Snapshot produces counts and explicit unavailable
+  freshness/version facts without reading disk.
+- Bad: `JSON.stringify(snapshot)`, interpolating raw warning text, or passing a
+  shell command string to the clipboard process is forbidden.
+
+### 6. Tests Required
+
+- Contract tests assert normal, degraded/fallback, schema-1, empty, and
+  multi-project projections; per-project incident mapping; unavailable and
+  malformed version facts; and Snapshot immutability.
+- Adversarial fixtures put path- or secret-like values in project names/IDs,
+  roots, warning codes/messages, task/session data, metadata, and archive
+  responses; assert each prohibited substring is absent from `report`.
+- Static Settings checks assert global-only placement, shared globals,
+  click-triggered argv execution, bounded feedback, and no shell interpolation
+  or direct serialization of Snapshot/archive detail.
+- JSON translation, task validation, and scoped diff checks pass before archive.
+  DMS/Wayland rendering and an actual user-clicked clipboard run remain separate
+  host checks; static tests do not prove them.
+
+### 7. Wrong vs Correct
+
+```qml
+// Wrong: copy raw state or run a shell command during component creation.
+Process { command: ["sh", "-c", "dms cl copy " + JSON.stringify(snapshot)] }
+```
+
+```qml
+// Correct: a pure allowlist report is copied only after an explicit click.
+Process { command: ["dms", "cl", "copy", diagnostics.report] }
+```
