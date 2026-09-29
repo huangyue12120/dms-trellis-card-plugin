@@ -339,3 +339,40 @@ Fixed desktop instance settings context and mounted-folder picker injection. Use
 ### Next Steps
 
 - Continue the remaining v1.0 DMS runtime gate checks recorded in PROJECT_PROGRESS.md.
+
+
+## Session 11: v1.1.2 About Diagnostics and Redacted Export
+<!-- trellis-session: v=2 fp=1ece26cb8ede6457 -->
+
+**Date**: 2026-09-29
+**Task**: v1.1.2 About Diagnostics and Redacted Export
+**Branch**: `feat/v11-health-freshness`
+
+### Summary
+
+Added a global Settings diagnostics panel and bounded allowlist export. Contract fixtures and static review passed; DMS/Wayland rendering and live clipboard use remain for host acceptance.
+
+### Main Changes
+
+- Added About / Diagnostics to plugin-wide Settings only.
+- Added a bounded redacted report projection and click-triggered argv clipboard copy.
+- Updated the State-Matrix diagnostics contract and privacy fixtures.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ecbf5cd` | feat: add redacted diagnostics center |
+
+### Testing
+
+- [OK] node tests/test_trellis_contract.mjs passed.
+- [OK] Chinese translation JSON parse, diagnostics task validation, and scoped diff check passed.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Continue with v1.1.3 Desktop Overview Tasks Health Views.
