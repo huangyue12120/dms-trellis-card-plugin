@@ -1,0 +1,31 @@
+{
+  "id": "v11-health-diagnostics-desktop",
+  "name": "v11-health-diagnostics-desktop",
+  "title": "v1.1 Health, Diagnostics, Desktop Views",
+  "description": "Implement and verify the v1.1 Health, Diagnostics, Desktop view modes, and host release criteria.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "huangyue12120",
+  "assignee": "huangyue12120",
+  "createdAt": "2026-09-29",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "09-29-v11-health-freshness",
+    "09-29-v11-diagnostics",
+    "09-29-v11-desktop-views",
+    "09-29-v11-host-acceptance"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

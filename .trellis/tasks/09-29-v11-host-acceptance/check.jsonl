@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/state-matrix-contract.md","reason":"Core Snapshot acceptance and static-versus-runtime evidence boundaries."}
+{"file":".trellis/spec/frontend/recovery-responsive-contract.md","reason":"Recovery, resize, and real-host validation gates."}
+{"file":".trellis/spec/frontend/desktop-projection-contract.md","reason":"Desktop multi-placement and single-daemon runtime acceptance."}
+{"file":".trellis/tasks/09-29-v11-health-diagnostics-desktop/research/v11-runtime-contracts.md","reason":"Current host/API facts and explicit evidence limits."}

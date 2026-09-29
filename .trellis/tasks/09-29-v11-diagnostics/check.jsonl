@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/settings-state-contract.md","reason":"Plugin-wide versus per-instance settings boundaries and recovery rules."}
+{"file":".trellis/spec/frontend/state-matrix-contract.md","reason":"Snapshot and warning source semantics for diagnostic counts."}
+{"file":".trellis/spec/frontend/desktop-projection-contract.md","reason":"Shared Snapshot consumer and no-extra-scanner contract."}
+{"file":".trellis/tasks/09-29-v11-health-diagnostics-desktop/research/v11-runtime-contracts.md","reason":"Verified DMS metadata and clipboard APIs plus path-bearing raw-field privacy findings."}

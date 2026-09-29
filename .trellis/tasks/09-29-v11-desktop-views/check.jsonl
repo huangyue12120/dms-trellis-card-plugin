@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/desktop-projection-contract.md","reason":"Existing Desktop Snapshot projection, responsive bounds, and lifecycle contract."}
+{"file":".trellis/spec/frontend/settings-state-contract.md","reason":"Per-placement settings and persistence boundaries."}
+{"file":".trellis/spec/frontend/recovery-responsive-contract.md","reason":"Degraded, last-good, and responsive view rules."}
+{"file":".trellis/tasks/09-29-v11-health-diagnostics-desktop/research/v11-runtime-contracts.md","reason":"Verified instance config API and shared archive response facts."}

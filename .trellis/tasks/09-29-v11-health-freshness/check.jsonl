@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/state-matrix-contract.md","reason":"Snapshot, warning, parser, and projection contracts for health incidents."}
+{"file":".trellis/spec/frontend/recovery-responsive-contract.md","reason":"Existing last-good and degraded recovery semantics."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Daemon-only collection, pure projection, and read-only requirements."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Cross-layer contract guidance for daemon/parser/projection/runtime metadata."}
+{"file":".trellis/tasks/09-29-v11-health-diagnostics-desktop/research/v11-runtime-contracts.md","reason":"Observed Snapshot v1, warning sources, archive detail channel, and schema extension evidence."}
