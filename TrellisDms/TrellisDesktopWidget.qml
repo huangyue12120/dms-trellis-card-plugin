@@ -12,10 +12,13 @@ DesktopPluginComponent {
     minHeight: 160
 
     readonly property var snapshot: snapshotVar.value
+    readonly property var detailResponse: detailResponseVar.value
+    readonly property string viewMode: TrellisProjection.normalizeDesktopViewMode(
+        root.instanceConfig?.viewMode)
     property bool versionWarningPreference: true
     readonly property bool versionWarning: versionWarningPreference
     readonly property var projection: TrellisProjection.makeDesktopProjection(
-        root.snapshot, { versionWarning: root.versionWarning })
+        root.snapshot, { versionWarning: root.versionWarning }, root.detailResponse)
 
     Component.onCompleted: reloadVersionWarningPreference()
     onPluginIdChanged: reloadVersionWarningPreference()
@@ -37,10 +40,81 @@ DesktopPluginComponent {
             : I18n.trFor("trellisDms", "%1 warnings").arg(count)
     }
 
+    function incidentCountLabel(count) {
+        return count === 1
+            ? I18n.trFor("trellisDms", "%1 incident").arg(count)
+            : I18n.trFor("trellisDms", "%1 incidents").arg(count)
+    }
+
     function sessionCountLabel(count) {
         return count === 1
             ? I18n.trFor("trellisDms", "%1 session").arg(count)
             : I18n.trFor("trellisDms", "%1 sessions").arg(count)
+    }
+
+    function taskCountLabel(count) {
+        return count === 1
+            ? I18n.trFor("trellisDms", "%1 active task").arg(count)
+            : I18n.trFor("trellisDms", "%1 active tasks").arg(count)
+    }
+
+    function viewModeLabel(value) {
+        switch (value) {
+        case "tasks": return I18n.trFor("trellisDms", "Tasks")
+        case "health": return I18n.trFor("trellisDms", "Health")
+        default: return I18n.trFor("trellisDms", "Overview")
+        }
+    }
+
+    function healthSummaryLabel(health) {
+        if (health.projectCount === 0)
+            return I18n.trFor("trellisDms", "No project health data")
+        var summary = health.attentionProjectCount === 1
+            ? "%1 healthy · %2 needs attention"
+            : "%1 healthy · %2 need attention"
+        return I18n.trFor("trellisDms", summary)
+            .arg(health.healthyProjectCount)
+            .arg(health.attentionProjectCount)
+    }
+
+    function healthStatusLabel(status) {
+        switch (status) {
+        case "healthy": return I18n.trFor("trellisDms", "Healthy")
+        case "warning": return I18n.trFor("trellisDms", "Needs attention")
+        case "degraded": return I18n.trFor("trellisDms", "Degraded")
+        default: return I18n.trFor("trellisDms", "Unknown")
+        }
+    }
+
+    function localizedTaskState(state) {
+        switch (state) {
+        case "active": return I18n.trFor("trellisDms", "Active")
+        case "in_progress": return I18n.trFor("trellisDms", "In progress")
+        case "planning": return I18n.trFor("trellisDms", "Planning")
+        case "error": return I18n.trFor("trellisDms", "Error")
+        default: return state
+        }
+    }
+
+    function localizedIncidentTitle(value) {
+        var titles = {
+            "Live task discovery failed": I18n.trFor("trellisDms", "Live task discovery failed"),
+            "Session discovery failed": I18n.trFor("trellisDms", "Session discovery failed"),
+            "Project discovery failed": I18n.trFor("trellisDms", "Project discovery failed"),
+            "Live task data is incomplete": I18n.trFor("trellisDms", "Live task data is incomplete"),
+            "Session data is incomplete": I18n.trFor("trellisDms", "Session data is incomplete"),
+            "Trellis data could not be parsed": I18n.trFor("trellisDms", "Trellis data could not be parsed"),
+            "Archive data is unavailable": I18n.trFor("trellisDms", "Archive data is unavailable"),
+            "A discovery limit was reached": I18n.trFor("trellisDms", "A discovery limit was reached"),
+            "A discovery or reload operation failed": I18n.trFor("trellisDms", "A discovery or reload operation failed"),
+            "Trellis version could not be verified": I18n.trFor("trellisDms", "Trellis version could not be verified"),
+            "Additional diagnostic": I18n.trFor("trellisDms", "Additional diagnostic")
+        }
+        return titles[value] || I18n.trFor("trellisDms", "Additional diagnostic")
+    }
+
+    function snapshotTimeLabel(value) {
+        return value ? value : I18n.trFor("trellisDms", "Unavailable")
     }
 
     function localizedWarningMessage(value) {
@@ -126,6 +200,12 @@ DesktopPluginComponent {
         defaultValue: null
     }
 
+    PluginGlobalVar {
+        id: detailResponseVar
+        varName: "detailResponse"
+        defaultValue: null
+    }
+
     Rectangle {
         id: background
 
@@ -175,7 +255,11 @@ DesktopPluginComponent {
                     anchors.right: projectCount.left
                     anchors.rightMargin: Theme.spacingXS
                     anchors.verticalCenter: parent.verticalCenter
-                    text: I18n.trFor("trellisDms", "Trellis DMS")
+                    text: root.viewMode === "overview"
+                        ? I18n.trFor("trellisDms", "Trellis DMS")
+                        : I18n.trFor("trellisDms", "%1 · %2")
+                            .arg(I18n.trFor("trellisDms", "Trellis DMS"))
+                            .arg(root.viewModeLabel(root.viewMode))
                     font.pixelSize: Theme.fontSizeMedium
                     font.weight: Font.DemiBold
                     color: Theme.surfaceText
@@ -189,9 +273,15 @@ DesktopPluginComponent {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     width: Math.min(90, parent.width * 0.55)
-                    text: root.projection.ready
-                        ? root.projectCountLabel(root.projection.projectCount)
-                        : ""
+                    text: {
+                        if (!root.projection.ready)
+                            return "";
+                        if (root.viewMode === "tasks")
+                            return root.taskCountLabel(root.projection.activeTaskCount);
+                        if (root.viewMode === "health")
+                            return root.incidentCountLabel(root.projection.health.incidentCount);
+                        return root.projectCountLabel(root.projection.projectCount);
+                    }
                     horizontalAlignment: Text.AlignRight
                     font.pixelSize: Theme.fontSizeSmall
                     color: Theme.surfaceVariantText
@@ -203,7 +293,8 @@ DesktopPluginComponent {
             Column {
                 id: warningSection
 
-                visible: root.projection.ready && root.projection.warningCount > 0
+                visible: root.viewMode === "overview"
+                    && root.projection.ready && root.projection.warningCount > 0
                 width: parent.width
                 spacing: Theme.spacingXS
 
@@ -303,8 +394,219 @@ DesktopPluginComponent {
                 wrapMode: Text.WordWrap
             }
 
+            StyledText {
+                visible: root.viewMode === "overview" && root.projection.ready
+                width: parent.width
+                text: root.healthSummaryLabel(root.projection.health)
+                font.pixelSize: Theme.fontSizeSmall
+                color: root.projection.health.attentionProjectCount > 0
+                    ? Theme.warning : Theme.surfaceVariantText
+                wrapMode: Text.WordWrap
+            }
+
+            Column {
+                id: tasksContent
+
+                visible: root.viewMode === "tasks" && root.projection.ready
+                width: parent.width
+                spacing: Theme.spacingS
+
+                StyledText {
+                    visible: root.projection.health.taskDataDegraded
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Some Trellis data needs attention; task details may be incomplete.")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.warning
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    visible: root.projection.activeTaskCount === 0
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "No active tasks")
+                    font.pixelSize: Theme.fontSizeMedium
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                Repeater {
+                    model: root.projection.taskProjects
+
+                    Column {
+                        id: taskProjectSection
+
+                        required property var modelData
+
+                        width: tasksContent.width
+                        spacing: Theme.spacingXS
+
+                        StyledText {
+                            width: parent.width
+                            text: taskProjectSection.modelData.name
+                            font.pixelSize: Theme.fontSizeMedium
+                            font.weight: Font.DemiBold
+                            color: Theme.surfaceText
+                            wrapMode: Text.NoWrap
+                            elide: Text.ElideRight
+                        }
+
+                        Repeater {
+                            model: taskProjectSection.modelData.activeTasks
+
+                            Column {
+                                required property var modelData
+
+                                width: taskProjectSection.width
+                                spacing: Theme.spacingXXS
+
+                                StyledText {
+                                    width: parent.width
+                                    leftPadding: Theme.spacingM
+                                    text: modelData.title
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.surfaceText
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                StyledText {
+                                    width: parent.width
+                                    leftPadding: Theme.spacingM
+                                    text: I18n.trFor("trellisDms", "%1 · %2 · %3")
+                                        .arg(root.localizedTaskState(modelData.displayState))
+                                        .arg(modelData.priority)
+                                        .arg(root.sessionCountLabel(modelData.activeSessionCount))
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.surfaceVariantText
+                                    wrapMode: Text.WordWrap
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Column {
+                id: healthContent
+
+                visible: root.viewMode === "health" && root.projection.ready
+                width: parent.width
+                spacing: Theme.spacingS
+
+                StyledText {
+                    width: parent.width
+                    text: root.healthSummaryLabel(root.projection.health)
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Font.Medium
+                    color: root.projection.health.attentionProjectCount > 0
+                        ? Theme.warning : Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    visible: root.projection.health.fallbackActive
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Showing the last valid snapshot")
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Font.DemiBold
+                    color: Theme.warning
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Last successful scan: %1")
+                        .arg(root.snapshotTimeLabel(
+                            root.projection.health.freshness.lastSuccessfulDiscoveryAt))
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    visible: root.projection.projectCount > 0
+                        && root.projection.health.incidentCount === 0
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "All loaded projects are healthy")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                Repeater {
+                    model: root.projection.health.projects
+
+                    Column {
+                        id: healthProjectSection
+
+                        required property var modelData
+
+                        width: healthContent.width
+                        spacing: Theme.spacingXS
+
+                        StyledText {
+                            width: parent.width
+                            text: healthProjectSection.modelData.name + " · "
+                                + root.healthStatusLabel(healthProjectSection.modelData.status)
+                            font.pixelSize: Theme.fontSizeMedium
+                            font.weight: Font.DemiBold
+                            color: healthProjectSection.modelData.status === "healthy"
+                                ? Theme.surfaceText : Theme.warning
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Repeater {
+                            model: healthProjectSection.modelData.incidents
+
+                            StyledText {
+                                required property var modelData
+
+                                width: healthProjectSection.width
+                                leftPadding: Theme.spacingM
+                                text: root.localizedIncidentTitle(modelData.title)
+                                    + " · " + modelData.count
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.surfaceVariantText
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+                    }
+                }
+
+                Column {
+                    visible: root.projection.health.unscopedIncidents.length > 0
+                    width: parent.width
+                    spacing: Theme.spacingXS
+
+                    StyledText {
+                        width: parent.width
+                        text: I18n.trFor("trellisDms", "Overall diagnostics")
+                        font.pixelSize: Theme.fontSizeMedium
+                        font.weight: Font.DemiBold
+                        color: Theme.surfaceText
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Repeater {
+                        model: root.projection.health.unscopedIncidents
+
+                        StyledText {
+                            required property var modelData
+
+                            width: parent.width
+                            leftPadding: Theme.spacingM
+                            text: root.localizedIncidentTitle(modelData.title)
+                                + " · " + modelData.count
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceVariantText
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+            }
+
             Repeater {
-                model: root.projection.ready ? root.projection.projects : []
+                model: root.viewMode === "overview" && root.projection.ready
+                    ? root.projection.projects : []
 
                 Column {
                     id: projectSection

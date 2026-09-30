@@ -22,6 +22,7 @@ var MAX_LAUNCHER_QUERY_LENGTH = 256;
 var MAX_LAUNCHER_ACTION_LENGTH = 4096;
 var MAX_HEALTH_INCIDENTS = 256;
 var MAX_HEALTH_WARNING_CODES = 16;
+var DESKTOP_VIEW_MODES = ["overview", "tasks", "health"];
 // Copied diagnostics are constructed only from these bounded public facts.
 var MAX_DIAGNOSTICS_REPORT_LENGTH = 8192;
 var MAX_DIAGNOSTIC_PROJECT_CODES = 8;
@@ -1328,10 +1329,18 @@ function makePopoutProjection(snapshot, limits, uiState) {
     };
 }
 
-function makeDesktopProjection(snapshot, uiState) {
+function normalizeDesktopViewMode(value) {
+    return typeof value === "string" && DESKTOP_VIEW_MODES.indexOf(value) !== -1
+        ? value : "overview";
+}
+
+function makeDesktopProjection(snapshot, uiState, detailResponse) {
     var facts = _snapshotFacts(snapshot);
     var state = normalizeUiState(uiState);
+    var healthProjection = makeHealthProjection(snapshot, detailResponse);
     var projects = [];
+    var taskProjects = [];
+    var activeTaskCount = 0;
 
     for (var i = 0; i < facts.projects.length; i++) {
         var sourceProject = facts.projects[i] || {};
@@ -1344,16 +1353,82 @@ function makeDesktopProjection(snapshot, uiState) {
             activeTasks.push({
                 id: _string(sourceTask.id),
                 title: _string(sourceTask.title, "unknown").slice(0, MAX_TASK_TITLE_LENGTH),
+                displayState: _string(sourceTask.displayState,
+                    _string(sourceTask.storedStatus, "unknown")).slice(0, MAX_TASK_STATE_LENGTH),
+                priority: _string(sourceTask.priority, "P2").slice(0, MAX_TASK_PRIORITY_LENGTH),
                 activeSessionCount: _number(sourceTask.activeSessionCount)
             });
         }
-        projects.push({
+        var project = {
             id: _string(sourceProject.id),
             name: _string(sourceProject.name, "unknown").slice(0, MAX_PROJECT_NAME_LENGTH),
             taskCount: sourceTasks.length,
             activeTaskCount: activeTasks.length,
             activeTasks: activeTasks
-        });
+        };
+        projects.push(project);
+        if (activeTasks.length) {
+            taskProjects.push(project);
+            activeTaskCount += activeTasks.length;
+        }
+    }
+
+    var healthProjects = [];
+    var unscopedIncidents = [];
+    var healthyProjectCount = 0;
+    var attentionProjectCount = 0;
+    var taskDataDegraded = healthProjection.fallbackActive;
+    for (var di = 0; di < healthProjection.incidents.length; di++) {
+        var degradedIncident = healthProjection.incidents[di] || {};
+        if (degradedIncident.severity === "degraded"
+                && degradedIncident.scope !== "archive") {
+            taskDataDegraded = true;
+            break;
+        }
+    }
+    for (var ui = 0; ui < healthProjection.incidents.length; ui++) {
+        var unscopedIncident = healthProjection.incidents[ui] || {};
+        if (unscopedIncident.projectIndex === null) {
+            unscopedIncidents.push({
+                title: unscopedIncident.title,
+                count: unscopedIncident.count,
+                impact: unscopedIncident.impact,
+                fallbackBehavior: unscopedIncident.fallbackBehavior,
+                severity: unscopedIncident.severity,
+                category: unscopedIncident.category
+            });
+        }
+    }
+    for (var hp = 0; hp < healthProjection.projects.length; hp++) {
+        var sourceHealth = healthProjection.projects[hp] || {};
+        var projectIncidents = [];
+        for (var hi = 0; hi < healthProjection.incidents.length; hi++) {
+            var incident = healthProjection.incidents[hi] || {};
+            if (incident.projectIndex === hp) {
+                projectIncidents.push({
+                    title: incident.title,
+                    count: incident.count,
+                    impact: incident.impact,
+                    fallbackBehavior: incident.fallbackBehavior,
+                    severity: incident.severity,
+                    category: incident.category
+                });
+            }
+        }
+        var healthProject = {
+            index: hp,
+            name: sourceHealth.name,
+            status: sourceHealth.status,
+            incidentCount: sourceHealth.incidentCount,
+            archiveIncidentCount: sourceHealth.archiveIncidentCount,
+            lastSuccessfulReadAt: sourceHealth.lastSuccessfulReadAt,
+            incidents: projectIncidents
+        };
+        healthProjects.push(healthProject);
+        if (sourceHealth.status === "healthy")
+            healthyProjectCount += 1;
+        else
+            attentionProjectCount += 1;
     }
 
     var unconfigured = false;
@@ -1399,9 +1474,26 @@ function makeDesktopProjection(snapshot, uiState) {
     return {
         ready: facts.ready,
         projectCount: facts.projectCount,
+        activeTaskCount: activeTaskCount,
         unconfigured: unconfigured,
         degraded: degraded,
         projects: projects,
+        taskProjects: taskProjects,
+        health: {
+            ready: healthProjection.ready,
+            freshness: healthProjection.freshness,
+            fallbackActive: healthProjection.fallbackActive,
+            taskDataDegraded: taskDataDegraded,
+            projectCount: healthProjection.projectCount,
+            healthyProjectCount: healthyProjectCount,
+            attentionProjectCount: attentionProjectCount,
+            projects: healthProjects,
+            unscopedIncidents: unscopedIncidents,
+            incidents: healthProjection.incidents,
+            incidentCount: healthProjection.incidentCount,
+            rawWarningCount: healthProjection.rawWarningCount,
+            rawErrorCount: healthProjection.rawErrorCount
+        },
         warningCount: visibleWarnings.length,
         warnings: warnings,
         hiddenWarningCount: Math.max(0, visibleWarnings.length - warnings.length)

@@ -54,7 +54,8 @@ const expectedQmlImports = {
     "lib/trellisprojection.js",
     "lib/trellisWatch.js"
   ],
-  "TrellisDms/TrellisWidget.qml": ["lib/trellisprojection.js"]
+  "TrellisDms/TrellisWidget.qml": ["lib/trellisprojection.js"],
+  "TrellisDms/TrellisDesktopWidget.qml": ["lib/trellisprojection.js"]
 };
 
 for (const [qmlRelativePath, expectedImports] of Object.entries(expectedQmlImports)) {
@@ -746,6 +747,7 @@ assert.match(liveTaskDiscoverySource,
   /for \(var i = 0; i < lines\.lines\.length; i\+\+\)\s+_discoverTask\(scan, project, lines\.lines\[i\]\);/,
   "normal live task candidates must retain the existing discovery and path validation flow");
 const widgetSource = fs.readFileSync(path.join(repoRoot, "TrellisDms/TrellisWidget.qml"), "utf8");
+const desktopSource = fs.readFileSync(path.join(repoRoot, "TrellisDms/TrellisDesktopWidget.qml"), "utf8");
 const launcherSource = fs.readFileSync(path.join(repoRoot, "TrellisDms/TrellisLauncher.qml"), "utf8");
 const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "TrellisDms/plugin.json"), "utf8"));
 const daemonLimits = {
@@ -1065,6 +1067,33 @@ assert.doesNotMatch(globalSettingsSource, /\["(?:sh|bash)",\s*"-c"/);
 assert.doesNotMatch(globalSettingsSource, /JSON\.stringify\(\s*diagnostics(?:Snapshot|Detail)/);
 assert.doesNotMatch(settingsSource.slice(desktopSettingsStart), /About \/ Diagnostics/,
   "About / Diagnostics belongs only to plugin-wide Settings");
+const desktopSettingsSource = settingsSource.slice(desktopSettingsStart);
+assert.match(desktopSettingsSource, /DankDropdown\s*\{[\s\S]*?text:\s*I18n\.trFor\("trellisDms",\s*"Desktop widget view"\)[\s\S]*?currentValue:\s*root\.desktopViewModeLabel\(root\.instanceData\?\.config\?\.viewMode\)[\s\S]*?onValueChanged:\s*value\s*=>\s*root\.saveDesktopViewMode\(value\)/);
+assert.match(settingsSource, /function saveDesktopViewMode\(label\)[\s\S]*?SettingsData\.updateDesktopWidgetInstanceConfig\(root\.desktopInstanceId,[\s\S]*?viewMode:/);
+assert.doesNotMatch(globalSettingsSource, /Desktop widget view|viewMode/,
+  "Desktop view mode remains placement-specific, not a plugin-wide setting");
+assert.match(desktopSource, /readonly property string viewMode:\s*TrellisProjection\.normalizeDesktopViewMode\(\s*root\.instanceConfig\?\.viewMode\s*\)/);
+assert.match(desktopSource, /makeDesktopProjection\([\s\S]*?root\.detailResponse\)/);
+assert.match(desktopSource, /id:\s*detailResponseVar[\s\S]*?varName:\s*"detailResponse"/);
+assert.equal((desktopSource.match(/DankFlickable\s*\{/g) || []).length, 1,
+  "all Desktop view modes share one vertical scroll region");
+assert.match(desktopSource, /visible:\s*root\.viewMode === "overview"/);
+assert.match(desktopSource, /visible:\s*root\.viewMode === "tasks" && root\.projection\.ready/);
+assert.match(desktopSource, /visible:\s*root\.viewMode === "health" && root\.projection\.ready/);
+assert.match(desktopSource, /model:\s*root\.projection\.taskProjects/);
+assert.match(desktopSource, /visible:\s*root\.projection\.health\.taskDataDegraded/);
+assert.match(desktopSource, /visible:\s*root\.projection\.activeTaskCount === 0/);
+for (const taskField of ["displayState", "priority", "activeSessionCount"])
+  assert.match(desktopSource, new RegExp(`modelData\\.${taskField}`));
+assert.match(desktopSource, /health\.freshness\.lastSuccessfulDiscoveryAt/);
+assert.match(desktopSource, /health\.fallbackActive/);
+assert.match(desktopSource, /health\.unscopedIncidents/);
+assert.match(desktopSource, /incidentCountLabel\(root\.projection\.health\.incidentCount\)/,
+  "the Health header must label grouped health incidents accurately");
+assert.match(desktopSource, /attentionProjectCount === 1/,
+  "the health summary must use the singular English verb for one project");
+assert.doesNotMatch(desktopSource, /FileView\s*\{|Process\s*\{|Timer\s*\{|startScan\s*\(|savePluginState\s*\(|setGlobalVar\s*\(/,
+  "Desktop view modes must not add readers, processes, timers, scans, or State writes");
 const diagnosticsSourceStart = globalSettingsSource.indexOf("function diagnosticsSnapshotState");
 const diagnosticsStrings = Array.from(globalSettingsSource.slice(diagnosticsSourceStart)
   .matchAll(/I18n\.trFor\("trellisDms",\s*"([^"]+)"\)/g), (match) => match[1]);
@@ -1073,6 +1102,17 @@ const zhCatalog = JSON.parse(fs.readFileSync(
 for (const sourceString of diagnosticsStrings)
   assert.ok(zhCatalog[sourceString] && zhCatalog[sourceString][sourceString],
     `About / Diagnostics string must have a Chinese translation: ${sourceString}`);
+const desktopStrings = new Set(Array.from(desktopSource.matchAll(
+  /I18n\.trFor\("trellisDms",\s*"([^"]+)"\)/g), (match) => match[1]));
+for (const sourceString of desktopStrings)
+  assert.ok(zhCatalog[sourceString] && zhCatalog[sourceString][sourceString],
+    `Desktop string must have a Chinese translation: ${sourceString}`);
+for (const sourceString of ["Desktop widget view",
+  "This view is saved separately for each Desktop placement.", "Overview", "Tasks", "Health",
+  "%1 incident", "%1 incidents", "%1 healthy · %2 need attention",
+  "%1 healthy · %2 needs attention"])
+  assert.ok(zhCatalog[sourceString] && zhCatalog[sourceString][sourceString],
+    `Desktop instance Settings string must have a Chinese translation: ${sourceString}`);
 assert.match(settingsSource, /settingKey:\s*"topologyInterval"/);
 assert.match(settingsSource, /TrellisWatch\.topologyIntervalDefaults\(\)\.minimum/);
 assert.match(settingsSource, /TrellisWatch\.topologyIntervalDefaults\(\)\.maximum/);
@@ -1926,6 +1966,29 @@ assert.equal(snapshot.projects[0].sessions.length, 5);
 assert.equal(snapshot.projects[0].tasks.find(task => task.id === "live").progress, null);
 assert.equal(Object.prototype.hasOwnProperty.call(snapshot.projects[0], "markdown"), false);
 assert.equal(JSON.stringify(snapshot).includes("not exposed"), false);
+assert.equal(projection.normalizeDesktopViewMode("overview"), "overview");
+assert.equal(projection.normalizeDesktopViewMode("tasks"), "tasks");
+assert.equal(projection.normalizeDesktopViewMode("health"), "health");
+for (const invalidDesktopMode of [null, "", "launcher", 1, {}])
+  assert.equal(projection.normalizeDesktopViewMode(invalidDesktopMode), "overview");
+const snapshotBeforeDesktopProjection = JSON.stringify(snapshot);
+const desktopProjection = projection.makeDesktopProjection(snapshot, {
+  versionWarning: true
+});
+assert.equal(desktopProjection.ready, true);
+assert.equal(desktopProjection.projectCount, 1);
+assert.equal(desktopProjection.activeTaskCount, 1);
+assert.equal(desktopProjection.taskProjects.length, 1);
+assert.equal(desktopProjection.taskProjects[0].activeTasks.length, 1);
+assert.equal(desktopProjection.taskProjects[0].activeTasks[0].id, "live");
+assert.equal(desktopProjection.taskProjects[0].activeTasks[0].displayState, "active");
+assert.equal(desktopProjection.taskProjects[0].activeTasks[0].priority, "P1");
+assert.equal(desktopProjection.taskProjects[0].activeTasks[0].activeSessionCount, 3);
+assert.equal(desktopProjection.health.ready, true);
+assert.equal(desktopProjection.health.freshness.lastSuccessfulDiscoveryAt,
+  "2026-09-21T00:00:00.500Z");
+assert.equal(JSON.stringify(snapshot), snapshotBeforeDesktopProjection,
+  "Desktop projection must not mutate the shared Snapshot");
 const parserToProjection = projection.makePopoutProjection(snapshot);
 assert.equal(parserToProjection.projects.length, 1);
 assert.equal(parserToProjection.projects[0].tasks.length, 4);
@@ -1992,6 +2055,140 @@ const healthSnapshot = parser.makeSnapshot([
   snapshotIsCurrent: false,
   lastGoodFallbackActive: true
 });
+const desktopAlphaRoot = "/private/projects/desktop-alpha";
+const desktopAlphaTaskDir = path.join(desktopAlphaRoot, ".trellis/tasks/alpha-active");
+const desktopBetaRoot = "/private/projects/desktop-beta";
+const desktopBetaTaskDir = path.join(desktopBetaRoot, ".trellis/tasks/beta-active");
+const desktopViewSnapshot = parser.makeSnapshot([
+  {
+    id: "desktop-alpha",
+    root: desktopAlphaRoot,
+    name: "Desktop Alpha",
+    lastSuccessfulReadAt: "2026-09-21T00:03:00.000Z",
+    taskRecords: [{
+      dirName: "alpha-active",
+      taskDir: desktopAlphaTaskDir,
+      taskJson: path.join(desktopAlphaTaskDir, "task.json"),
+      value: { id: "alpha-active", title: "Alpha active task", status: "in_progress", priority: "P1" }
+    }],
+    sessionRecords: [{
+      sessionKey: "desktop-alpha-session",
+      value: { current_task: ".trellis/tasks/alpha-active" },
+      resolution: { ok: true, taskDir: desktopAlphaTaskDir }
+    }],
+    warnings: []
+  },
+  {
+    id: "desktop-beta",
+    root: desktopBetaRoot,
+    name: "Desktop Beta",
+    lastSuccessfulReadAt: "2026-09-21T00:03:30.000Z",
+    taskRecords: [{
+      dirName: "beta-active",
+      taskDir: desktopBetaTaskDir,
+      taskJson: path.join(desktopBetaTaskDir, "task.json"),
+      value: { id: "beta-active", title: "Beta active task", status: "active", priority: "P2" }
+    }],
+    sessionRecords: [{
+      sessionKey: "desktop-beta-session",
+      value: { current_task: ".trellis/tasks/beta-active" },
+      resolution: { ok: true, taskDir: desktopBetaTaskDir }
+    }],
+    warnings: [
+      { code: "task_discovery_failed", message: "private warning /private/projects/desktop-beta" },
+      { code: "task_discovery_failed", message: "second warning /private/projects/desktop-beta" }
+    ]
+  }
+], [{ code: "topology_interval", message: "private global warning /private/root" }],
+"2026-09-21T00:04:00.000Z", {
+  scanStartedAt: "2026-09-21T00:04:00.000Z",
+  lastSuccessfulDiscoveryAt: "2026-09-21T00:03:30.000Z",
+  snapshotIsCurrent: false,
+  lastGoodFallbackActive: true
+});
+const desktopViewSnapshotBefore = JSON.stringify(desktopViewSnapshot);
+const multiProjectDesktop = projection.makeDesktopProjection(desktopViewSnapshot, {
+  versionWarning: true
+}, {
+  kind: "archive-task",
+  status: "error",
+  projectId: "desktop-beta",
+  warnings: [{ code: "archive_task_read_failed", message: "private archive /private/root" }],
+  content: "private archive markdown"
+});
+assert.equal(multiProjectDesktop.projectCount, 2);
+assert.equal(multiProjectDesktop.activeTaskCount, 2);
+assert.deepEqual(Array.from(multiProjectDesktop.projects, project => project.name),
+  ["Desktop Alpha", "Desktop Beta"]);
+assert.deepEqual(Array.from(multiProjectDesktop.taskProjects, project => project.name),
+  ["Desktop Alpha", "Desktop Beta"],
+  "Tasks groups preserve the shared Snapshot project order");
+assert.equal(multiProjectDesktop.health.healthyProjectCount, 1);
+assert.equal(multiProjectDesktop.health.attentionProjectCount, 1);
+assert.equal(multiProjectDesktop.health.projects[0].status, "healthy");
+assert.equal(multiProjectDesktop.health.projects[1].status, "degraded");
+assert.equal(multiProjectDesktop.health.projects[1].archiveIncidentCount, 1);
+assert.ok(multiProjectDesktop.health.projects[1].incidents.some(
+  incident => incident.title === "Archive data is unavailable"));
+assert.equal(multiProjectDesktop.health.fallbackActive, true);
+assert.equal(multiProjectDesktop.health.taskDataDegraded, true);
+assert.equal(multiProjectDesktop.health.freshness.lastSuccessfulDiscoveryAt,
+  "2026-09-21T00:03:30.000Z");
+assert.ok(multiProjectDesktop.health.unscopedIncidents.length > 0);
+assert.equal(JSON.stringify(multiProjectDesktop.health).includes("/private/"), false,
+  "Desktop Health view data must not expose roots or raw warning messages");
+assert.equal(JSON.stringify(multiProjectDesktop.health).includes("private archive markdown"), false,
+  "archive content remains outside Desktop Health projection");
+assert.equal(JSON.stringify(desktopViewSnapshot), desktopViewSnapshotBefore,
+  "mode projections must not mutate the shared multi-project Snapshot");
+const healthyDesktopSnapshot = parser.makeSnapshot([{
+  id: "desktop-healthy",
+  root: "/private/projects/desktop-healthy",
+  name: "Healthy project",
+  taskRecords: [],
+  sessionRecords: [],
+  warnings: []
+}], [], "2026-09-21T00:05:00.000Z", {
+  scanStartedAt: "2026-09-21T00:05:00.000Z",
+  lastSuccessfulDiscoveryAt: "2026-09-21T00:05:00.000Z",
+  snapshotIsCurrent: true,
+  lastGoodFallbackActive: false
+});
+const healthyDesktop = projection.makeDesktopProjection(healthyDesktopSnapshot);
+assert.equal(healthyDesktop.activeTaskCount, 0);
+assert.equal(healthyDesktop.taskProjects.length, 0);
+assert.equal(healthyDesktop.health.incidentCount, 0);
+assert.equal(healthyDesktop.health.healthyProjectCount, 1);
+assert.equal(healthyDesktop.health.taskDataDegraded, false);
+const warningOnlySnapshot = Object.assign({}, healthyDesktopSnapshot, {
+  warnings: [{ code: "topology_interval", message: "scan interval was normalized" }]
+});
+const warningOnlyDesktop = projection.makeDesktopProjection(warningOnlySnapshot);
+assert.ok(warningOnlyDesktop.health.incidentCount > 0);
+assert.equal(warningOnlyDesktop.health.taskDataDegraded, false,
+  "warning-only configuration incidents must not claim live task details are incomplete");
+const taskDegradedSnapshot = Object.assign({}, healthyDesktopSnapshot, {
+  warnings: [{ code: "task_discovery_failed", projectId: "desktop-healthy" }]
+});
+const taskDegradedDesktop = projection.makeDesktopProjection(taskDegradedSnapshot);
+assert.equal(taskDegradedDesktop.health.fallbackActive, false);
+assert.equal(taskDegradedDesktop.health.taskDataDegraded, true,
+  "degraded live-task incidents must appear in the compact Tasks banner");
+const archiveOnlyDesktop = projection.makeDesktopProjection(healthyDesktopSnapshot, undefined, {
+  kind: "archive-task",
+  status: "error",
+  projectId: "desktop-healthy",
+  warnings: [{ code: "archive_task_read_failed" }]
+});
+assert.ok(archiveOnlyDesktop.health.incidentCount > 0);
+assert.equal(archiveOnlyDesktop.health.taskDataDegraded, false,
+  "archive-only incidents must not claim live task details are incomplete");
+const emptyDesktop = projection.makeDesktopProjection(parser.makeSnapshot([], [],
+  "2026-09-21T00:06:00.000Z"));
+assert.equal(emptyDesktop.ready, true);
+assert.equal(emptyDesktop.projectCount, 0);
+assert.equal(emptyDesktop.activeTaskCount, 0);
+assert.equal(emptyDesktop.health.projectCount, 0);
 const healthSnapshotBefore = JSON.stringify(healthSnapshot);
 const health = projection.makeHealthProjection(healthSnapshot);
 assert.equal(health.ready, true);

@@ -805,5 +805,98 @@
     },
     "Desktop widget instance ID is unavailable. Close and reopen these settings.": {
         "Desktop widget instance ID is unavailable. Close and reopen these settings.": "无法获取桌面部件实例 ID。请关闭并重新打开此设置面板。"
+    },
+    "%1 active task": {
+        "%1 active task": "%1 个活动任务"
+    },
+    "%1 active tasks": {
+        "%1 active tasks": "%1 个活动任务"
+    },
+    "%1 incident": {
+        "%1 incident": "%1 个健康事件"
+    },
+    "%1 incidents": {
+        "%1 incidents": "%1 个健康事件"
+    },
+    "%1 healthy · %2 need attention": {
+        "%1 healthy · %2 need attention": "%1 个健康项目 · %2 个需要关注"
+    },
+    "%1 healthy · %2 needs attention": {
+        "%1 healthy · %2 needs attention": "%1 个健康项目 · %2 个需要关注"
+    },
+    "%1 · %2": {
+        "%1 · %2": "%1 · %2"
+    },
+    "%1 · %2 · %3": {
+        "%1 · %2 · %3": "%1 · %2 · %3"
+    },
+    "A discovery limit was reached": {
+        "A discovery limit was reached": "已达到发现上限"
+    },
+    "A discovery or reload operation failed": {
+        "A discovery or reload operation failed": "发现或重新加载操作失败"
+    },
+    "Additional diagnostic": {
+        "Additional diagnostic": "其他诊断"
+    },
+    "All loaded projects are healthy": {
+        "All loaded projects are healthy": "所有已加载项目均健康"
+    },
+    "Archive data is unavailable": {
+        "Archive data is unavailable": "归档数据不可用"
+    },
+    "Desktop widget view": {
+        "Desktop widget view": "桌面小组件视图"
+    },
+    "Health": {
+        "Health": "健康"
+    },
+    "Live task data is incomplete": {
+        "Live task data is incomplete": "实时任务数据不完整"
+    },
+    "Live task discovery failed": {
+        "Live task discovery failed": "实时任务发现失败"
+    },
+    "Needs attention": {
+        "Needs attention": "需要关注"
+    },
+    "No active tasks": {
+        "No active tasks": "没有活动任务"
+    },
+    "No project health data": {
+        "No project health data": "暂无项目健康数据"
+    },
+    "Overall diagnostics": {
+        "Overall diagnostics": "总体诊断"
+    },
+    "Overview": {
+        "Overview": "概览"
+    },
+    "Project discovery failed": {
+        "Project discovery failed": "项目发现失败"
+    },
+    "Session data is incomplete": {
+        "Session data is incomplete": "会话数据不完整"
+    },
+    "Session discovery failed": {
+        "Session discovery failed": "会话发现失败"
+    },
+    "Showing the last valid snapshot": {
+        "Showing the last valid snapshot": "正在显示上一次有效快照"
+    },
+    "Some Trellis data needs attention; task details may be incomplete.": {
+        "Some Trellis data needs attention; task details may be incomplete.": "部分 Trellis 数据需要关注；任务详情可能不完整。"
+    },
+    "Tasks": {
+        "Tasks": "任务"
+    },
+    "This view is saved separately for each Desktop placement.": {
+        "This view is saved separately for each Desktop placement.": "此视图会分别保存到每个桌面小组件实例。"
+    },
+    "Trellis data could not be parsed": {
+        "Trellis data could not be parsed": "无法解析 Trellis 数据"
+    },
+    "Trellis version could not be verified": {
+        "Trellis version could not be verified": "无法验证 Trellis 版本"
     }
 }

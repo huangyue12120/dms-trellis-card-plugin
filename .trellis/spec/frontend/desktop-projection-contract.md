@@ -1,22 +1,28 @@
-# v0.9.1 Desktop Snapshot Projection Contract
+# Desktop Snapshot Projection Contract
 
 ### 1. Scope / Trigger
 
-Use this contract when changing the v0.9.1 desktop surface or its pure Snapshot
-projection. The daemon remains the only filesystem collector; desktop
-placements render one shared Snapshot.
+Use this contract when changing the v0.9.1 desktop surface, its v1.1 view modes,
+or its pure Snapshot projection. The daemon remains the only filesystem
+collector; desktop placements render one shared Snapshot.
 
 ### 2. Signatures
 
 ```text
-makeDesktopProjection(snapshot, uiState?) -> DesktopProjection
+normalizeDesktopViewMode(value)
+  -> "overview" | "tasks" | "health"
+makeDesktopProjection(snapshot, uiState?, detailResponse?) -> DesktopProjection
 ```
 
 The projection returns `ready`, `projectCount`, `unconfigured`, `degraded`,
-`projects[]`, `warningCount`, `warnings[]`, and `hiddenWarningCount`. Each
-project has `{ id, name, taskCount, activeTaskCount, activeTasks[] }`; each
-active task has `{ id, title, activeSessionCount }`; each warning has
-`{ code, message }`.
+`projects[]`, `warningCount`, `warnings[]`, and `hiddenWarningCount`, plus the
+`activeTaskCount`, `taskProjects[]`, and `health`. Each base project has
+`{ id, name, taskCount, activeTaskCount, activeTasks[] }`; each base active
+task has `{ id, title, activeSessionCount }`; each task-mode active task also
+has `displayState` and `priority`. `taskProjects` retains Snapshot order and
+contains only projects with active tasks. `health` carries project health
+counts, freshness, fallback state, grouped incidents, and `taskDataDegraded`.
+Each warning has `{ code, message }`.
 
 ### 3. Contracts
 
@@ -25,6 +31,14 @@ active task has `{ id, title, activeSessionCount }`; each warning has
   `PluginService.loadPluginData(pluginId, key, defaultValue)`. Reload it when
   `PluginService.pluginDataChanged(pluginId)` fires for this plugin. Desktop
   `pluginData` is per-placement config and is not the source of shared settings.
+- The Desktop view mode comes from `DesktopPluginComponent.instanceConfig.viewMode`.
+  Normalize missing or invalid values to `overview`; persist a selection only
+  through `SettingsData.updateDesktopWidgetInstanceConfig(instanceId, { viewMode })`.
+  This preference is per placement and does not trigger a scan.
+- The Desktop surface may read the existing
+  `PluginGlobalVar("detailResponse")` and pass it to the pure projection so
+  archive-detail errors can be grouped with Snapshot health. Ignore non-archive
+  detail responses and never copy response content into the Desktop projection.
 - The surface creates no reader, process, timer, watcher, persistent UI State,
   or filesystem scan.
 - Keep projects and tasks in Snapshot order. Include every loaded project and
@@ -40,6 +54,16 @@ active task has `{ id, title, activeSessionCount }`; each warning has
 - Set `unconfigured` only when a ready Snapshot has `root_empty`; distinguish
   that from a valid configured scan with zero projects. Degraded warnings
   augment healthy facts and do not replace them.
+- Overview keeps the compact project/task presentation and adds a health
+  summary. Tasks groups active tasks by Snapshot project order and exposes only
+  title, display state, priority, and active-session count. Health groups
+  project incidents and freshness without duplicating the task list.
+- `health.taskDataDegraded` is true for last-good fallback or degraded
+  non-archive incidents. Warning-only configuration and archive-only incidents
+  do not claim that live task details may be incomplete.
+- Tasks with no active items and Health with no project health data or no
+  incidents have explicit empty/healthy copy. Missing Snapshot copy remains
+  visible in every mode.
 - Do not copy task `progress`, session timestamps, archive content, or Markdown
   into the desktop projection. The UI uses one vertical scroll region and
   leaves placement/resize persistence to the DMS host.
@@ -74,9 +98,12 @@ active task has `{ id, title, activeSessionCount }`; each warning has
 - Projection assertions cover null/invalid Snapshot, configured and
   unconfigured empty states, project/task order, active-session counts,
   warning filtering/cap/overflow, degraded-warning priority, immutability, and
-  absence of `progress` in the view model.
+  absence of `progress` in the view model. Desktop-view assertions cover mode
+  normalization, active-task field allowlists, Health grouping/freshness,
+  non-archive degradation classification, and archive-content exclusion.
 - Static QML checks cover the exact helper/global import and absence of file
-  readers, processes, sockets, timers, watchers, and State writes.
+  readers, processes, sockets, timers, watchers, and State writes; they also
+  verify the single scroll region and one placement-specific mode selector.
 - Live DMS checks separately cover plugin load, desktop placement/removal,
   resize, multiple screens, and unchanged single-daemon lifecycle. Static
   checks do not stand in for those runtime results.

@@ -40,6 +40,7 @@ instanceData.id: string -> DMS desktop instance ID in the settings loader
 effective desktop instance ID -> instanceData.id, then instanceId
 desktop instance context -> effective ID, instanceData, or scoped pluginService
 instanceData.config.displayPreferences -> preference records or ["all"]
+instanceData.config.viewMode -> "overview" | "tasks" | "health" (default "overview")
 SettingsData.updateDesktopWidgetInstanceConfig(effectiveInstanceId, updates)
 SessionData.desktopWidgetInstancePositions[effectiveInstanceId][screenKey]
   -> { x?, y?, width?, height? }
@@ -81,6 +82,13 @@ SessionData.set("desktopWidgetInstancePositions", positionsByInstance)
   or `["all"]` and persist with
   `SettingsData.updateDesktopWidgetInstanceConfig(effectiveInstanceId, { displayPreferences })`.
   Each instance has its own config.
+- Desktop view mode accepts only `overview`, `tasks`, or `health`; missing and
+  invalid values resolve to `overview`. The widget reads
+  `DesktopPluginComponent.instanceConfig.viewMode`, and the instance Settings
+  selector persists `{ viewMode }` with
+  `SettingsData.updateDesktopWidgetInstanceConfig(effectiveInstanceId, updates)`.
+  It is placement-specific and must not use plugin data, DMS Plugin State, or
+  trigger a Snapshot scan.
 - DMS 1.6.2 desktop geometry is stored in
   `SessionData.desktopWidgetInstancePositions[effectiveInstanceId][screenKey]`, not in
   `instanceData.config.positions`. Reset Position removes only `x` and `y`;
@@ -122,6 +130,7 @@ SessionData.set("desktopWidgetInstancePositions", positionsByInstance)
 | Desktop settings component has `instanceData`, an effective instance ID, or the instance-scoped `pluginService` | Create instance controls only; leave plugin-data migration and plugin State untouched |
 | Desktop instance context exists but no effective ID is available | Show an ID-unavailable diagnostic; do not show global settings or inert controls |
 | Desktop instance lacks `displayPreferences` | Show the all-displays default and persist a change only to that instance config |
+| Desktop instance lacks a valid `viewMode` | Show Overview and persist future changes only to that instance config |
 | Reset Position / Reset Size clicked | Remove only the matching geometry fields from this instance's SessionData map; preserve other dimensions and instances |
 | Picker opened or navigated to `/`, `/run/media`, or `/mnt` | Keep `scanRoots` unchanged until a concrete directory is selected |
 
@@ -143,6 +152,12 @@ SessionData.set("desktopWidgetInstancePositions", positionsByInstance)
 - Bad: using the instance-scoped `pluginService` fallback for global migration,
   writing `positions: {}` into instance config as a geometry reset, or adding
   `/` to `scanRoots` just because the picker navigated there is forbidden.
+- Good: two Desktop placements read and write independent `viewMode` values
+  through their DMS instance IDs; changing a mode reuses the shared Snapshot.
+- Base: missing or malformed `viewMode` displays Overview without rewriting
+  global settings or forcing a scan.
+- Bad: saving `viewMode` through plugin-wide settings or DMS UI State, or
+  storing it in a shared Snapshot, is forbidden.
 
 ## 6. Tests Required
 
@@ -153,6 +168,9 @@ SessionData.set("desktopWidgetInstancePositions", positionsByInstance)
   visibility, and empty Repeater models. They also cover global-versus-instance
   Loader gating, instance display preference writes, targeted geometry field
   removal, and picker navigation without trusted-root mutation.
+- Desktop mode assertions cover normalization, instance-scoped config writes,
+  absence of global/State writes, and the shared Snapshot boundary. Runtime
+  DMS checks separately cover independent placements and restart persistence.
 - State-matrix fixtures cover empty roots, no projects, invalid State, healthy
   warnings, degraded refresh, archive/detail failure, and narrow responsive
   layout.
@@ -183,6 +201,11 @@ instance config API and reset geometry in the SessionData map:
 ```qml
 SettingsData.updateDesktopWidgetInstanceConfig(instanceId, {
     displayPreferences: preferences
+})
+
+// Desktop view mode is saved to the same placement-specific config boundary.
+SettingsData.updateDesktopWidgetInstanceConfig(instanceId, {
+    viewMode: "health"
 })
 
 // After cloning desktopWidgetInstancePositions, remove only the selected fields

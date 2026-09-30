@@ -70,6 +70,27 @@ PluginSettings {
         SessionData.set("desktopWidgetInstancePositions", positionsByInstance);
     }
 
+    function desktopViewModeLabel(value) {
+        switch (TrellisProjection.normalizeDesktopViewMode(value)) {
+        case "tasks": return I18n.trFor("trellisDms", "Tasks");
+        case "health": return I18n.trFor("trellisDms", "Health");
+        default: return I18n.trFor("trellisDms", "Overview");
+        }
+    }
+
+    function saveDesktopViewMode(label) {
+        if (!root.desktopInstanceId
+                || typeof SettingsData.updateDesktopWidgetInstanceConfig !== "function")
+            return;
+        var tasksLabel = I18n.trFor("trellisDms", "Tasks");
+        var healthLabel = I18n.trFor("trellisDms", "Health");
+        var mode = label === tasksLabel ? "tasks"
+            : (label === healthLabel ? "health" : "overview");
+        SettingsData.updateDesktopWidgetInstanceConfig(root.desktopInstanceId, {
+            viewMode: TrellisProjection.normalizeDesktopViewMode(mode)
+        });
+    }
+
     function loadVariants() {
         if (root.isDesktopInstance || !root.pluginService
                 || typeof root.pluginService.getPluginVariants !== "function"
@@ -1039,6 +1060,20 @@ PluginSettings {
                     font.pixelSize: Theme.fontSizeSmall
                     color: Theme.warning
                     wrapMode: Text.WordWrap
+                }
+
+                DankDropdown {
+                    visible: root.desktopInstanceId.length > 0
+                    width: parent.width
+                    text: I18n.trFor("trellisDms", "Desktop widget view")
+                    description: I18n.trFor("trellisDms", "This view is saved separately for each Desktop placement.")
+                    currentValue: root.desktopViewModeLabel(root.instanceData?.config?.viewMode)
+                    options: [
+                        I18n.trFor("trellisDms", "Overview"),
+                        I18n.trFor("trellisDms", "Tasks"),
+                        I18n.trFor("trellisDms", "Health")
+                    ]
+                    onValueChanged: value => root.saveDesktopViewMode(value)
                 }
 
                 SettingsDisplayPicker {
