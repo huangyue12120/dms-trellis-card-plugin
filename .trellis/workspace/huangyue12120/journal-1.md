@@ -376,3 +376,39 @@ Added a global Settings diagnostics panel and bounded allowlist export. Contract
 ### Next Steps
 
 - Continue with v1.1.3 Desktop Overview Tasks Health Views.
+
+
+## Session 12: v1.1.3 Desktop Views
+<!-- trellis-session: v=2 fp=98d67de64d909f61 -->
+
+**Date**: 2026-09-30
+**Task**: v1.1.3 Desktop Views
+**Branch**: `feat/v11-health-freshness`
+
+### Summary
+
+Implemented and verified per-placement Overview, Tasks, and Health views; archived v1.1.3. Host-specific DMS checks remain for v1.1.4.
+
+### Main Changes
+
+- Added per-placement Desktop view selection and shared Snapshot projections for Tasks and Health.
+- Updated Chinese UI translations and frontend contracts; preserved PROJECT_PROGRESS.md user changes.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2fadf79` | feat: add desktop tasks and health views |
+
+### Testing
+
+- [OK] node tests/test_trellis_contract.mjs and projection JavaScript syntax check passed.
+- [OK] Chinese/plugin JSON parsing, task context validation, and scoped git diff --check passed.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Start v1.1.4 host acceptance after reviewing its planned test matrix; verify restart, independent placements, resize, locale, diagnostics copy, and v1.0 regressions on DMS.
