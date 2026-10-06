@@ -412,3 +412,25 @@ Implemented and verified per-placement Overview, Tasks, and Health views; archiv
 ### Next Steps
 
 - Start v1.1.4 host acceptance after reviewing its planned test matrix; verify restart, independent placements, resize, locale, diagnostics copy, and v1.0 regressions on DMS.
+
+
+## Session 13: Archive v1.1 acceptance and commit fixes
+<!-- trellis-session: v=2 fp=1fe2e807908ed4f7 -->
+
+**Date**: 2026-10-06
+**Task**: Archive v1.1 acceptance and commit fixes
+**Branch**: `feat/v11-health-freshness`
+
+### Summary
+
+Committed the v1.1 settings reload, widget and automatic refresh, and Diagnostics repairs. Recorded host-only checks as unverified and kept manifest at 1.0.0. Archived the host-acceptance task and v1.1 parent task; left PROJECT_PROGRESS.md untouched.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `46e831a` | fix: repair v1.1 acceptance regressions |
+
+### Status
+
+[OK] **Completed**
