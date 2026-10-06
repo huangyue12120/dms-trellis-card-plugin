@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "author": "Trellis DMS Contributors",
     "type": "composite",
-    "capabilities": ["daemon", "dankbar-widget", "desktop-widget", "launcher"],
+    "capabilities": ["daemon", "dankbar-widget", "desktop-widget"],
     "components": {
         "daemon": "./TrellisDaemon.qml",
         "widget": "./TrellisWidget.qml",

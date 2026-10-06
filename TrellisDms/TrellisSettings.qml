@@ -391,9 +391,12 @@ PluginSettings {
             Column {
                 id: globalSettingsView
 
+                property string pluginId: root.pluginId
                 property var pillModeSettingControl: pillModeSetting
                 property var diagnosticsMetadata: {
-                    var plugins = PluginService.availablePlugins || ({});
+                    var service = root.pluginService;
+                    var plugins = service && service.availablePlugins
+                        ? service.availablePlugins : ({});
                     var metadata = plugins[root.pluginId] || null;
                     var components = metadata && metadata.components
                         && typeof metadata.components === "object"
@@ -401,8 +404,8 @@ PluginSettings {
                     if (metadata && typeof metadata.settings === "string"
                             && metadata.settings.length > 0)
                         components.push("settings");
-                    var loaded = typeof PluginService.isPluginLoaded === "function"
-                        ? PluginService.isPluginLoaded(root.pluginId) : null;
+                    var loaded = service && typeof service.isPluginLoaded === "function"
+                        ? service.isPluginLoaded(root.pluginId) : null;
                     return {
                         pluginVersion: metadata ? metadata.version : "",
                         pluginLoaded: loaded,

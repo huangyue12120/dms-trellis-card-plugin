@@ -99,8 +99,10 @@ canonical path and stores `generation`, `projectId`, `kind` (`version`,
   submitted. This guard also covers synchronous process-creation failures, so
   `_maybeFinish()` cannot publish a partial multi-root scan.
 - The topology timer defaults to 30 seconds and accepts only 15–300 seconds.
-  Root/interval changes and the settings refresh token start an immediate
-  topology scan; directory enumeration remains argv-only and bounded.
+  Effective root changes and the settings refresh token start an immediate
+  topology scan. An interval-only change re-arms the existing timer without
+  scanning, and presentation-only plugin-data changes do not restart daemon
+  work. Directory enumeration remains argv-only and bounded.
 - JSON and command-output limit semantics are not pre-read memory bounds:
   ordinary task/session `FileView` reads call `text()` before checking the
   1 MiB JavaScript-string limit, and `StdioCollector` accumulates stdout before
@@ -152,7 +154,10 @@ canonical path and stores `generation`, `projectId`, `kind` (`version`,
 - `tests/test_trellis_contract.mjs` must assert interval bounds/default,
   pending-path coalescing and caps, warning cooldown/ledger eviction, one
   daemon publisher, watcher properties, generation cleanup, and the unchanged
-  Snapshot/raw-content contract.
+  Snapshot/raw-content contract. It must also cover settings-change
+  classification: effective roots and refresh tokens request a scan,
+  interval-only changes re-arm the timer, and presentation-only changes do
+  neither.
 - Static source checks must reject shell-string commands, writes, network,
   hooks, sockets, widget-owned readers, high-frequency polling, and archive or
   Markdown body loading.

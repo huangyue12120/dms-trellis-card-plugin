@@ -58,7 +58,7 @@ PluginComponent {
     property var warningLedger: ({})
     property var warningLedgerOrder: []
     property int topologyIntervalSeconds: topologyIntervalDefault
-    property var observedRefreshToken: null
+    property var observedTopologySettings: null
     property int detailGeneration: 0
     property string currentDetailRequestId: ""
     property var ownedDetailProcesses: []
@@ -1943,13 +1943,42 @@ PluginComponent {
         topologyTimer.restart();
     }
 
+    function _topologySettingsSnapshot(settings) {
+        var source = settings || ({});
+        return {
+            scanRoots: Array.isArray(source.scanRoots)
+                ? source.scanRoots.slice() : source.scanRoots,
+            projectRoot: source.projectRoot,
+            refreshToken: source.refreshToken,
+            topologyInterval: source.topologyInterval
+        };
+    }
+
+    function _observePluginSettingsChange() {
+        if (!root.observedTopologySettings)
+            return;
+        var settings = root.pluginData || ({});
+        var changes = TrellisWatch.topologySettingsChanges(
+            root.observedTopologySettings, settings,
+            root.topologyIntervalDefault, root.maxScanRoots);
+        root.observedTopologySettings = root._topologySettingsSnapshot(settings);
+
+        if (changes.intervalChanged) {
+            root.topologyIntervalSeconds = changes.intervalSeconds;
+            if (topologyTimer.running)
+                root._armTopologyTimer();
+        }
+        if (changes.rootsChanged || changes.refreshRequested)
+            settingsRefreshTimer.restart();
+    }
+
     function startScan(reason) {
         root.scanGeneration += 1;
         _destroyOwned();
         root.scanStartedAt = new Date().toISOString();
         var generation = root.scanGeneration;
         var settings = pluginData || {};
-        root.observedRefreshToken = settings.refreshToken;
+        root.observedTopologySettings = root._topologySettingsSnapshot(settings);
         var intervalResult = TrellisWatch.normalizeTopologyInterval(settings.topologyInterval, root.topologyIntervalDefault);
         root.topologyIntervalSeconds = intervalResult.value;
         // An array-valued scanRoots setting is authoritative even when empty.
@@ -2007,7 +2036,15 @@ PluginComponent {
         _maybeFinish(scan);
     }
 
-    onPluginDataChanged: settingsRefreshTimer.restart()
+    Connections {
+        target: root.pluginService
+        enabled: !!root.pluginService
+
+        function onPluginDataChanged(changedPluginId) {
+            if (changedPluginId === root.pluginId)
+                Qt.callLater(root._observePluginSettingsChange);
+        }
+    }
 
     Component.onCompleted: Qt.callLater(function () { startScan("initial"); })
 

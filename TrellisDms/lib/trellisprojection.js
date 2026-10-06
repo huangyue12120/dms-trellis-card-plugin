@@ -967,7 +967,7 @@ function makeDiagnosticsProjection(snapshot, detailResponse, metadata) {
     addReportLine("host.dms=unavailable");
     addReportLine("host.quickshell=unavailable");
     addReportLine("host.qt=" + qtVersion);
-    addReportLine("snapshot.source=daemon");
+    addReportLine("snapshot.source=" + (facts.ready ? "daemon" : "unavailable"));
     addReportLine("snapshot.state=" + snapshotState);
     addReportLine("snapshot.schema_version=" + (safeSchemaVersion === null
         ? "unavailable" : safeSchemaVersion));

@@ -14,6 +14,29 @@ Exercise on the target DMS/Quickshell/Wayland session:
 - English/Chinese locale; plugin disable/enable; DMS restart;
 - v1.0 bar, popout, archive, Markdown, project filter, pin, Launcher, Settings, and multi-project regression.
 
+### Follow-up regression gates (2026-10-06)
+
+The user reported three v1.1 symptoms. Verify these separately on the supported
+host after the local repair:
+
+- Change a plugin setting while the Desktop widget is shown; confirm its view
+  remains mounted and visible. Confirm Launcher remains available after the
+  setting save.
+- Keep `components.launcher` as the explicit Launcher surface. Do not also
+  declare `launcher` in this composite manifest's `capabilities`: DMS 1.6.2
+  reloads the whole plugin on `pluginDataChanged` when that capability is
+  present, which unloads and recreates Desktop content.
+- Confirm presentation-only settings do not request a topology scan.
+- Add a task under a discovered project, use the widget's Refresh action, and
+  confirm the new task appears without using Settings > Refresh.
+- Confirm the default topology interval is 30 seconds, then change it within
+  the supported 15–300 second range and verify automatic discovery follows the
+  selected cadence. A running scan must not be necessary for an interval-only
+  update to take effect.
+
+Keep any visual-reload conclusion labeled as host evidence: static event and
+timer assertions cannot prove the Desktop wrapper's visible behavior.
+
 Record each item with result, steps, and direct evidence (host display/log or user observation). Do not count an offscreen/static check as a host pass.
 
 ## Release

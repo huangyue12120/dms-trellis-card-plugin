@@ -44,6 +44,51 @@ function normalizeTopologyInterval(value, fallback) {
     };
 }
 
+function topologySettingsChanges(previousSettings, nextSettings, fallbackInterval,
+        maxRoots) {
+    var previous = previousSettings && typeof previousSettings === "object"
+        ? previousSettings : {};
+    var next = nextSettings && typeof nextSettings === "object"
+        ? nextSettings : {};
+    var rootLimit = Number(maxRoots);
+    if (!isFinite(rootLimit) || rootLimit < 1)
+        rootLimit = 16;
+    rootLimit = Math.floor(rootLimit);
+
+    function rootInput(settings) {
+        if (Array.isArray(settings.scanRoots)) {
+            return {
+                source: "scanRoots",
+                value: settings.scanRoots.slice(0, rootLimit)
+            };
+        }
+        return {
+            source: "projectRoot",
+            value: typeof settings.projectRoot === "string"
+                ? settings.projectRoot : ""
+        };
+    }
+
+    var previousRootInput = rootInput(previous);
+    var nextRootInput = rootInput(next);
+    var previousInterval = normalizeTopologyInterval(
+        previous.topologyInterval, fallbackInterval).value;
+    var nextInterval = normalizeTopologyInterval(
+        next.topologyInterval, fallbackInterval).value;
+    var previousRefreshToken = previous.refreshToken === undefined
+        ? null : previous.refreshToken;
+    var nextRefreshToken = next.refreshToken === undefined
+        ? null : next.refreshToken;
+
+    return {
+        rootsChanged: JSON.stringify(previousRootInput)
+            !== JSON.stringify(nextRootInput),
+        refreshRequested: previousRefreshToken !== nextRefreshToken,
+        intervalChanged: previousInterval !== nextInterval,
+        intervalSeconds: nextInterval
+    };
+}
+
 function addPendingPath(pending, path, limit) {
     var result = {};
     var source = pending || {};

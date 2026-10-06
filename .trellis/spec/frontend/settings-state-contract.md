@@ -47,6 +47,106 @@ SessionData.desktopWidgetInstancePositions[effectiveInstanceId][screenKey]
 SessionData.set("desktopWidgetInstancePositions", positionsByInstance)
 ```
 
+## Scenario: Composite plugin data saves and Desktop lifecycle
+
+### 1. Scope / Trigger
+
+This contract applies to plugin-data settings writes from `TrellisSettings.qml`
+when the manifest exposes multiple explicit components, including both Desktop
+and Launcher surfaces. It records the DMS 1.6.2 reload behavior that otherwise
+recreates Desktop content after each setting save.
+
+### 2. Signatures
+
+```text
+PluginService.savePluginData(pluginId, key, value)
+  -> writes plugin setting; emits pluginDataChanged(pluginId)
+PluginService.reloadPlugin(pluginId)
+  -> unloads then loads a currently loaded plugin
+DesktopPluginWrapper
+  -> pluginLoaded/pluginUnloaded(pluginId) calls contentLoader.reloadComponent()
+PluginService.getLauncherPlugins()
+  -> plugins with registered `components.launcher` and loaded state
+
+Composite manifest fields:
+  type: "composite"
+  components.launcher: component path or absent
+  capabilities: string[]
+```
+
+### 3. Contracts
+
+- DMS 1.6.2 `PluginsTab` handles every `pluginDataChanged(pluginId)` for a
+  loaded plugin whose `type` is `launcher` or whose `capabilities` include
+  `launcher` by calling `reloadPlugin(pluginId)`, regardless of which setting
+  key changed. That unload/load cycle makes `DesktopPluginWrapper` disable and
+  re-enable its content Loader.
+- For a composite manifest with explicit `components`, DMS resolves component
+  surfaces from those keys and registers `components.launcher` independently of
+  `capabilities`. Keep `type: "composite"` and the explicit launcher component,
+  but do not also list `launcher` in `capabilities`; that redundant declaration
+  triggers an unnecessary whole-plugin reload after settings saves.
+- Normal plugin-data signaling remains enabled so `PluginComponent` instances
+  can refresh their settings data and the daemon can classify scan-relevant
+  changes. Only the redundant launcher capability is removed.
+- In the inspected DMS 1.6.2 source, `PluginSettings.settingChanged()` has no
+  consumer and is not the reload trigger. DMS versions may change this
+  behavior; keep a host acceptance check for the supported runtime.
+- Removing the launcher capability changes declared capability metadata.
+  The explicit component remains the runtime Launcher surface; consumers that
+  only inspect `capabilities` may no longer display a launcher capability badge.
+
+### 4. Validation & Error Matrix
+
+| Manifest / event | Required result |
+|---|---|
+| Composite manifest has `components.launcher` and omits launcher capability | Settings save does not satisfy DMS's launcher-triggered reload predicate; Launcher remains in `getLauncherPlugins()` while loaded |
+| Composite manifest includes launcher capability and plugin data changes | DMS 1.6.2 reloads the plugin; Desktop content Loader is recreated |
+| Explicit launcher component is absent | No Launcher component is registered, regardless of capability metadata |
+| Desktop wrapper receives `pluginLoaded` or `pluginUnloaded` | Its content Loader may reload; ordinary plugin-data updates alone do not trigger this wrapper path |
+
+### 5. Good / Base / Bad Cases
+
+- Good: a composite manifest keeps `components.launcher`, omits the redundant
+  launcher capability, and a settings save updates consumers without unloading
+  the Desktop widget.
+- Base: a non-Launcher composite plugin saves settings and retains its normal
+  `pluginDataChanged` propagation.
+- Bad: adding `launcher` to both `components` and `capabilities` on DMS 1.6.2
+  makes every plugin-data save unload/reload all plugin components.
+
+### 6. Tests Required
+
+- `tests/test_trellis_contract.mjs` asserts `type: "composite"`, the explicit
+  `components.launcher` path, the absence of `launcher` in `capabilities`, and
+  the unchanged registered surfaces.
+- DMS source compatibility checks confirm component registration comes from
+  explicit `components` and that Launcher discovery uses the registered
+  component map.
+- On a supported running host, save a plugin setting and verify the Desktop
+  widget remains mounted while the Launcher surface remains discoverable. Static
+  manifest assertions do not establish visible runtime behavior.
+
+### 7. Wrong vs Correct
+
+```json
+// Wrong on DMS 1.6.2: the capability causes a full plugin reload on each save.
+{
+  "type": "composite",
+  "capabilities": ["launcher"],
+  "components": { "launcher": "./TrellisLauncher.qml" }
+}
+```
+
+```json
+// Correct: the explicit component declares the Launcher surface once.
+{
+  "type": "composite",
+  "capabilities": ["daemon", "dankbar-widget", "desktop-widget"],
+  "components": { "launcher": "./TrellisLauncher.qml" }
+}
+```
+
 ## 3. Contracts
 
 - `pillMode` accepts the six existing v0.6 values. A missing `pillMode` may
@@ -78,6 +178,11 @@ SessionData.set("desktopWidgetInstancePositions", positionsByInstance)
   display preferences through the instance-scoped `pluginService` adapter. If
   instance context exists without an effective ID, show a diagnostic instead
   of global settings or inert controls.
+- A `PluginGlobalVar` resolves its plugin ID from its immediate parent. When
+  nested under a settings container such as a `Column`, that container must
+  expose `pluginId: root.pluginId`. Plugin-wide Settings reads plugin metadata
+  through the injected `root.pluginService` (`availablePlugins` and
+  `isPluginLoaded`), not an unimported `PluginService` singleton.
 - Desktop display preferences default to `instanceData.config.displayPreferences`
   or `["all"]` and persist with
   `SettingsData.updateDesktopWidgetInstanceConfig(effectiveInstanceId, { displayPreferences })`.

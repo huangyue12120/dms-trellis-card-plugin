@@ -694,6 +694,40 @@ assert.equal(watch.normalizeTopologyInterval(undefined, 30).value, 30);
 assert.equal(watch.normalizeTopologyInterval(1, 30).value, 15);
 assert.equal(watch.normalizeTopologyInterval(999, 30).value, 300);
 assert.equal(watch.normalizeTopologyInterval("bad", 30).invalid, true);
+const scanSettings = {
+  scanRoots: ["/workspace"],
+  projectRoot: "/legacy",
+  refreshToken: "first",
+  topologyInterval: 30,
+  showArchive: true
+};
+const cosmeticSettings = { ...scanSettings, showArchive: false };
+const cosmeticChanges = watch.topologySettingsChanges(
+  scanSettings, cosmeticSettings, 30, 16);
+assert.equal(cosmeticChanges.rootsChanged, false,
+  "presentation-only changes must not trigger a topology scan");
+assert.equal(cosmeticChanges.refreshRequested, false);
+assert.equal(cosmeticChanges.intervalChanged, false);
+const refreshChanges = watch.topologySettingsChanges(scanSettings,
+  { ...scanSettings, refreshToken: "second" }, 30, 16);
+assert.equal(refreshChanges.refreshRequested, true,
+  "a refresh token update must request a topology scan");
+assert.equal(refreshChanges.rootsChanged, false);
+const rootChanges = watch.topologySettingsChanges(scanSettings,
+  { ...scanSettings, scanRoots: ["/workspace", "/another"] }, 30, 16);
+assert.equal(rootChanges.rootsChanged, true,
+  "trusted-root changes must request a topology scan");
+const intervalChanges = watch.topologySettingsChanges(scanSettings,
+  { ...scanSettings, topologyInterval: 15 }, 30, 16);
+assert.equal(intervalChanges.intervalChanged, true,
+  "topology interval changes must update the running schedule");
+assert.equal(intervalChanges.intervalSeconds, 15);
+const cappedRootChanges = watch.topologySettingsChanges(
+  { scanRoots: Array.from({ length: 17 }, (_, index) => `/root/${index}`) },
+  { scanRoots: [...Array.from({ length: 16 }, (_, index) => `/root/${index}`), "/ignored"] },
+  30, 16);
+assert.equal(cappedRootChanges.rootsChanged, false,
+  "roots beyond the scanner cap do not change the effective scan input");
 let pending = {};
 pending = watch.addPendingPath(pending, "/tmp/a", 2).pending;
 pending = watch.addPendingPath(pending, "/tmp/a", 2).pending;
@@ -810,7 +844,12 @@ assert.match(daemonSource, /function _pushProjectWarning\([\s\S]*?project\.warni
 assert.match(daemonSource, /pendingKnownWarnings\.length > root\.maxWarnings/);
 assert.match(daemonSource, /warningCooldownMs, root\.maxWarnings/);
 assert.match(daemonSource, /id:\s*settingsRefreshTimer[\s\S]*?onTriggered:\s*root\.startScan\("settings"\)/);
-assert.match(daemonSource, /onPluginDataChanged:\s*settingsRefreshTimer\.restart\(\)/);
+assert.match(daemonSource, /function _observePluginSettingsChange\(\)[\s\S]*?TrellisWatch\.topologySettingsChanges\([\s\S]*?changes\.rootsChanged \|\| changes\.refreshRequested/);
+assert.match(daemonSource, /function onPluginDataChanged\(changedPluginId\)[\s\S]*?changedPluginId === root\.pluginId[\s\S]*?Qt\.callLater\(root\._observePluginSettingsChange\)/);
+assert.doesNotMatch(daemonSource, /onPluginDataChanged:\s*settingsRefreshTimer\.restart\(\)/,
+  "presentation-only settings must not restart the daemon scan");
+assert.match(daemonSource, /if \(changes\.intervalChanged\)[\s\S]*?root\.topologyIntervalSeconds = changes\.intervalSeconds[\s\S]*?if \(topologyTimer\.running\)[\s\S]*?root\._armTopologyTimer\(\)/);
+assert.match(daemonSource, /function _armTopologyTimer\(\)[\s\S]*?topologyTimer\.interval = root\.topologyIntervalSeconds \* 1000[\s\S]*?topologyTimer\.restart\(\)/);
 assert.match(daemonSource, /Component\.onDestruction:[\s\S]*?_destroyOwned\(\)/);
 assert.equal((daemonSource.match(/setGlobalVar\s*\(/g) || []).length, 1);
 assert.equal(manifest.components.daemon, "./TrellisDaemon.qml");
@@ -819,10 +858,12 @@ assert.equal(manifest.components.desktop, "./TrellisDesktopWidget.qml");
 assert.equal(manifest.components.launcher, "./TrellisLauncher.qml");
 assert.equal(manifest.type, "composite");
 assert.deepEqual(Object.keys(manifest.components).sort(), ["daemon", "desktop", "launcher", "widget"]);
+assert.equal(manifest.capabilities.includes("launcher"), false,
+  "DMS 1.6.2 reloads loaded launcher-capable plugins on pluginDataChanged; the explicit launcher component remains registered without the redundant capability");
 assert.equal(manifest.requires_dms, ">=1.6.2");
 assert.deepEqual([...manifest.permissions].sort(), ["process", "settings_read", "settings_write"]);
 assert.equal(manifest.permissions.includes("network"), false);
-assert.deepEqual([...manifest.capabilities].sort(), ["daemon", "dankbar-widget", "desktop-widget", "launcher"]);
+assert.deepEqual([...manifest.capabilities].sort(), ["daemon", "dankbar-widget", "desktop-widget"]);
 assert.equal(manifest.version, "1.0.0",
   "the frozen v1.0 candidate must report its stable package version");
 assert.match(launcherSource, /^Item\s*\{/m,
@@ -852,7 +893,7 @@ const destroyOwnedSource = sourceSection(daemonSource,
 const destroyWatchersSource = sourceSection(daemonSource,
   "function _destroyWatchers(", "function _queueProcess(");
 const startScanSource = sourceSection(daemonSource,
-  "function startScan(", "onPluginDataChanged:");
+  "function startScan(", "Component.onCompleted: Qt.callLater");
 const installWatchersSource = sourceSection(daemonSource,
   "function _installWatchers(", "function _maybeFinish(");
 const applyKnownReloadSource = sourceSection(daemonSource,
@@ -1056,7 +1097,13 @@ const globalSettingsSource = settingsSource.slice(globalSettingsStart, desktopSe
 assert.match(globalSettingsSource, /id: diagnosticsSnapshotVar[\s\S]*?varName:\s*"snapshot"/);
 assert.match(globalSettingsSource, /id: diagnosticsDetailResponseVar[\s\S]*?varName:\s*"detailResponse"/);
 assert.match(globalSettingsSource, /TrellisProjection\.makeDiagnosticsProjection\(/);
-assert.match(globalSettingsSource, /PluginService\.availablePlugins/);
+assert.match(globalSettingsSource, /Column\s*\{\s*id:\s*globalSettingsView\s*property string pluginId:\s*root\.pluginId/,
+  "PluginGlobalVar children need the plugin ID on their immediate parent");
+assert.match(globalSettingsSource, /var service = root\.pluginService;[\s\S]*?service && service\.availablePlugins/,
+  "Diagnostics metadata must tolerate the injected plugin service being initially null");
+assert.match(globalSettingsSource, /service && typeof service\.isPluginLoaded === "function"/);
+assert.doesNotMatch(globalSettingsSource, /\bPluginService\.(?:availablePlugins|isPluginLoaded)/,
+  "Diagnostics reads plugin metadata from the injected PluginSettings service");
 assert.match(globalSettingsSource, /Qt\.version/);
 assert.match(globalSettingsSource, /dmsVersion:\s*""[\s\S]*?quickshellVersion:\s*""/);
 assert.match(globalSettingsSource, /text:\s*I18n\.trFor\("trellisDms",\s*"About \/ Diagnostics"\)/);
@@ -1162,6 +1209,21 @@ assert.match(widgetSource, /buttonHeight:\s*40/);
 assert.match(widgetSource, /buttonSize:\s*40/);
 assert.match(widgetSource, /iconName:\s*taskRow\.modelData\.pinned[\s\S]*?"keep_off"\s*:\s*"push_pin"/);
 assert.match(widgetSource, /savePluginData\(root\.pluginId,\s*"refreshToken"/);
+const widgetRefreshSource = sourceSection(widgetSource,
+  "function requestRefresh()", "function openPluginSettings()");
+const settingsRefreshSource = sourceSection(settingsSource,
+  "function requestRefresh()", "Component.onCompleted: Qt.callLater(function()");
+assert.match(widgetRefreshSource,
+  /root\.refreshPending = true;[\s\S]*?savePluginData\(root\.pluginId,\s*"refreshToken",\s*Date\.now\(\)\s*\+\s*"-"\s*\+\s*root\.refreshRequestSerial\)/,
+  "widget Refresh must write a changing refresh token");
+assert.match(settingsRefreshSource,
+  /savePluginData\(root\.pluginId,\s*"refreshToken",\s*Date\.now\(\)\s*\+\s*"-"\s*\+\s*root\.refreshRequestSerial\)/,
+  "Settings Refresh must request a scan through the same token");
+assert.match(widgetSource,
+  /text:\s*I18n\.trFor\("trellisDms",\s*"Refresh"\)[\s\S]{0,220}?onClicked:\s*root\.requestRefresh\(\)/,
+  "the widget Refresh button must call its refresh request");
+assert.match(settingsSource, /onClicked:\s*root\.requestRefresh\(\)/,
+  "Settings Refresh must call its refresh request");
 assert.match(widgetSource, /PopoutService\.openSettingsWithTab\("plugins"\)/);
 assert.match(widgetSource, /Current data stays visible until a new coherent snapshot arrives\./);
 assert.match(widgetSource, /root\.popoutProjection\.degraded/);
@@ -2450,6 +2512,38 @@ for (const privateValue of ["alice", "private-alpha-id", "private-beta-id", "pri
     `copied diagnostics must exclude private source data: ${privateValue}`);
 assert.equal(JSON.stringify(diagnosticsSnapshot), diagnosticsSnapshotBefore,
   "diagnostics projection must not mutate the shared Snapshot");
+const unavailableDiagnostics = projection.makeDiagnosticsProjection(null);
+assert.equal(unavailableDiagnostics.ready, false);
+assert.equal(unavailableDiagnostics.snapshotState, "unavailable");
+assert.equal(unavailableDiagnostics.schemaVersion, null);
+assert.equal(unavailableDiagnostics.projectCount, 0);
+assert.equal(unavailableDiagnostics.taskCount, 0);
+assert.equal(unavailableDiagnostics.sessionCount, 0);
+assert.ok(unavailableDiagnostics.report.includes("snapshot.source=unavailable"));
+assert.ok(unavailableDiagnostics.report.includes("snapshot.schema_version=unavailable"));
+const emptyDiagnostics = projection.makeDiagnosticsProjection({
+  schemaVersion: 2,
+  generatedAt: "2026-09-21T00:10:00.000Z",
+  runtime: {
+    scanStartedAt: "2026-09-21T00:09:30.000Z",
+    lastSuccessfulDiscoveryAt: "2026-09-21T00:09:00.000Z",
+    snapshotIsCurrent: true,
+    lastGoodFallbackActive: false
+  },
+  projects: [],
+  warnings: []
+});
+assert.equal(emptyDiagnostics.ready, true);
+assert.equal(emptyDiagnostics.snapshotState, "current");
+assert.equal(emptyDiagnostics.schemaVersion, 2);
+assert.equal(emptyDiagnostics.projectCount, 0);
+assert.equal(emptyDiagnostics.taskCount, 0);
+assert.equal(emptyDiagnostics.sessionCount, 0);
+assert.ok(emptyDiagnostics.report.includes("snapshot.source=daemon"));
+assert.ok(emptyDiagnostics.report.includes("snapshot.schema_version=2"));
+assert.ok(emptyDiagnostics.report.includes("counts.projects=0"));
+assert.ok(emptyDiagnostics.report.includes("counts.tasks=0"));
+assert.ok(emptyDiagnostics.report.includes("counts.sessions=0"));
 const unsafeTimestampDiagnostics = projection.makeDiagnosticsProjection(Object.assign({},
   diagnosticsSnapshot, { generatedAt: "2026-09-21T00:10:00.000Z /home/alice/time-secret" }),
 null, { qtVersion: "6.8.2" });
