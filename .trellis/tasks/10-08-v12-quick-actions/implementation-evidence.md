@@ -59,4 +59,3 @@ Read-only inspection after freeze found a lifecycle gap: completed `actionReques
 The implementer reported this finding immediately and made no post-freeze product/test edits. Main assigned exclusive product/test verification, correction, and actual daemon/widget recreation regression coverage to `v12_check`. The proposed correction is to publish completion before consuming only the still-owned request, consume pending requests on cancellation/root change/destruction, and have widget ownership observation recognize an already-matching completion before treating a cleared request as superseded. The checker owns the final design and regression result. Do not claim the frozen implementation alone satisfies reload replay prevention; use the checker's evidence for that gate.
 
 All valid live JSON directory-name fallback cases above retain the approved existing parser effective-ID behavior. This post-freeze lifecycle correction does not require a new task JSON schema.
-

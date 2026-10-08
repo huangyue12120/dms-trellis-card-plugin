@@ -434,3 +434,42 @@ Committed the v1.1 settings reload, widget and automatic refresh, and Diagnostic
 ### Status
 
 [OK] **Completed**
+
+
+## Session 14: v1.2 implementation and candidate acceptance
+<!-- trellis-session: v=2 fp=55d46420089bffae -->
+
+**Date**: 2026-10-08
+**Task**: v1.2 implementation and candidate acceptance
+**Branch**: `feat/v11-health-freshness`
+
+### Summary
+
+Implemented and checked Recent Changes, Global Search and safe Quick Actions. Candidate hot reload failed; original host restored. User approved commits and retained baseline for later manual acceptance.
+
+### Main Changes
+
+- Added runtime changes, bounded Live/Archive/All search, validated clipboard/folder actions, executable contracts and candidate documentation.
+- Committed only the v1.2 status block in PROJECT_PROGRESS.md; original 957 added roadmap lines remain unstaged.
+- Corrected one new evidence-file trailing blank line during the journal batch after the staged whitespace check reported it.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dc76d7a` | feat: add v1.2 changes search and quick actions |
+| `5680c63` | docs: record v1.2 candidate and acceptance evidence |
+
+### Testing
+
+- [OK] Full Node contract suite and independent final Trellis integration review PASS; frozen source syntax, JSON, exact-case resources and task contexts PASS.
+- [OK] Unreleased ZIP has 16 exact members and reproducible SHA-256 2a7c74757173bce0db7164b7d0e632af77ad64f15aefc995df94914b26849655; manifest remains 1.0.0.
+- [OK] DMS 1.6.2 candidate hot reload FAIL: new trellischanges.js import reports File name case mismatch. Original 13-file plugin restored, byte-verified and successfully reloaded. Fresh isolated library import PASS only.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Keep original installed plugin as requested; complete manual supported-host interaction and fresh-load acceptance before a v1.2 version/tag/release decision. Tasks remain active and unarchived.

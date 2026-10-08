@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 13
-- **Last Active**: 2026-10-06
+- **Total Sessions**: 14
+- **Last Active**: 2026-10-08
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~436 | Active |
+| `journal-1.md` | ~475 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 14 | 2026-10-08 | v1.2 implementation and candidate acceptance | `dc76d7a`, `5680c63` | `feat/v11-health-freshness` |
 | 13 | 2026-10-06 | Archive v1.1 acceptance and commit fixes | `46e831a` | `feat/v11-health-freshness` |
 | 12 | 2026-09-30 | v1.1.3 Desktop Views | `2fadf79` | `feat/v11-health-freshness` |
 | 11 | 2026-09-29 | v1.1.2 About Diagnostics and Redacted Export | `ecbf5cd` | `feat/v11-health-freshness` |
