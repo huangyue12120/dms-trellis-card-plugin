@@ -7,6 +7,8 @@ import "lib/trellisPaths.js" as TrellisPaths
 import "lib/trellisParser.js" as TrellisParser
 import "lib/trellisWatch.js" as TrellisWatch
 import "lib/trellisdiscovery.js" as TrellisDiscovery
+import "lib/trellisprojection.js" as TrellisProjection
+import "lib/trellischanges.js" as TrellisChanges
 
 PluginComponent {
     id: root
@@ -36,6 +38,11 @@ PluginComponent {
     readonly property string verifiedTrellisVersion: "0.6.17"
 
     property int scanGeneration: 0
+    // Publication provenance is independent of scan/reload cancellation.
+    property string observationEpoch: new Date().toISOString() + "-" + Math.random().toString(36).slice(2)
+    property double publicationGeneration: 0
+    property var changeTracker: TrellisChanges.createTracker(observationEpoch)
+    property var observationPreferences: null
     property var activeScan: null
     property var ownedProcesses: []
     property var ownedReaders: []
@@ -61,8 +68,49 @@ PluginComponent {
     property var observedTopologySettings: null
     property int detailGeneration: 0
     property string currentDetailRequestId: ""
+    property var currentDetailRequest: null
+    property string currentDetailRootsKey: ""
+    property string currentDetailProjectRoot: ""
     property var ownedDetailProcesses: []
     property var ownedDetailReaders: []
+    property int searchGeneration: 0
+    property string currentSearchRequestId: ""
+    property var searchSession: null
+    property var ownedSearchProcesses: []
+    property var ownedSearchReaders: []
+    property int searchCursorSerial: 0
+    readonly property int maxSearchJsonPerBatch: 128
+    readonly property int maxSearchListingsPerBatch: 16
+    readonly property int maxSearchResults: 64
+
+    property int actionGeneration: 0
+    property var currentAction: null
+    property var pendingActionRequest: null
+    property var ownedActionProcesses: []
+    property var ownedActionReaders: []
+
+    PluginGlobalVar {
+        id: actionRequestVar
+        varName: "actionRequest"
+        defaultValue: null
+        onValueChanged: {
+            var request = value;
+            root.pendingActionRequest = request;
+            Qt.callLater(function () { root._handleActionRequest(request); });
+        }
+    }
+
+    PluginGlobalVar {
+        id: actionResponseVar
+        varName: "actionResponse"
+        defaultValue: null
+    }
+
+    PluginGlobalVar {
+        id: recentChangesVar
+        varName: "recentChanges"
+        defaultValue: null
+    }
 
     PluginGlobalVar {
         id: detailRequestVar
@@ -77,6 +125,22 @@ PluginComponent {
     PluginGlobalVar {
         id: detailResponseVar
         varName: "detailResponse"
+        defaultValue: null
+    }
+
+    PluginGlobalVar {
+        id: searchRequestVar
+        varName: "searchRequest"
+        defaultValue: null
+        onValueChanged: {
+            var request = value;
+            Qt.callLater(function () { root._handleSearchRequest(request); });
+        }
+    }
+
+    PluginGlobalVar {
+        id: searchResponseVar
+        varName: "searchResponse"
         defaultValue: null
     }
 
@@ -203,6 +267,7 @@ PluginComponent {
             property string requestId: ""
             property var callback: null
             property var ownerRoot: null
+            property string ownedList: "ownedDetailReaders"
             property int byteLimit: root.maxMarkdownBytes
             property string errorPrefix: "markdown"
             blockWrites: true
@@ -217,7 +282,7 @@ PluginComponent {
                 var error = TrellisPaths.utf8ByteLength(value) > byteLimit
                     ? errorPrefix + "_size_limit" : null;
                 if (ownerRoot)
-                    ownerRoot._untrack("ownedDetailReaders", this);
+                    ownerRoot._untrack(ownedList, this);
                 Qt.callLater(function () {
                     if (fn)
                         fn(error ? "" : value, error);
@@ -229,7 +294,7 @@ PluginComponent {
                 var fn = callback;
                 callback = null;
                 if (ownerRoot)
-                    ownerRoot._untrack("ownedDetailReaders", this);
+                    ownerRoot._untrack(ownedList, this);
                 Qt.callLater(function () {
                     if (fn)
                         fn("", errorPrefix + "_read_failed:" + error);
@@ -351,6 +416,9 @@ PluginComponent {
     function _cancelDetailRead(clearResponse) {
         root.detailGeneration += 1;
         root.currentDetailRequestId = "";
+        root.currentDetailRequest = null;
+        root.currentDetailRootsKey = "";
+        root.currentDetailProjectRoot = "";
         var processes = root.ownedDetailProcesses || [];
         for (var i = 0; i < processes.length; i++) {
             if (processes[i])
@@ -370,14 +438,20 @@ PluginComponent {
     function _queueDetailProcess(generation, requestId, command, callback) {
         if (!_isCurrentDetail(generation, requestId))
             return false;
+        if (!_detailScopeCurrent()) {
+            _rejectDetailScope(generation, requestId);
+            return false;
+        }
         var process = processComponent.createObject(root, {
             generation: generation,
             ownerRoot: root,
             ownedList: "ownedDetailProcesses",
             command: command,
             callback: function (output, exitCode) {
-                if (_isCurrentDetail(generation, requestId))
-                    callback(output, exitCode);
+                if (_isCurrentDetail(generation, requestId)) {
+                    if (_detailScopeCurrent()) callback(output, exitCode);
+                    else _rejectDetailScope(generation, requestId);
+                }
             }
         });
         if (!process)
@@ -391,6 +465,10 @@ PluginComponent {
             errorPrefix, callback) {
         if (!_isCurrentDetail(generation, requestId))
             return false;
+        if (!_detailScopeCurrent()) {
+            _rejectDetailScope(generation, requestId);
+            return false;
+        }
         var reader = detailFileViewComponent.createObject(root, {
             generation: generation,
             requestId: requestId,
@@ -399,8 +477,10 @@ PluginComponent {
             byteLimit: byteLimit,
             errorPrefix: errorPrefix,
             callback: function (text, error) {
-                if (_isCurrentDetail(generation, requestId))
-                    callback(text, error);
+                if (_isCurrentDetail(generation, requestId)) {
+                    if (_detailScopeCurrent()) callback(text, error);
+                    else _rejectDetailScope(generation, requestId);
+                }
             }
         });
         if (!reader)
@@ -472,6 +552,7 @@ PluginComponent {
 
     function _findLiveTaskRecord(project, taskId) {
         var records = project && project.taskRecords ? project.taskRecords : [];
+        var found = null;
         for (var i = 0; i < records.length; i++) {
             var record = records[i];
             if (!record)
@@ -480,10 +561,12 @@ PluginComponent {
                 ? record.value.id.trim() : "";
             var recordId = sourceId || (typeof record.dirName === "string"
                 ? record.dirName.trim() : "");
-            if (recordId === taskId)
-                return record;
+            if (recordId === taskId) {
+                if (found) return null;
+                found = record;
+            }
         }
-        return null;
+        return found;
     }
 
     function _readMarkdownRequest(generation, request, project, taskRecord,
@@ -643,9 +726,18 @@ PluginComponent {
             if (context.rows[i])
                 tasks.push(context.rows[i]);
         }
-        detailResponseVar.set(_archiveResponse(context.request,
+        var response = _archiveResponse(context.request,
             tasks.length ? "ready" : "empty", context.months, tasks,
-            context.hasMore, context.warnings));
+            context.hasMore, context.warnings);
+        observeArchiveMetadata(context.project, response);
+        detailResponseVar.set(response);
+    }
+
+    // Reused by metadata consumers after their own current-request/read guards.
+    // No archive reads or watchers are initiated by this observation hook.
+    function observeArchiveMetadata(project, response) {
+        recentChangesVar.set(TrellisChanges.observeArchivePage(root.changeTracker,
+            project, response, new Date().toISOString()));
     }
 
     function _loadArchivePageRow(context, candidate, slot) {
@@ -779,8 +871,10 @@ PluginComponent {
             request.page = normalizedPage.page;
             request.pageSize = normalizedPage.pageSize;
             if (!selected.length) {
-                detailResponseVar.set(_archiveResponse(request, "empty",
-                    months, [], hasMore, warnings));
+                var emptyResponse = _archiveResponse(request, "empty",
+                    months, [], hasMore, warnings);
+                observeArchiveMetadata(project, emptyResponse);
+                detailResponseVar.set(emptyResponse);
                 return;
             }
             var context = {
@@ -1036,36 +1130,858 @@ PluginComponent {
 
         var request = validation.request;
         root.currentDetailRequestId = request.requestId;
-        var project = _findProjectInput(root.currentInputs, request.projectId);
-        if (!project) {
-            if (archiveRequest) {
-                _publishArchiveError(generation, request, "archive_project_missing",
-                    "The selected project is no longer available.");
-            } else {
+        root.currentDetailRequest = request;
+        root.currentDetailRootsKey = JSON.stringify(_configuredRoots());
+        var project = _uniqueCurrentProject(request.projectId);
+        root.currentDetailProjectRoot = project ? project.root : "";
+        _authorizeDetailProject(generation, request.requestId, project, function (authorized) {
+            if (!_isCurrentDetail(generation, request.requestId)) return;
+            if (!authorized || !_detailScopeCurrent()) {
+                _rejectDetailScope(generation, request.requestId);
+                return;
+            }
+            if (request.kind === "archive-index") {
+                _loadArchiveIndex(generation, request, project);
+                return;
+            }
+            if (request.kind === "archive-page") {
+                _openArchiveMonth(generation, request, project, [], request.month);
+                return;
+            }
+            if (request.kind === "archive-task") {
+                _readArchiveTaskRequest(generation, request, project);
+                return;
+            }
+            var taskRecord = _findLiveTaskRecord(project, request.taskId);
+            if (!taskRecord) {
                 _publishDetailError(generation, request, "markdown_task_missing",
                     "The selected live task is no longer available.");
+                return;
             }
+            _readMarkdownRequest(generation, request, project, taskRecord);
+        });
+    }
+
+    function _uniqueCurrentProject(projectId) {
+        var inputs = root.currentInputs || [];
+        var found = null;
+        for (var i = 0; i < inputs.length; i++) {
+            if (inputs[i] && inputs[i].id === projectId) {
+                if (found) return null;
+                found = inputs[i];
+            }
+        }
+        return found;
+    }
+
+    function _projectAuthorizedByRoots(projectRoot, canonicalRoots) {
+        for (var i = 0; i < canonicalRoots.length; i++) {
+            if (TrellisPaths.isWithin(projectRoot, canonicalRoots[i], true)
+                    || TrellisPaths.ancestorPaths(canonicalRoots[i], root.maxAncestorCandidates).indexOf(projectRoot) !== -1)
+                return true;
+        }
+        return false;
+    }
+
+    function _detailScopeCurrent() {
+        var request = root.currentDetailRequest;
+        var project = request ? _uniqueCurrentProject(request.projectId) : null;
+        return !!request && root.currentDetailRootsKey === JSON.stringify(_configuredRoots())
+            && !!project && project.root === root.currentDetailProjectRoot;
+    }
+
+    function _rejectDetailScope(generation, requestId) {
+        if (!requestId || !_isCurrentDetail(generation, requestId)) return;
+        var request = root.currentDetailRequest;
+        _cancelDetailRead(false);
+        if (!request) return;
+        var warning = [{ code: "detail_scope_changed",
+            message: "The selected project is no longer authorized or available. Retry from the current view." }];
+        if (request.kind === "archive-index" || request.kind === "archive-page")
+            detailResponseVar.set(_archiveResponse(request, "error", [], [], false, warning));
+        else
+            detailResponseVar.set(_detailResponse(request, "error", "", "plain", warning));
+    }
+
+    function _authorizeDetailProject(generation, requestId, project, callback) {
+        if (!project || !TrellisPaths.normalizeProjectRoot(project.root).ok) { callback(false); return; }
+        var roots = _configuredRoots();
+        var canonicalRoots = [];
+        function canonicalDirectory(path, done) {
+            if (!_queueDetailProcess(generation, requestId, ["realpath", "-e", "--", path], function (output, code) {
+                var parsed = code === 0 ? TrellisPaths.parseCanonicalOutput(output) : { ok: false };
+                if (!parsed.ok) { done(""); return; }
+                if (!_queueDetailProcess(generation, requestId, ["test", "-d", parsed.path], function (text, exitCode) {
+                    done(exitCode === 0 ? parsed.path : "");
+                })) done("");
+            })) done("");
+        }
+        function probe(index) {
+            if (!_isCurrentDetail(generation, requestId)) return;
+            if (index < roots.length) {
+                canonicalDirectory(roots[index], function (path) {
+                    if (path) canonicalRoots.push(path);
+                    probe(index + 1);
+                });
+                return;
+            }
+            if (!_projectAuthorizedByRoots(project.root, canonicalRoots)) { callback(false); return; }
+            canonicalDirectory(project.root, function (path) {
+                if (path !== project.root) { callback(false); return; }
+                var trellis = TrellisPaths.joinPath(project.root, ".trellis");
+                canonicalDirectory(trellis, function (canonicalTrellis) {
+                    callback(canonicalTrellis === trellis && _detailScopeCurrent()
+                        && _uniqueCurrentProject(project.id).root === project.root);
+                });
+            });
+        }
+        probe(0);
+    }
+
+    function _configuredRoots() {
+        var input = TrellisDiscovery.selectRootInput(root.pluginData || {}, root.maxScanRoots);
+        return TrellisPaths.normalizeRoots(input.value).roots;
+    }
+
+    function _searchProjects() {
+        // Only current daemon discovery inputs are candidates; State caches have
+        // no path authority. Ambiguous identities are excluded, including __proto__.
+        var inputs = root.currentInputs || [];
+        var projects = [];
+        for (var i = 0; i < Math.min(inputs.length, root.maxProjects); i++) {
+            var project = inputs[i];
+            if (!project || typeof project.id !== "string" || !project.id
+                    || project.id.length > 4096 || TrellisPaths.hasControlCharacters(project.id)
+                    || !TrellisPaths.normalizeProjectRoot(project.root).ok)
+                continue;
+            var duplicates = 0;
+            for (var j = 0; j < inputs.length; j++) {
+                if (inputs[j] && inputs[j].id === project.id)
+                    duplicates += 1;
+            }
+            if (duplicates === 1)
+                projects.push({ id: project.id, root: project.root,
+                    name: _boundedArchiveString(project.name, "Project", 160) });
+        }
+        projects.sort(function (a, b) { return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
+        return projects;
+    }
+
+    function _searchScopeKey() {
+        return JSON.stringify([_configuredRoots(), _searchProjects().map(function (p) {
+            return [p.id, p.root];
+        })]);
+    }
+
+    function _isCurrentSearch(generation, requestId) {
+        return generation === root.searchGeneration
+            && requestId === root.currentSearchRequestId
+            && root.searchSession && root.searchSession.scopeKey === _searchScopeKey();
+    }
+
+    function _cancelSearchRead(dropSession) {
+        root.searchGeneration += 1;
+        root.currentSearchRequestId = "";
+        var objects = (root.ownedSearchProcesses || []).concat(root.ownedSearchReaders || []);
+        root.ownedSearchProcesses = [];
+        root.ownedSearchReaders = [];
+        for (var i = 0; i < objects.length; i++) {
+            if (objects[i]) objects[i].destroy();
+        }
+        if (dropSession)
+            root.searchSession = null;
+    }
+
+    function _queueSearchProcess(generation, requestId, command, callback) {
+        if (!_isCurrentSearch(generation, requestId)) return false;
+        var process = processComponent.createObject(root, {
+            generation: generation, ownerRoot: root, ownedList: "ownedSearchProcesses",
+            command: command, callback: function (output, exitCode) {
+                if (_isCurrentSearch(generation, requestId)) callback(output, exitCode);
+                else _invalidateSearchScope(generation, requestId);
+            }
+        });
+        if (!process) return false;
+        root.ownedSearchProcesses.push(process);
+        process.running = true;
+        return true;
+    }
+
+    function _queueSearchFile(context, path, callback) {
+        if (!_isCurrentSearch(context.generation, context.request.requestId)) return false;
+        var reader = detailFileViewComponent.createObject(root, {
+            generation: context.generation, requestId: context.request.requestId,
+            ownerRoot: root, ownedList: "ownedSearchReaders", path: path,
+            byteLimit: root.maxJsonBytes, errorPrefix: "archive_task",
+            callback: function (text, error) {
+                if (_isCurrentSearch(context.generation, context.request.requestId)) callback(text, error);
+                else _invalidateSearchScope(context.generation, context.request.requestId);
+            }
+        });
+        if (!reader) return false;
+        root.ownedSearchReaders.push(reader);
+        return true;
+    }
+
+    function _invalidateSearchScope(generation, requestId) {
+        if (generation !== root.searchGeneration || requestId !== root.currentSearchRequestId)
+            return;
+        var request = root.searchSession.request;
+        _cancelSearchRead(true);
+        _searchError(request, "search_scope_changed");
+    }
+
+    function _searchError(request, code) {
+        searchResponseVar.set({ requestId: request.requestId, kind: "archive-search",
+            query: request.query || "", status: "error", results: [], partial: true,
+            hasMore: false, cursor: "", examinedCount: 0, batchExamined: 0,
+            batchListings: 0, truncated: false, sourceSnapshotGeneration: root.publicationGeneration,
+            warnings: [{ code: code, message: "Archive search could not continue. Retry the query." }] });
+    }
+
+    function _canonicalizeSearch(context, path, callback) {
+        if (!_queueSearchProcess(context.generation, context.request.requestId,
+                ["realpath", "-e", "--", path], function (output, exitCode) {
+            var parsed = exitCode === 0 ? TrellisPaths.parseCanonicalOutput(output) : { ok: false };
+            callback(parsed.ok ? parsed.path : "");
+        })) callback("");
+    }
+
+    function _canonicalizeSearchDirectory(context, path, callback) {
+        if (!_queueSearchProcess(context.generation, context.request.requestId,
+                ["test", "-d", path], function (output, exitCode) {
+            if (exitCode !== 0) { callback(""); return; }
+            _canonicalizeSearch(context, path, callback);
+        })) callback("");
+    }
+
+    function _searchWarn(context, code) {
+        context.session.partial = true;
+        _archiveWarning(context.session, code, "Some archive metadata could not be searched safely.");
+    }
+
+    function _finishSearchBatch(context) {
+        if (!_isCurrentSearch(context.generation, context.request.requestId)) {
+            _invalidateSearchScope(context.generation, context.request.requestId);
             return;
         }
-        if (request.kind === "archive-index") {
-            _loadArchiveIndex(generation, request, project);
+        var session = context.session;
+        var capped = session.results.length >= root.maxSearchResults;
+        var more = !capped && session.projectIndex < session.projects.length;
+        root.searchCursorSerial += 1;
+        session.cursor = more ? "s-" + root.searchCursorSerial + "-"
+            + Math.random().toString(36).slice(2, 18) : "";
+        searchResponseVar.set({ requestId: context.request.requestId, kind: "archive-search",
+            query: session.query, status: session.results.length ? "ready" : "empty",
+            results: _cloneValue(session.results), partial: more || session.partial || capped,
+            hasMore: more, cursor: session.cursor, examinedCount: session.examined,
+            batchExamined: context.examined, batchListings: context.listings,
+            truncated: session.truncated || capped,
+            sourceSnapshotGeneration: root.publicationGeneration,
+            warnings: session.warnings.slice(0, root.maxArchiveWarnings) });
+    }
+
+    function _handleSearchRequest(value) {
+        // A queued older global write must not supersede a newer widget request.
+        var latest = searchRequestVar.value;
+        if (value !== latest && (!value || !latest || value.requestId !== latest.requestId)) return;
+        if (value === null || value === undefined) {
+            _cancelSearchRead(true);
+            searchResponseVar.set(null);
             return;
         }
-        if (request.kind === "archive-page") {
-            _openArchiveMonth(generation, request, project, [], request.month);
+        var validation = TrellisPaths.validateSearchRequest(value);
+        if (!validation.ok) {
+            _cancelSearchRead(true);
+            _searchError({ requestId: validation.requestId || "invalid-request" }, validation.reason);
             return;
         }
-        if (request.kind === "archive-task") {
-            _readArchiveTaskRequest(generation, request, project);
+        var request = validation.request;
+        if (!request.query) {
+            _cancelSearchRead(true);
+            searchResponseVar.set({ requestId: request.requestId, kind: "archive-search",
+                query: "", status: "empty", results: [], partial: false, hasMore: false,
+                cursor: "", examinedCount: 0, batchExamined: 0, batchListings: 0,
+                truncated: false, sourceSnapshotGeneration: root.publicationGeneration, warnings: [] });
             return;
         }
-        var taskRecord = _findLiveTaskRecord(project, request.taskId);
-        if (!taskRecord) {
-            _publishDetailError(generation, request, "markdown_task_missing",
-                "The selected live task is no longer available.");
+        var session = root.searchSession;
+        if (request.cursor && (!session || session.query !== request.query
+                || session.cursor !== request.cursor || session.scopeKey !== _searchScopeKey())) {
+            _cancelSearchRead(true);
+            _searchError(request, "search_cursor_stale");
             return;
         }
-        _readMarkdownRequest(generation, request, project, taskRecord);
+        _cancelSearchRead(!request.cursor);
+        if (!request.cursor) {
+            session = { query: request.query, scopeKey: _searchScopeKey(),
+                projects: _searchProjects(), projectIndex: 0, months: null, monthIndex: 0,
+                candidates: null, offset: 0, results: [], warnings: [],
+                partial: false, truncated: false, examined: 0, canonicalRoots: null, cursor: "" };
+        }
+        root.searchSession = session;
+        session.cursor = ""; // Each opaque cursor is consumed once.
+        session.request = request;
+        root.currentSearchRequestId = request.requestId;
+        var context = { generation: root.searchGeneration, request: request, session: session,
+            listings: 0, examined: 0, roots: [], validatedProjects: [] };
+        var roots = _configuredRoots();
+        function resolveRoot(index) {
+            if (!_isCurrentSearch(context.generation, request.requestId)) {
+                _invalidateSearchScope(context.generation, request.requestId);
+                return;
+            }
+            if (index >= roots.length) {
+                var key = JSON.stringify(context.roots);
+                if (session.canonicalRoots !== null && session.canonicalRoots !== key) {
+                    _cancelSearchRead(true);
+                    _searchError(request, "search_scope_changed");
+                    return;
+                }
+                session.canonicalRoots = key;
+                _advanceSearch(context);
+                return;
+            }
+            _canonicalizeSearchDirectory(context, roots[index], function (path) {
+                if (path) context.roots.push(path);
+                else _searchWarn(context, "search_root_unavailable");
+                resolveRoot(index + 1);
+            });
+        }
+        resolveRoot(0);
+    }
+
+    function _nextSearchProject(context) {
+        var session = context.session;
+        session.projectIndex += 1;
+        session.months = null;
+        session.monthIndex = 0;
+        session.candidates = null;
+        session.offset = 0;
+        Qt.callLater(function () { _advanceSearch(context); });
+    }
+
+    function _advanceSearch(context) {
+        if (!_isCurrentSearch(context.generation, context.request.requestId)) {
+            _invalidateSearchScope(context.generation, context.request.requestId);
+            return;
+        }
+        var session = context.session;
+        if (session.projectIndex >= session.projects.length
+                || session.results.length >= root.maxSearchResults
+                || context.examined >= root.maxSearchJsonPerBatch) {
+            _finishSearchBatch(context);
+            return;
+        }
+        var project = session.projects[session.projectIndex];
+        if (context.validatedProjects.indexOf(project.id) === -1) {
+            _validateSearchProject(context, project, function (valid) {
+                if (!valid) {
+                    _searchWarn(context, "search_project_stale");
+                    _nextSearchProject(context);
+                    return;
+                }
+                context.validatedProjects.push(project.id);
+                _advanceSearch(context);
+            });
+            return;
+        }
+        if (session.months === null) {
+            if (context.listings >= root.maxSearchListingsPerBatch) {
+                _finishSearchBatch(context);
+                return;
+            }
+            _searchProjectIndex(context, project);
+            return;
+        }
+        if (session.monthIndex >= session.months.length) {
+            _nextSearchProject(context);
+            return;
+        }
+        if (session.candidates === null) {
+            if (context.listings >= root.maxSearchListingsPerBatch) {
+                _finishSearchBatch(context);
+                return;
+            }
+            _searchMonthIndex(context, project, session.months[session.monthIndex]);
+            return;
+        }
+        if (session.offset >= session.candidates.length) {
+            session.monthIndex += 1;
+            session.candidates = null;
+            session.offset = 0;
+            Qt.callLater(function () { _advanceSearch(context); });
+            return;
+        }
+        _searchPage(context, project);
+    }
+
+    function _searchList(context, path, limit, callback) {
+        context.listings += 1;
+        if (!_queueSearchProcess(context.generation, context.request.requestId,
+                ["find", path, "-mindepth", "1", "-maxdepth", "1", "-print"], function (output, exitCode) {
+            if (exitCode !== 0) {
+                _searchWarn(context, "archive_permission");
+                callback(null);
+                return;
+            }
+            var bounded = TrellisPaths.parseBoundedLines(output || "", limit + 1, root.maxCommandBytes);
+            if (bounded.truncated || bounded.lines.length > limit) {
+                context.session.truncated = true;
+                _searchWarn(context, "archive_limit");
+            }
+            if (bounded.warnings.length) _searchWarn(context, "archive_layout_unknown");
+            var lines = bounded.lines.slice(0, limit).sort().reverse();
+            // A malformed producer cannot double-read a directory identity.
+            callback(lines.filter(function (line, index) { return lines.indexOf(line) === index; }),
+                !bounded.truncated && bounded.lines.length <= limit && !bounded.warnings.length);
+        })) {
+            _searchWarn(context, "archive_unavailable");
+            callback(null);
+        }
+    }
+
+    function _validateSearchProject(context, project, callback) {
+        if (!_projectAuthorizedByRoots(project.root, context.roots)) { callback(false); return; }
+        _canonicalizeSearchDirectory(context, project.root, function (canonicalProject) {
+            if (canonicalProject !== project.root) { callback(false); return; }
+            var trellis = TrellisPaths.joinPath(project.root, ".trellis");
+            _canonicalizeSearchDirectory(context, trellis, function (canonicalTrellis) {
+                callback(canonicalTrellis === trellis);
+            });
+        });
+    }
+
+    function _searchProjectIndex(context, project) {
+        var archive = TrellisPaths.archiveRootPath(project.root);
+        _canonicalizeSearchDirectory(context, archive, function (canonicalArchive) {
+            if (!canonicalArchive) {
+                _searchWarn(context, "archive_unavailable");
+                _nextSearchProject(context);
+                return;
+            }
+            if (!TrellisPaths.resolveArchive(project.root, archive, canonicalArchive).ok) {
+                _searchWarn(context, "archive_layout_unknown");
+                _nextSearchProject(context);
+                return;
+            }
+            _searchList(context, archive, root.maxArchiveMonths, function (lines) {
+                context.session.months = (lines || []).filter(function (path) {
+                    var valid = TrellisPaths.isArchiveMonth(TrellisPaths.basename(path))
+                        && TrellisPaths.parentPath(path) === archive;
+                    if (!valid) _searchWarn(context, "archive_layout_unknown");
+                    return valid;
+                });
+                _advanceSearch(context);
+            });
+        });
+    }
+
+    function _searchMonthIndex(context, project, candidate) {
+        var month = TrellisPaths.basename(candidate);
+        _canonicalizeSearchDirectory(context, candidate, function (canonical) {
+            if (!TrellisPaths.resolveArchiveMonth(project.root, month, candidate, canonical).ok
+                    || !canonical) {
+                _searchWarn(context, "archive_month_invalid");
+                context.session.monthIndex += 1;
+                Qt.callLater(function () { _advanceSearch(context); });
+                return;
+            }
+            _searchList(context, canonical, root.maxArchiveTaskDirectories, function (lines, reliable) {
+                context.session.monthReliable = !!reliable;
+                context.session.candidates = lines || [];
+                context.session.offset = 0;
+                // Empty months are complete page observations, but failed listings aren't.
+                if (reliable && lines && !lines.length && _isCurrentSearch(context.generation, context.request.requestId))
+                    observeArchiveMetadata(project, { kind: "archive-page", status: "empty",
+                        selectedMonth: month, page: 0, pageSize: 32, tasks: [], warnings: [] });
+                _advanceSearch(context);
+            });
+        });
+    }
+
+    function _searchPage(context, project) {
+        var session = context.session;
+        var month = TrellisPaths.basename(session.months[session.monthIndex]);
+        var offset = session.offset;
+        var page = Math.floor(offset / root.archiveLimits.pageSizeMaximum);
+        var selected = session.candidates.slice(offset, offset + root.archiveLimits.pageSizeMaximum);
+        // Short final pages in earlier months may leave a non-aligned budget.
+        // Defer the whole next page so it remains a complete observation unit.
+        if (context.examined + selected.length > root.maxSearchJsonPerBatch) {
+            _finishSearchBatch(context);
+            return;
+        }
+        var rows = [];
+        var complete = session.monthReliable;
+        function next(index) {
+            if (!_isCurrentSearch(context.generation, context.request.requestId)) {
+                _invalidateSearchScope(context.generation, context.request.requestId);
+                return;
+            }
+            if (index >= selected.length) {
+                session.offset += selected.length;
+                if (complete && page <= root.archiveLimits.pageMaximum)
+                    observeArchiveMetadata(project, { kind: "archive-page", status: rows.length ? "ready" : "empty",
+                        selectedMonth: month, page: page, pageSize: root.archiveLimits.pageSizeMaximum,
+                        tasks: rows, warnings: [] });
+                Qt.callLater(function () { _advanceSearch(context); });
+                return;
+            }
+            // Result cap may stop mid-page, which must never create a
+            // complete observation.
+            if (session.results.length >= root.maxSearchResults) {
+                _finishSearchBatch(context);
+                return;
+            }
+            context.examined += 1;
+            session.examined += 1;
+            _readSearchTask(context, project, month, selected[index], function (row) {
+                if (!row) complete = false;
+                else {
+                    rows.push(row);
+                    if (TrellisProjection.searchMetadataMatches(session.query, project.name, row.title, row.id)) {
+                        session.results.push({ kind: "archive", projectId: project.id, projectName: project.name,
+                            taskId: row.id, title: row.title, storedStatus: row.storedStatus,
+                            month: month, dirName: row.dirName });
+                    }
+                }
+                next(index + 1);
+            });
+        }
+        next(0);
+    }
+
+    function _readSearchTask(context, project, month, candidate, callback) {
+        function fail(code) { _searchWarn(context, code); callback(null); }
+        var dirName = TrellisPaths.basename(candidate);
+        if (!TrellisPaths.isArchiveTaskDirectoryName(dirName)) {
+            fail("archive_task_rejected");
+            return;
+        }
+        if (!_queueSearchProcess(context.generation, context.request.requestId,
+                ["test", "-d", candidate], function (output, exitCode) {
+            if (exitCode !== 0) { fail("archive_layout_unknown"); return; }
+            _canonicalizeSearch(context, candidate, function (canonicalTask) {
+                var task = canonicalTask ? TrellisPaths.resolveArchiveTask(project.root,
+                    month, dirName, candidate, canonicalTask) : { ok: false };
+                if (!task.ok) { fail("archive_task_rejected"); return; }
+                _canonicalizeSearch(context, task.taskJsonPath, function (canonicalJson) {
+                    var json = canonicalJson ? TrellisPaths.resolveTaskJson(task, canonicalJson) : { ok: false };
+                    if (!json.ok) { fail("archive_task_rejected"); return; }
+                    if (!_queueSearchProcess(context.generation, context.request.requestId,
+                            ["test", "-f", json.path], function (testOutput, testExitCode) {
+                        if (testExitCode !== 0) { fail("archive_task_read_failed"); return; }
+                        if (!_queueSearchProcess(context.generation, context.request.requestId,
+                                ["stat", "-c", "%s", "--", json.path], function (statOutput, statExitCode) {
+                            var size = (statOutput || "").trim();
+                            if (statExitCode !== 0 || !/^\d+$/.test(size)
+                                    || !isFinite(Number(size)) || Number(size) > root.maxJsonBytes) {
+                                fail("archive_limit"); return;
+                            }
+                            if (!_queueSearchFile(context, json.path, function (text, error) {
+                                var parsed = error ? { ok: false } : TrellisParser.parseJson(text);
+                                if (!parsed.ok || !parsed.value || typeof parsed.value !== "object"
+                                        || Array.isArray(parsed.value)) { fail("archive_task_read_failed"); return; }
+                                callback(_archiveTaskSummary(parsed.value, dirName, month, null));
+                            })) fail("archive_task_read_failed");
+                        })) fail("archive_task_read_failed");
+                    })) fail("archive_task_read_failed");
+                });
+            });
+        })) fail("archive_task_read_failed");
+    }
+
+    function _cancelAction(clearResponse, preserveRequest) {
+        var context = root.currentAction;
+        var pendingRequest = root.pendingActionRequest;
+        root.actionGeneration += 1;
+        root.currentAction = null;
+        if (!preserveRequest) root.pendingActionRequest = null;
+        var objects = (root.ownedActionProcesses || []).concat(root.ownedActionReaders || []);
+        root.ownedActionProcesses = [];
+        root.ownedActionReaders = [];
+        for (var i = 0; i < objects.length; i++) {
+            if (objects[i]) objects[i].destroy();
+        }
+        if (clearResponse) actionResponseVar.set(null);
+        if (!preserveRequest) {
+            _consumeActionRequest(context ? context.rawRequest : null);
+            _consumeActionRequest(pendingRequest);
+        }
+    }
+
+    function _consumeActionRequest(request) {
+        // DMS retains globals across unload/reload; consume only this raw owner.
+        if (request && request === actionRequestVar.value) actionRequestVar.set(null);
+    }
+
+    function _isCurrentAction(context) {
+        return !!context && context === root.currentAction
+            && context.generation === root.actionGeneration && !context.finished;
+    }
+
+    function _actionScopeCurrent(context) {
+        if (!_isCurrentAction(context)) return false;
+        if (actionRequestVar.value !== context.rawRequest) return false;
+        var latest = TrellisPaths.validateActionRequest(actionRequestVar.value);
+        var project = _uniqueCurrentProject(context.request.projectId);
+        if (!latest.ok || JSON.stringify(latest.request) !== JSON.stringify(context.request)
+                || context.rootsKey !== JSON.stringify(_configuredRoots())
+                || !project || project.root !== context.projectRoot) return false;
+        if (context.request.kind === "live") {
+            var task = _findLiveTaskRecord(project, context.request.taskId);
+            if (!task || task.readError || task.taskDir !== context.taskDir) return false;
+        }
+        return true;
+    }
+
+    function _finishAction(context, status, code, value) {
+        if (!_isCurrentAction(context)) return;
+        var response = Object.assign({}, context.request, { status: status, code: code });
+        if ((status === "copied" || status === "accepted") && typeof value === "string")
+            response.value = value.slice(0, 4096);
+        _cancelAction(false, true);
+        actionResponseVar.set(response);
+        _consumeActionRequest(context.rawRequest);
+    }
+
+    function _guardAction(context) {
+        if (!_isCurrentAction(context)) return false;
+        if (_actionScopeCurrent(context)) return true;
+        _finishAction(context, "error", "action_scope_changed", "");
+        return false;
+    }
+
+    function _queueActionProcess(context, command, callback) {
+        if (!_guardAction(context)) return false;
+        var process = null;
+        try {
+            process = processComponent.createObject(root, {
+                generation: context.generation, ownerRoot: root, ownedList: "ownedActionProcesses",
+                command: command, callback: function (output, exitCode) {
+                    if (_guardAction(context)) {
+                        if ((output || "").length > root.maxCommandBytes) callback("", -1);
+                        else callback(output || "", exitCode);
+                    }
+                }
+            });
+            if (!process) return false;
+            root.ownedActionProcesses.push(process);
+            // Recheck effective authority after object creation, before launch.
+            if (!_guardAction(context)) return false;
+            process.running = true;
+            return true;
+        } catch (error) {
+            if (process) process.destroy();
+            return false;
+        }
+    }
+
+    function _checkActionLocation(context, path, directory, callback) {
+        var normalized = TrellisPaths.normalizeAbsolutePath(path);
+        if (!normalized.ok || normalized.path !== path || path.length > 4096) { callback(false); return; }
+        if (!_queueActionProcess(context, ["realpath", "-e", "--", path], function (output, code) {
+            var parsed = code === 0 ? TrellisPaths.parseCanonicalOutput(output) : { ok: false };
+            if (!parsed.ok || parsed.path !== path) { callback(false); return; }
+            if (!_queueActionProcess(context, ["test", directory ? "-d" : "-f", path], function (text, exitCode) {
+                callback(exitCode === 0);
+            })) callback(false);
+        })) callback(false);
+    }
+
+    function _authorizeActionProject(context, callback) {
+        var roots = _configuredRoots(), canonicalRoots = [];
+        function next(index) {
+            if (!_guardAction(context)) return;
+            if (index >= roots.length) {
+                var key = JSON.stringify(canonicalRoots);
+                if (!_projectAuthorizedByRoots(context.projectRoot, canonicalRoots)
+                        || (context.canonicalRootsKey !== undefined && context.canonicalRootsKey !== key)) {
+                    callback(false); return;
+                }
+                context.canonicalRootsKey = key;
+                _checkActionLocation(context, context.projectRoot, true, function (ok) {
+                    if (!ok) { callback(false); return; }
+                    _checkActionLocation(context, TrellisPaths.joinPath(context.projectRoot, ".trellis"), true, callback);
+                });
+                return;
+            }
+            var path = roots[index];
+            if (!_queueActionProcess(context, ["realpath", "-e", "--", path], function (output, code) {
+                var parsed = code === 0 ? TrellisPaths.parseCanonicalOutput(output) : { ok: false };
+                if (!parsed.ok) { next(index + 1); return; }
+                if (!_queueActionProcess(context, ["test", "-d", parsed.path], function (text, exitCode) {
+                    if (exitCode === 0) canonicalRoots.push(parsed.path);
+                    next(index + 1);
+                })) callback(false);
+            })) callback(false);
+        }
+        next(0);
+    }
+
+    function _readActionIdentity(context, taskResult, callback) {
+        var path = taskResult.taskJsonPath;
+        _checkActionLocation(context, path, false, function (ok) {
+            if (!ok || !TrellisPaths.resolveTaskJson(taskResult, path).ok) { callback(false); return; }
+            if (!_queueActionProcess(context, ["stat", "-c", "%s", "--", path], function (output, code) {
+                var text = output.trim(), size = Number(text);
+                if (code !== 0 || !/^\d+$/.test(text) || !isFinite(size) || size > root.maxJsonBytes) {
+                    callback(false); return;
+                }
+                var reader = null;
+                try {
+                    if (!_guardAction(context)) return;
+                    reader = detailFileViewComponent.createObject(root, {
+                        generation: context.generation, requestId: context.request.requestId,
+                        ownerRoot: root, ownedList: "ownedActionReaders", path: path,
+                        byteLimit: root.maxJsonBytes, errorPrefix: "action_task",
+                        callback: function (content, error) {
+                            if (!_guardAction(context)) return;
+                            if (error || TrellisPaths.utf8ByteLength(content) > root.maxJsonBytes) { callback(false); return; }
+                            var value;
+                            try { value = JSON.parse(content); } catch (parseError) { callback(false); return; }
+                            var id = "";
+                            if (context.request.kind === "archive") {
+                                var summary = _archiveTaskSummary(value, context.request.dirName, context.request.month, null);
+                                if (!summary.available) { callback(false); return; }
+                                id = summary.id;
+                            } else {
+                                id = value && typeof value.id === "string" ? value.id.trim() : "";
+                                id = id || context.dirName.trim();
+                            }
+                            callback(id === context.request.taskId);
+                        }
+                    });
+                    if (!reader) { callback(false); return; }
+                    root.ownedActionReaders.push(reader);
+                } catch (error) {
+                    if (reader) reader.destroy();
+                    callback(false);
+                }
+            })) callback(false);
+        });
+    }
+
+    function _validateActionTarget(context, callback) {
+        if (context.request.kind === "project") { callback(true); return; }
+        var projectRoot = context.projectRoot;
+        var locations = [TrellisPaths.tasksRootPath(projectRoot)];
+        if (context.request.kind === "archive") {
+            var archive = TrellisPaths.archiveRootPath(projectRoot);
+            var month = TrellisPaths.joinPath(archive, context.request.month);
+            context.taskDir = TrellisPaths.joinPath(month, context.request.dirName);
+            if (!TrellisPaths.resolveArchive(projectRoot, archive, archive).ok
+                    || !TrellisPaths.resolveArchiveMonth(projectRoot, context.request.month, month, month).ok
+                    || !TrellisPaths.resolveArchiveTask(projectRoot, context.request.month,
+                        context.request.dirName, context.taskDir, context.taskDir).ok) { callback(false); return; }
+            locations = locations.concat([archive, month]);
+        }
+        var taskResult = context.request.kind === "archive"
+            ? TrellisPaths.resolveArchiveTask(projectRoot, context.request.month,
+                context.request.dirName, context.taskDir, context.taskDir)
+            : TrellisPaths.resolveTaskDir(projectRoot, context.taskDir, context.taskDir, {});
+        if (!taskResult.ok || taskResult.kind !== context.request.kind) { callback(false); return; }
+        context.locations = locations.concat([context.taskDir]);
+        function next(index) {
+            if (!_guardAction(context)) return;
+            if (index >= context.locations.length) {
+                _readActionIdentity(context, taskResult, callback);
+                return;
+            }
+            _checkActionLocation(context, context.locations[index], true, function (ok) {
+                if (!ok) { callback(false); return; }
+                next(index + 1);
+            });
+        }
+        next(0);
+    }
+
+    function _revalidateActionLocations(context, callback) {
+        var locations = context.locations || [];
+        function next(index) {
+            if (!_guardAction(context)) return;
+            if (index >= locations.length) {
+                if (context.request.kind === "project") { callback(true); return; }
+                _checkActionLocation(context, TrellisPaths.joinPath(context.taskDir, "task.json"), false, callback);
+                return;
+            }
+            _checkActionLocation(context, locations[index], true, function (ok) {
+                if (!ok) { callback(false); return; }
+                next(index + 1);
+            });
+        }
+        next(0);
+    }
+
+    function _executeAction(context) {
+        if (!_guardAction(context)) return;
+        var action = context.request.action;
+        var value = action === "copy-task-id" ? context.request.taskId
+            : (action === "copy-project-path" || action === "open-project-folder")
+                ? context.projectRoot : context.taskDir;
+        if (!value || value.length > 4096) { _finishAction(context, "error", "action_validation_failed", ""); return; }
+        if (action.indexOf("copy-") === 0) {
+            if (!_queueActionProcess(context, ["dms", "cl", "copy", "--", value], function (output, code) {
+                _finishAction(context, code === 0 ? "copied" : "error",
+                    code === 0 ? "action_copied" : "action_host_failed", code === 0 ? value : "");
+            })) _finishAction(context, "error", "action_host_failed", "");
+            return;
+        }
+        var url = TrellisPaths.actionFileUrl(value);
+        try {
+            if (!url || typeof Qt.openUrlExternally !== "function" || !_guardAction(context)) {
+                _finishAction(context, "error", "action_host_failed", ""); return;
+            }
+            var accepted = Qt.openUrlExternally(url);
+            _finishAction(context, accepted ? "accepted" : "error",
+                accepted ? "action_open_accepted" : "action_host_failed", accepted ? value : "");
+        } catch (error) {
+            _finishAction(context, "error", "action_host_failed", "");
+        }
+    }
+
+    function _handleActionRequest(value) {
+        // Deferred writes from an older widget never supersede the current owner.
+        if (value !== actionRequestVar.value) return;
+        if (root.pendingActionRequest === value) root.pendingActionRequest = null;
+        if (value === null || value === undefined) {
+            if (root.currentAction) _cancelAction(true);
+            return;
+        }
+        _cancelAction(false, true);
+        var validation = TrellisPaths.validateActionRequest(value);
+        if (!validation.ok) {
+            actionResponseVar.set({ requestId: typeof value.requestId === "string"
+                && !TrellisPaths.hasControlCharacters(value.requestId) ? value.requestId.slice(0, 128) : "invalid-request",
+                status: "error", code: "action_request" });
+            _consumeActionRequest(value);
+            return;
+        }
+        var request = validation.request, project = _uniqueCurrentProject(request.projectId);
+        var task = request.kind === "live" ? _findLiveTaskRecord(project, request.taskId) : null;
+        var context = { generation: root.actionGeneration, request: request, rawRequest: value,
+            rootsKey: JSON.stringify(_configuredRoots()), projectRoot: project ? project.root : "",
+            taskDir: task ? task.taskDir : "", dirName: task ? task.dirName : "" };
+        root.currentAction = context;
+        if (!project || !TrellisPaths.normalizeProjectRoot(project.root).ok
+                || (request.kind === "live" && (!task || task.readError))) {
+            _finishAction(context, "error", "action_validation_failed", ""); return;
+        }
+        _authorizeActionProject(context, function (authorized) {
+            if (!authorized) { _finishAction(context, "error", "action_validation_failed", ""); return; }
+            _validateActionTarget(context, function (valid) {
+                if (!valid) { _finishAction(context, "error", "action_validation_failed", ""); return; }
+                _revalidateActionLocations(context, function (safe) {
+                    if (!safe) { _finishAction(context, "error", "action_validation_failed", ""); return; }
+                    // Canonical root authority is refreshed again after task I/O.
+                    _authorizeActionProject(context, function (current) {
+                        if (!current) { _finishAction(context, "error", "action_validation_failed", ""); return; }
+                        _executeAction(context);
+                    });
+                });
+            });
+        });
     }
 
     function _untrack(propertyName, object) {
@@ -1724,10 +2640,50 @@ PluginComponent {
             snapshotIsCurrent: root.snapshotIsCurrent,
             lastGoodFallbackActive: root.lastGoodFallbackActive
         });
+        root.publicationGeneration += 1;
+        snapshot.runtime.observationEpoch = root.observationEpoch;
+        snapshot.runtime.publicationGeneration = root.publicationGeneration;
+        var quietSelection = !root.changeTracker.initialized;
+        var recent = TrellisChanges.observeSnapshot(root.changeTracker, snapshot,
+            TrellisProjection.makeHealthProjection(snapshot),
+            root.publicationGeneration, publishedAt);
+        // Primary is a UI projection, including when new source facts change
+        // its selection. This event does not imply a manual user action.
+        if (root.observationPreferences) {
+            recent = TrellisChanges.observeSelection(root.changeTracker,
+                _selectionSummary(snapshot), publishedAt, quietSelection);
+        }
         if (root.pluginService)
             root.pluginService.setGlobalVar(root.pluginId, "snapshot", snapshot);
+        recentChangesVar.set(recent);
         root.lastGoodSnapshot = snapshot;
         return snapshot;
+    }
+
+    function _selectionSummary(snapshot) {
+        var preferences = root.observationPreferences || ({});
+        return TrellisChanges.selectionSummary(
+            TrellisProjection.parsePinnedTaskToken(preferences.pinnedTaskId),
+            TrellisProjection.selectPrimary(snapshot, preferences));
+    }
+
+    function _observeSelectionPreferences() {
+        if (!root.pluginService || !root.pluginId
+                || typeof root.pluginService.loadPluginState !== "function")
+            return;
+        try {
+            // Key-scoped reads only: the output discovery cache is not input.
+            var preferences = {
+                pinnedTaskId: root.pluginService.loadPluginState(root.pluginId, "pinnedTaskId", ""),
+                selectedProjectId: root.pluginService.loadPluginState(root.pluginId, "selectedProjectId", "")
+            };
+            var quiet = root.observationPreferences === null || !root.lastGoodSnapshot;
+            root.observationPreferences = preferences;
+            recentChangesVar.set(TrellisChanges.observeSelection(root.changeTracker,
+                _selectionSummary(root.lastGoodSnapshot), new Date().toISOString(), quiet));
+        } catch (error) {
+            // A State read failure is not an observed selection or Health fact.
+        }
     }
 
     function _rememberProjects(inputs) {
@@ -1968,6 +2924,12 @@ PluginComponent {
             if (topologyTimer.running)
                 root._armTopologyTimer();
         }
+        if (changes.rootsChanged) {
+            _rejectDetailScope(root.detailGeneration, root.currentDetailRequestId);
+            _cancelSearchRead(true);
+            searchResponseVar.set(null);
+            _cancelAction(true);
+        }
         if (changes.rootsChanged || changes.refreshRequested)
             settingsRefreshTimer.restart();
     }
@@ -1985,6 +2947,7 @@ PluginComponent {
         // Only an absent/non-array key falls back to the v0.4 projectRoot.
         var rootInput = TrellisDiscovery.selectRootInput(settings, root.maxScanRoots);
         var normalized = TrellisPaths.normalizeRoots(rootInput.value);
+        TrellisChanges.resetScope(root.changeTracker, JSON.stringify(normalized.roots || []));
         if (rootInput.truncated > 0) {
             normalized.warnings.push(_warning("scan_root_limit", "trusted scan root cap reached", {
                 limit: root.maxScanRoots,
@@ -2044,14 +3007,27 @@ PluginComponent {
             if (changedPluginId === root.pluginId)
                 Qt.callLater(root._observePluginSettingsChange);
         }
+
+        function onPluginStateChanged(changedPluginId) {
+            if (changedPluginId === root.pluginId)
+                Qt.callLater(root._observeSelectionPreferences);
+        }
     }
 
-    Component.onCompleted: Qt.callLater(function () { startScan("initial"); })
+    Component.onCompleted: Qt.callLater(function () {
+        _observeSelectionPreferences();
+        startScan("initial");
+    })
+    onPluginServiceChanged: Qt.callLater(root._observeSelectionPreferences)
+    onPluginIdChanged: Qt.callLater(root._observeSelectionPreferences)
 
     Component.onDestruction: {
         root.scanGeneration += 1;
         root.activeScan = null;
         _cancelDetailRead(false);
+        _cancelSearchRead(true);
+        _cancelAction(true);
         _destroyOwned();
+        root.changeTracker = TrellisChanges.createTracker(root.observationEpoch);
     }
 }

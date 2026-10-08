@@ -1683,6 +1683,27 @@ function _findUniqueTask(project, taskId) {
     return found;
 }
 
+// Action views pass qualified identities; filesystem authority stays in the daemon.
+function makeActionContext(snapshot, kind, projectId, taskId, month, dirName) {
+    var facts = _snapshotFacts(snapshot);
+    if (!facts.ready || typeof projectId !== "string"
+            || !_findUniqueProject(facts.projects, projectId))
+        return null;
+    if (kind === "project")
+        return { kind: kind, projectId: projectId };
+    if (kind !== "live" && kind !== "archive") return null;
+    if (typeof taskId !== "string" || !taskId || taskId.length > 256
+            || /[\u0000-\u001f\u007f]/.test(taskId)) return null;
+    if (kind === "live" && !_findUniqueTask(_findUniqueProject(facts.projects, projectId), taskId))
+        return null;
+    var context = { kind: kind, projectId: projectId, taskId: taskId };
+    if (kind === "archive") {
+        context.month = month;
+        context.dirName = dirName;
+    }
+    return context;
+}
+
 function resolveLauncherAction(snapshot, encodedAction) {
     if (typeof encodedAction !== "string" || !encodedAction
             || encodedAction.length > MAX_LAUNCHER_ACTION_LENGTH)
@@ -1731,4 +1752,65 @@ function resolveLauncherAction(snapshot, encodedAction) {
     return pinnedTaskId
         ? { kind: "task", projectId: projectId, taskId: taskId, pinnedTaskId: pinnedTaskId }
         : null;
+}
+
+// Global popout search deliberately differs from the Launcher's title-only API.
+function normalizeSearchQuery(value) {
+    return typeof value === "string"
+        ? value.slice(0, 256).replace(/[\u0000-\u001f\u007f]/g, " ").trim() : "";
+}
+
+function normalizeSearchScope(value) {
+    return value === "archive" || value === "all" ? value : "live";
+}
+
+function searchMetadataMatches(query, projectName, title, taskId) {
+    var needle = normalizeSearchQuery(query).toLowerCase();
+    if (!needle)
+        return false;
+    var fields = [projectName, title, taskId];
+    for (var i = 0; i < fields.length; i++) {
+        if (typeof fields[i] === "string" && fields[i].toLowerCase().indexOf(needle) !== -1)
+            return true;
+    }
+    return false;
+}
+
+function makeSearchProjection(snapshot, query, scope) {
+    var facts = _snapshotFacts(snapshot);
+    query = normalizeSearchQuery(query);
+    scope = normalizeSearchScope(scope);
+    var result = { ready: facts.ready, active: !!query, query: query,
+        scope: scope, live: [], liveOverflow: 0 };
+    if (!query || !facts.ready || scope === "archive")
+        return result;
+    var count = 0;
+    function append(row) {
+        count += 1;
+        if (result.live.length < 64)
+            result.live.push(row);
+    }
+    for (var i = 0; i < facts.projects.length; i++) {
+        var project = facts.projects[i];
+        var projectId = _launcherId(project && project.id);
+        if (!projectId || !_findUniqueProject(facts.projects, projectId))
+            continue;
+        var name = _launcherText(project.name, "Project", 160);
+        if (searchMetadataMatches(query, project.name, "", ""))
+            append({ kind: "project", projectId: projectId, projectName: name,
+                taskId: "", title: name });
+        var tasks = _array(project.tasks);
+        for (var t = 0; t < tasks.length; t++) {
+            var task = tasks[t];
+            var taskId = _launcherId(task && task.id);
+            if (!taskId || taskId.length > 256 || !_findUniqueTask(project, taskId))
+                continue;
+            if (searchMetadataMatches(query, project.name, task.title, task.id))
+                append({ kind: "live", projectId: projectId, projectName: name,
+                    taskId: taskId, title: _launcherText(task.title, taskId, 240),
+                    storedStatus: _launcherText(task.storedStatus, "unknown", 64) });
+        }
+    }
+    result.liveOverflow = Math.max(0, count - result.live.length);
+    return result;
 }

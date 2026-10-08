@@ -4,6 +4,8 @@ import qs.Services
 import qs.Widgets
 import qs.Modules.Plugins
 import "lib/trellisprojection.js" as TrellisProjection
+import "lib/trellischanges.js" as TrellisChanges
+import "lib/trellisPaths.js" as TrellisPaths
 
 PluginComponent {
     id: root
@@ -30,7 +32,54 @@ PluginComponent {
     property bool refreshPending: false
     property string refreshBaselineGeneratedAt: ""
     property int refreshRequestSerial: 0
+    property string actionInstanceId: "action-" + Date.now() + "-" + Math.random().toString(36).slice(2, 14)
+    property int actionSerial: 0
+    property var actionIdentity: null
+    property string actionRequestId: ""
+    property string actionStatus: "idle"
+    property string actionCode: ""
+    readonly property bool actionPending: actionStatus === "pending"
+    readonly property var detailActionContext: TrellisProjection.makeActionContext(root.snapshot,
+        root.detailArchive ? "archive" : "live", root.detailProjectId, root.detailTaskId,
+        root.detailMonth, root.detailDirName)
+    readonly property var taskActions: [
+        { action: "copy-task-id", label: I18n.trFor("trellisDms", "Copy task ID"), icon: "content_copy" },
+        { action: "copy-task-path", label: I18n.trFor("trellisDms", "Copy task path"), icon: "content_copy" },
+        { action: "open-task-folder", label: I18n.trFor("trellisDms", "Open task folder"), icon: "folder_open" },
+        { action: "copy-project-path", label: I18n.trFor("trellisDms", "Copy project path"), icon: "content_copy" },
+        { action: "open-project-folder", label: I18n.trFor("trellisDms", "Open project folder"), icon: "folder_open" }
+    ]
+    readonly property var projectActions: [
+        { action: "copy-project-path", label: I18n.trFor("trellisDms", "Copy project path"), icon: "content_copy" },
+        { action: "open-project-folder", label: I18n.trFor("trellisDms", "Open project folder"), icon: "folder_open" }
+    ]
     property bool detailMode: false
+    property bool recentChangesMode: false
+    property real recentReturnContentY: 0
+    property bool searchMode: false
+    property string searchQuery: ""
+    property string searchScope: "live"
+    property string searchInstanceId: "search-" + Date.now() + "-" + Math.random().toString(36).slice(2, 14)
+    property int searchRequestSerial: 0
+    property string searchRequestId: ""
+    property string searchStatus: "idle"
+    property var searchArchiveResults: []
+    property string searchCursor: ""
+    property bool searchHasMore: false
+    property bool searchPartial: false
+    property bool searchTruncated: false
+    property double searchExamined: 0
+    property var searchWarnings: []
+    property bool detailFromSearch: false
+    property real searchReturnContentY: 0
+    readonly property var searchProjection: TrellisProjection.makeSearchProjection(
+        root.snapshot, root.searchQuery, root.searchScope)
+    readonly property bool searchViewActive: root.searchMode && root.searchProjection.active
+    readonly property var searchScopes: [
+        { key: "live", label: I18n.trFor("trellisDms", "Live") },
+        { key: "archive", label: I18n.trFor("trellisDms", "Archive") },
+        { key: "all", label: I18n.trFor("trellisDms", "All scopes") }
+    ]
     property string detailProjectId: ""
     property string detailTaskId: ""
     property string detailTitle: ""
@@ -66,6 +115,24 @@ PluginComponent {
     ]
 
     readonly property var snapshot: snapshotVar.value || ({})
+    readonly property var recentChangesProjection: TrellisChanges.makeHistoryProjection(
+        recentChangesVar.value, snapshot)
+    readonly property var recentChangeLabels: ({
+        project_discovered: I18n.trFor("trellisDms", "Project discovered"),
+        project_unavailable: I18n.trFor("trellisDms", "Project unavailable"),
+        project_recovered: I18n.trFor("trellisDms", "Project recovered"),
+        task_discovered: I18n.trFor("trellisDms", "Task discovered"),
+        task_status_changed: I18n.trFor("trellisDms", "Stored task status changed"),
+        task_state_changed: I18n.trFor("trellisDms", "Displayed task state changed"),
+        session_attached: I18n.trFor("trellisDms", "Session attached"),
+        session_detached: I18n.trFor("trellisDms", "Session detached"),
+        active_session_count_changed: I18n.trFor("trellisDms", "Active session count changed"),
+        archive_item_observed: I18n.trFor("trellisDms", "Archive item newly observed"),
+        pin_changed: I18n.trFor("trellisDms", "Pinned task selection changed"),
+        primary_changed: I18n.trFor("trellisDms", "Primary selection changed"),
+        health_degraded: I18n.trFor("trellisDms", "Trellis health degraded"),
+        health_recovered: I18n.trFor("trellisDms", "Trellis health recovered")
+    })
     readonly property string pillMode: TrellisProjection.normalizeDisplayMode(
         root.pluginData && root.pluginData.pillMode !== undefined
             ? root.pluginData.pillMode
@@ -91,6 +158,38 @@ PluginComponent {
         snapshot, {}, uiState)
     readonly property var projectFilterOptions: [{ id: "", name: I18n.trFor("trellisDms", "All") }]
         .concat(popoutProjection.projectOptions || [])
+
+    function recentSelectionLabel(value) {
+        if (!value)
+            return I18n.trFor("trellisDms", "None");
+        var projects = root.snapshot.projects || [];
+        var name = I18n.trFor("trellisDms", "Project");
+        for (var i = 0; i < projects.length; i++) {
+            if (projects[i].id === value.project_id) {
+                name = (projects[i].name || name).slice(0, 160);
+                break;
+            }
+        }
+        return name + (value.task_id ? " / " + value.task_id : "");
+    }
+
+    function recentChangeSummary(event) {
+        var before = event.before || ({});
+        var after = event.after || ({});
+        if (event.event_type === "task_status_changed")
+            return root.localizedTaskState(before.status) + " → " + root.localizedTaskState(after.status);
+        if (event.event_type === "task_state_changed")
+            return root.localizedTaskState(before.state) + " → " + root.localizedTaskState(after.state);
+        if (event.event_type === "active_session_count_changed")
+            return before.count + " → " + after.count;
+        if (event.event_type === "task_discovered")
+            return root.localizedTaskState(after.status);
+        if (event.event_type === "pin_changed" || event.event_type === "primary_changed")
+            return recentSelectionLabel(event.before) + " → " + recentSelectionLabel(event.after);
+        if (event.event_type === "archive_item_observed")
+            return after.month + " / " + after.dir_name;
+        return "";
+    }
 
     function projectCountLabel(count) {
         return count === 1
@@ -212,6 +311,7 @@ PluginComponent {
         case "Trellis refresh could not be requested from DMS.": return I18n.trFor("trellisDms", "Trellis refresh could not be requested from DMS.");
         case "DMS Settings are unavailable in this session.": return I18n.trFor("trellisDms", "DMS Settings are unavailable in this session.");
         case "DMS Settings could not be opened.": return I18n.trFor("trellisDms", "DMS Settings could not be opened.");
+        case "The selected project is no longer authorized or available. Retry from the current view.": return I18n.trFor("trellisDms", "The selected project is no longer authorized or available. Retry from the current view.");
         case "The task document response was invalid or stale.": return I18n.trFor("trellisDms", "The task document response was invalid or stale.");
         case "The archive response was invalid or stale.": return I18n.trFor("trellisDms", "The archive response was invalid or stale.");
         case "Task document could not be loaded.": return I18n.trFor("trellisDms", "Task document could not be loaded.");
@@ -508,6 +608,246 @@ PluginComponent {
         }
     }
 
+    function cancelAction() {
+        var request = actionRequestVar.value;
+        var owned = root.actionRequestId && request && request.requestId === root.actionRequestId;
+        root.actionRequestId = "";
+        root.actionIdentity = null;
+        root.actionStatus = "idle";
+        root.actionCode = "";
+        if (owned) actionRequestVar.set(null);
+    }
+
+    function requestAction(action, context) {
+        if (root.actionPending || !context) return;
+        var request = Object.assign({}, context, {
+            requestId: root.actionInstanceId + "-" + (++root.actionSerial), action: action
+        });
+        var validation = TrellisPaths.validateActionRequest(request);
+        if (!validation.ok) {
+            root.actionIdentity = context;
+            root.actionStatus = "error";
+            root.actionCode = "action_request";
+            return;
+        }
+        root.actionIdentity = validation.request;
+        root.actionRequestId = validation.request.requestId;
+        root.actionStatus = "pending";
+        root.actionCode = "";
+        try { actionRequestVar.set(validation.request); }
+        catch (error) { root.actionStatus = "error"; root.actionCode = "action_host_failed"; root.actionRequestId = ""; }
+    }
+
+    function observeActionOwnership() {
+        if (!root.actionRequestId) return;
+        var request = actionRequestVar.value;
+        if (request && request.requestId === root.actionRequestId) return;
+        var response = actionResponseVar.value;
+        if (response && response.requestId === root.actionRequestId) {
+            root.observeActionResponse();
+            if (!root.actionRequestId) return;
+        }
+        root.actionRequestId = "";
+        root.actionStatus = "superseded";
+        root.actionCode = "action_superseded";
+    }
+
+    function observeActionResponse() {
+        if (!root.actionRequestId) return;
+        var response = actionResponseVar.value;
+        if (!response) {
+            root.actionRequestId = "";
+            root.actionStatus = "superseded";
+            root.actionCode = "action_scope_changed";
+            return;
+        }
+        if (response.requestId !== root.actionRequestId) return;
+        var identity = root.actionIdentity;
+        var fields = ["action", "kind", "projectId", "taskId", "month", "dirName"];
+        var valid = !!identity && ["copied", "accepted", "error"].indexOf(response.status) !== -1
+            && typeof response.code === "string" && response.code.length <= 64;
+        for (var i = 0; i < fields.length; i++) {
+            if (response[fields[i]] !== identity[fields[i]]) valid = false;
+        }
+        root.actionStatus = valid ? response.status : "error";
+        root.actionCode = valid ? response.code : "action_request";
+        root.actionRequestId = "";
+    }
+
+    function actionFeedbackFor(context) {
+        var identity = root.actionIdentity;
+        return !!context && !!identity && context.kind === identity.kind
+            && context.projectId === identity.projectId && context.taskId === identity.taskId
+            && context.month === identity.month && context.dirName === identity.dirName;
+    }
+
+    function detailActionFeedbackVisible() {
+        var identity = { kind: root.detailArchive ? "archive" : "live",
+            projectId: root.detailProjectId, taskId: root.detailTaskId };
+        if (root.detailArchive) {
+            identity.month = root.detailMonth;
+            identity.dirName = root.detailDirName;
+        }
+        return root.detailMode && root.actionStatus !== "idle" && root.actionFeedbackFor(identity);
+    }
+
+    function actionFeedbackText() {
+        if (root.actionStatus === "pending") return I18n.trFor("trellisDms", "Validating action…");
+        if (root.actionStatus === "copied") return I18n.trFor("trellisDms", "Copied to clipboard.");
+        if (root.actionStatus === "accepted") return I18n.trFor("trellisDms", "Folder launch request accepted.");
+        if (root.actionStatus === "superseded") return I18n.trFor("trellisDms", "Action cancelled or superseded. Retry from the current view.");
+        return I18n.trFor("trellisDms", "Action unavailable or validation failed. Retry from the current view.");
+    }
+
+    function cancelSearch(preserveResults) {
+        searchDebounceTimer.stop();
+        var ownedId = root.searchRequestId;
+        root.searchRequestId = "";
+        var request = searchRequestVar.value;
+        if (ownedId && request && request.requestId === ownedId)
+            searchRequestVar.set(null);
+        if (preserveResults) {
+            if (root.searchStatus === "loading" || root.searchHasMore)
+                root.searchStatus = "paused";
+        } else {
+            root.searchArchiveResults = [];
+            root.searchStatus = "idle";
+            root.searchPartial = false;
+            root.searchTruncated = false;
+            root.searchExamined = 0;
+            root.searchWarnings = [];
+        }
+        root.searchCursor = "";
+        root.searchHasMore = false;
+    }
+
+    function closeSearch() {
+        root.cancelSearch(false);
+        root.searchMode = false;
+        root.searchQuery = "";
+    }
+
+    function updateSearch() {
+        root.cancelSearch(false);
+        if (root.searchMode && !root.detailMode && root.searchProjection.active
+                && root.searchScope !== "live") {
+            root.searchStatus = "loading";
+            searchDebounceTimer.restart();
+        }
+    }
+
+    function requestSearch(continuation) {
+        if (!root.searchMode || root.detailMode || !root.searchProjection.active
+                || root.searchScope === "live")
+            return;
+        var cursor = continuation ? root.searchCursor : "";
+        if (continuation && !cursor) return;
+        if (!continuation) {
+            root.cancelSearch(false);
+        }
+        root.searchRequestSerial += 1;
+        root.searchRequestId = root.searchInstanceId + "-" + root.searchRequestSerial;
+        root.searchStatus = "loading";
+        searchRequestVar.set({ requestId: root.searchRequestId, kind: "archive-search",
+            query: root.searchProjection.query, cursor: cursor });
+    }
+
+    function observeSearchOwnership() {
+        var request = searchRequestVar.value;
+        if (!root.searchRequestId || (request && request.requestId === root.searchRequestId)) return;
+        root.searchRequestId = "";
+        root.searchStatus = "superseded";
+        root.searchCursor = "";
+        root.searchHasMore = false;
+        searchDebounceTimer.stop();
+    }
+
+    function observeSearchResponse() {
+        if (!root.searchRequestId || !root.searchMode || root.detailMode) return;
+        var response = searchResponseVar.value;
+        if (!response) {
+            root.searchStatus = "superseded";
+            root.searchCursor = "";
+            root.searchHasMore = false;
+            return;
+        }
+        if (response.requestId !== root.searchRequestId) return;
+        if (response.kind !== "archive-search" || response.query !== root.searchProjection.query
+                || ["ready", "empty", "error"].indexOf(response.status) === -1
+                || !Array.isArray(response.results) || response.results.length > 64
+                || !Array.isArray(response.warnings) || response.warnings.length > 8
+                || typeof response.examinedCount !== "number" || !isFinite(response.examinedCount)
+                || response.examinedCount < 0 || typeof response.cursor !== "string"
+                || response.cursor.length > 128 || typeof response.partial !== "boolean"
+                || typeof response.hasMore !== "boolean" || typeof response.truncated !== "boolean"
+                || (response.hasMore && !/^[a-zA-Z0-9-]+$/.test(response.cursor))) {
+            root.searchStatus = "error";
+            root.searchHasMore = false;
+            root.searchCursor = "";
+            return;
+        }
+        var rows = [];
+        for (var i = 0; i < response.results.length; i++) {
+            var row = response.results[i];
+            if (!row || row.kind !== "archive" || typeof row.projectId !== "string"
+                    || !row.projectId || row.projectId.length > 4096
+                    || typeof row.taskId !== "string" || !row.taskId || row.taskId.length > 256
+                    || typeof row.title !== "string" || row.title.length > 240
+                    || typeof row.projectName !== "string" || row.projectName.length > 160
+                    || TrellisProjection.normalizeSelectedArchiveMonth(row.month) !== row.month
+                    || typeof row.dirName !== "string" || !row.dirName || row.dirName.length > 256
+                    || /[\/\\\u0000-\u001f\u007f]/.test(row.dirName)
+                    || row.dirName === "." || row.dirName === "..") {
+                root.searchStatus = "error";
+                root.searchHasMore = false;
+                root.searchCursor = "";
+                return;
+            }
+            rows.push({ kind: "archive", projectId: row.projectId, taskId: row.taskId,
+                projectName: row.projectName, title: row.title,
+                month: row.month, dirName: row.dirName });
+        }
+        root.searchArchiveResults = rows;
+        root.searchStatus = response.status;
+        root.searchExamined = response.examinedCount;
+        root.searchPartial = response.partial;
+        root.searchTruncated = response.truncated;
+        root.searchHasMore = response.hasMore;
+        root.searchCursor = response.cursor;
+        // Only bounded code/count facts are displayed; no raw reader text.
+        root.searchWarnings = response.warnings.slice(0, 8);
+    }
+
+    function selectSearchResult(row) {
+        if (!row) return;
+        var project = TrellisProjection._findUniqueProject(root.snapshot.projects || [], row.projectId);
+        if (!project || (row.kind === "live"
+                && !TrellisProjection._findUniqueTask(project, row.taskId))) {
+            root.searchStatus = "stale";
+            return;
+        }
+        root.cancelSearch(true);
+        if (row.kind === "project") {
+            root.selectProject(row.projectId);
+            root.closeSearch();
+            return;
+        }
+        root.detailFromSearch = true;
+        if (row.kind === "live") {
+            root.openTaskDetail(row.projectId, row.taskId, row.title);
+        } else if (row.kind === "archive") {
+            // The existing daemon archive-task reader revalidates month/dir/ID.
+            root.detailArchive = true;
+            root.detailMode = true;
+            root.detailProjectId = row.projectId;
+            root.detailTaskId = row.taskId;
+            root.detailMonth = row.month;
+            root.detailDirName = row.dirName;
+            root.detailTitle = row.title;
+            root.requestDetailDocument("prd.md");
+        }
+    }
+
     function _isAllowedDetailDocument(document) {
         return document === "prd.md" || document === "design.md"
             || document === "implement.md";
@@ -562,6 +902,7 @@ PluginComponent {
     }
 
     function closeTaskDetail() {
+        root.cancelAction();
         root.detailRequestSerial += 1;
         root.detailRequestId = "";
         root.detailMode = false;
@@ -576,6 +917,7 @@ PluginComponent {
         root.detailFormat = "plain";
         root.detailError = "";
         detailRequestVar.set(null);
+        root.detailFromSearch = false;
     }
 
     function observeDetailResponse() {
@@ -767,6 +1109,17 @@ PluginComponent {
         detailRequestVar.set(null);
     }
 
+    onSearchQueryChanged: root.updateSearch()
+    onSearchScopeChanged: root.updateSearch()
+    Component.onDestruction: { root.cancelSearch(false); root.cancelAction(); }
+
+    Timer {
+        id: searchDebounceTimer
+        interval: 250
+        repeat: false
+        onTriggered: root.requestSearch(false)
+    }
+
     Component.onCompleted: loadPreferenceState()
     onPluginServiceChanged: loadPreferenceState()
     onPluginIdChanged: loadPreferenceState()
@@ -797,6 +1150,12 @@ PluginComponent {
     }
 
     PluginGlobalVar {
+        id: recentChangesVar
+        varName: "recentChanges"
+        defaultValue: null
+    }
+
+    PluginGlobalVar {
         id: detailRequestVar
         varName: "detailRequest"
         defaultValue: null
@@ -807,6 +1166,34 @@ PluginComponent {
         varName: "detailResponse"
         defaultValue: null
         onValueChanged: root.observeDetailResponse()
+    }
+
+    PluginGlobalVar {
+        id: searchRequestVar
+        varName: "searchRequest"
+        defaultValue: null
+        onValueChanged: root.observeSearchOwnership()
+    }
+
+    PluginGlobalVar {
+        id: searchResponseVar
+        varName: "searchResponse"
+        defaultValue: null
+        onValueChanged: root.observeSearchResponse()
+    }
+
+    PluginGlobalVar {
+        id: actionRequestVar
+        varName: "actionRequest"
+        defaultValue: null
+        onValueChanged: root.observeActionOwnership()
+    }
+
+    PluginGlobalVar {
+        id: actionResponseVar
+        varName: "actionResponse"
+        defaultValue: null
+        onValueChanged: root.observeActionResponse()
     }
 
     horizontalBarPill: Component {
@@ -943,8 +1330,11 @@ PluginComponent {
             readonly property real targetHeight: root.popoutHeight - Theme.spacingS * 2
 
             width: parent ? parent.width : root.popoutWidth - Theme.spacingS * 2
-            headerText: "Trellis"
-            detailsText: root.detailMode
+            headerText: root.recentChangesMode
+                ? I18n.trFor("trellisDms", "Recent Trellis Changes") : "Trellis"
+            detailsText: root.recentChangesMode
+                ? ""
+                : root.detailMode
                 ? (root.detailArchive
                     ? I18n.trFor("trellisDms", "Archive · Read only") + " · " : "")
                     + root.detailTitle
@@ -957,7 +1347,20 @@ PluginComponent {
                 : I18n.trFor("trellisDms", "Loading status")))
             showCloseButton: true
 
+            Component.onDestruction: { root.closeSearch(); root.cancelAction(); }
+            Connections {
+                target: popoutPanel.parentPopout
+                function onShouldBeVisibleChanged() {
+                    if (popoutPanel.parentPopout && !popoutPanel.parentPopout.shouldBeVisible) {
+                        root.closeSearch();
+                        root.cancelAction();
+                    }
+                }
+            }
+
             DankFlickable {
+                id: popoutFlickable
+                property int historyFocusIndex: -1
                 width: parent.width
                 height: Math.max(0, popoutPanel.targetHeight
                     - popoutPanel.headerHeight - popoutPanel.detailsHeight)
@@ -965,11 +1368,450 @@ PluginComponent {
                 contentHeight: popoutBody.implicitHeight
                 clip: true
 
+                function revealControl(control) {
+                    var point = control.mapToItem(popoutBody, 0, 0);
+                    var nextY = contentY;
+                    if (point.y < contentY)
+                        nextY = point.y;
+                    else if (point.y + control.height > contentY + height)
+                        nextY = point.y + control.height - height;
+                    contentY = Math.max(0, Math.min(Math.max(0, contentHeight - height), nextY));
+                }
+
+                Keys.onPressed: event => {
+                    if (!root.recentChangesMode)
+                        return;
+                    var target = historyFocusIndex;
+                    if (event.key === Qt.Key_Down) target += 1;
+                    else if (event.key === Qt.Key_Up) target -= 1;
+                    else if (event.key === Qt.Key_Home) target = -1;
+                    else if (event.key === Qt.Key_End) target = historyRows.count - 1;
+                    else if (event.key === Qt.Key_PageDown || event.key === Qt.Key_PageUp) {
+                        var direction = event.key === Qt.Key_PageDown ? 1 : -1;
+                        var goalY = contentY + direction * height;
+                        target += direction;
+                        while (target >= 0 && target < historyRows.count - 1) {
+                            var row = historyRows.itemAt(target);
+                            var rowY = row.mapToItem(popoutBody, 0, 0).y;
+                            if ((direction > 0 && rowY >= goalY)
+                                    || (direction < 0 && rowY <= goalY))
+                                break;
+                            target += direction;
+                        }
+                    }
+                    else return;
+                    target = Math.max(-1, Math.min(historyRows.count - 1, target));
+                    if (target < 0) historyBack.forceActiveFocus();
+                    else historyRows.itemAt(target).forceActiveFocus();
+                    event.accepted = true;
+                }
+
                 Column {
                     id: popoutBody
 
                     width: parent.width
                     spacing: Theme.spacingM
+
+                    Column {
+                        visible: root.searchMode && !root.detailMode && !root.archiveMode && !root.recentChangesMode
+                        width: parent.width
+                        spacing: Theme.spacingS
+
+                        Flow {
+                            width: parent.width
+                            height: childrenRect.height
+                            spacing: Theme.spacingS
+                            DankButton {
+                                width: Math.min(120, parent.width)
+                                text: I18n.trFor("trellisDms", "Back")
+                                iconName: "arrow_back"
+                                buttonHeight: 40
+                                onActiveFocusChanged: { if (activeFocus) popoutFlickable.revealControl(this); }
+                                onClicked: {
+                                    root.closeSearch();
+                                    Qt.callLater(function () { searchEntry.forceActiveFocus(); });
+                                }
+                            }
+                            DankButton {
+                                width: Math.min(120, parent.width)
+                                text: I18n.trFor("trellisDms", "Clear search")
+                                iconName: "close"
+                                buttonHeight: 40
+                                onActiveFocusChanged: { if (activeFocus) popoutFlickable.revealControl(this); }
+                                onClicked: { root.searchQuery = ""; searchInput.forceActiveFocus(); }
+                            }
+                        }
+
+                        DankTextField {
+                            id: searchInput
+                            width: parent.width
+                            labelText: I18n.trFor("trellisDms", "Search projects and tasks")
+                            placeholderText: I18n.trFor("trellisDms", "Project name, task title or ID")
+                            leftIconName: "search"
+                            maximumLength: 256
+                            text: root.searchQuery
+                            onTextEdited: root.searchQuery = text
+                            onFocusStateChanged: hasFocus => {
+                                if (hasFocus) popoutFlickable.revealControl(this);
+                            }
+                            onAccepted: {
+                                for (var i = 0; i < searchResultGroups.count; i++) {
+                                    var group = searchResultGroups.itemAt(i);
+                                    if (group.focusFirst()) break;
+                                }
+                            }
+                        }
+
+                        Flow {
+                            id: searchScopeControls
+                            width: parent.width
+                            height: childrenRect.height
+                            spacing: Theme.spacingS
+                            Repeater {
+                                model: root.searchScopes
+                                DankButton {
+                                    required property var modelData
+                                    readonly property bool selected: root.searchScope === modelData.key
+                                    width: Math.min(120, searchScopeControls.width)
+                                    clip: true
+                                    text: modelData.label
+                                    buttonHeight: 40
+                                    backgroundColor: selected ? Theme.primary : Theme.surfaceVariant
+                                    textColor: selected ? Theme.primaryText : Theme.surfaceVariantText
+                                    onActiveFocusChanged: { if (activeFocus) popoutFlickable.revealControl(this); }
+                                    onClicked: root.searchScope = modelData.key
+                                }
+                            }
+                        }
+
+                        StyledText {
+                            visible: !root.searchProjection.active
+                            width: parent.width
+                            text: I18n.trFor("trellisDms", "Search covers all trusted discovered projects. Archive metadata loads only for a nonempty query.")
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceVariantText
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Repeater {
+                            id: searchResultGroups
+                            model: !root.searchViewActive || root.detailMode ? [] : [
+                                { label: I18n.trFor("trellisDms", "Live"), rows: root.searchProjection.live, visible: root.searchScope !== "archive" },
+                                { label: I18n.trFor("trellisDms", "Archive"), rows: root.searchArchiveResults, visible: root.searchScope !== "live" }
+                            ]
+                            Column {
+                                id: searchResultGroup
+                                required property var modelData
+                                width: parent.width
+                                visible: modelData.visible
+                                spacing: Theme.spacingS
+                                function focusFirst() {
+                                    if (!visible || resultRows.count === 0) return false;
+                                    resultRows.itemAt(0).focusResult();
+                                    return true;
+                                }
+                                StyledText {
+                                    width: parent.width
+                                    text: searchResultGroup.modelData.label
+                                    font.pixelSize: Theme.fontSizeMedium
+                                    font.weight: Font.DemiBold
+                                    color: Theme.surfaceText
+                                }
+                                Repeater {
+                                    id: resultRows
+                                    model: searchResultGroup.modelData.visible ? searchResultGroup.modelData.rows : []
+                                    Column {
+                                        id: searchResultRow
+                                        required property var modelData
+                                        width: parent.width
+                                        spacing: Theme.spacingXXS
+                                        function focusResult() { searchResultButton.forceActiveFocus(); }
+                                        DankButton {
+                                            id: searchResultButton
+                                            width: parent.width
+                                            clip: true
+                                            text: searchResultRow.modelData.title
+                                            iconName: searchResultRow.modelData.kind === "project" ? "account_tree" : "description"
+                                            buttonHeight: 40
+                                            Accessible.name: searchResultRow.modelData.title + " / "
+                                                + searchResultRow.modelData.projectName + " / " + searchResultRow.modelData.taskId
+                                            onActiveFocusChanged: { if (activeFocus) popoutFlickable.revealControl(this); }
+                                            onClicked: {
+                                                root.searchReturnContentY = popoutFlickable.contentY;
+                                                root.selectSearchResult(searchResultRow.modelData);
+                                                if (root.detailMode) popoutFlickable.contentY = 0;
+                                            }
+                                        }
+                                        StyledText {
+                                            width: parent.width
+                                            text: searchResultRow.modelData.projectName
+                                                + (searchResultRow.modelData.taskId ? " / " + searchResultRow.modelData.taskId : "")
+                                                + (searchResultRow.modelData.month ? " / " + searchResultRow.modelData.month : "")
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            color: Theme.surfaceVariantText
+                                            elide: Text.ElideRight
+                                            maximumLineCount: 1
+                                        }
+                                    }
+                                }
+                                StyledText {
+                                    visible: searchResultGroup.modelData.rows.length === 0
+                                        && searchResultGroup.modelData.label === I18n.trFor("trellisDms", "Live")
+                                    width: parent.width
+                                    text: I18n.trFor("trellisDms", "No live metadata matches.")
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.surfaceVariantText
+                                    wrapMode: Text.WordWrap
+                                }
+                            }
+                        }
+
+                        StyledText {
+                            visible: root.searchViewActive && root.searchProjection.liveOverflow > 0
+                            width: parent.width
+                            text: I18n.trFor("trellisDms", "%1 more live matches. Narrow the query.").arg(root.searchProjection.liveOverflow)
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceVariantText
+                            wrapMode: Text.WordWrap
+                        }
+                        StyledText {
+                            visible: root.searchViewActive && root.searchStatus === "stale" && root.searchScope === "live"
+                            width: parent.width
+                            text: I18n.trFor("trellisDms", "The selected search result is no longer available.")
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.warning
+                            wrapMode: Text.WordWrap
+                        }
+                        StyledText {
+                            visible: root.searchViewActive && root.searchScope !== "live"
+                            width: parent.width
+                            text: root.searchStatus === "loading"
+                                ? I18n.trFor("trellisDms", "Searching archive metadata…")
+                                : root.searchStatus === "superseded"
+                                ? I18n.trFor("trellisDms", "Archive search was superseded or its trusted scope changed. Retry the query.")
+                                : root.searchStatus === "paused"
+                                ? I18n.trFor("trellisDms", "Archive search was paused for details. Retry to search again; earlier results remain visible.")
+                                : root.searchStatus === "error" || root.searchStatus === "stale"
+                                ? I18n.trFor("trellisDms", "Archive search or the selected identity is unavailable. Retry the query.")
+                                : root.searchTruncated
+                                ? I18n.trFor("trellisDms", "Archive search reached a finite cap. Coverage is incomplete; narrow the query.")
+                                : root.searchPartial
+                                ? I18n.trFor("trellisDms", "Archive coverage is incomplete. No match within the checked metadata does not mean no match in all archives.")
+                                : root.searchArchiveResults.length === 0
+                                ? I18n.trFor("trellisDms", "No archive metadata matches within the complete checked coverage.")
+                                : I18n.trFor("trellisDms", "Archive metadata search completed.")
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: root.searchPartial || root.searchStatus === "error" ? Theme.warning : Theme.surfaceVariantText
+                            wrapMode: Text.WordWrap
+                        }
+                        StyledText {
+                            visible: root.searchViewActive && root.searchScope !== "live"
+                            width: parent.width
+                            text: I18n.trFor("trellisDms", "%1 archive records examined.").arg(root.searchExamined)
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceVariantText
+                            wrapMode: Text.WordWrap
+                        }
+                        StyledText {
+                            visible: root.searchViewActive && root.searchWarnings.length > 0
+                            width: parent.width
+                            text: I18n.trFor("trellisDms", "%1 bounded archive warnings.").arg(root.searchWarnings.length)
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.warning
+                            wrapMode: Text.WordWrap
+                        }
+                        Flow {
+                            visible: root.searchViewActive && root.searchScope !== "live"
+                                && root.searchStatus !== "loading"
+                            width: parent.width
+                            height: childrenRect.height
+                            spacing: Theme.spacingS
+                            DankButton {
+                                visible: root.searchHasMore
+                                width: Math.min(180, parent.width)
+                                text: I18n.trFor("trellisDms", "Continue archive search")
+                                buttonHeight: 40
+                                onActiveFocusChanged: { if (activeFocus) popoutFlickable.revealControl(this); }
+                                onClicked: root.requestSearch(true)
+                            }
+                            DankButton {
+                                visible: ["paused", "superseded", "error", "stale"].indexOf(root.searchStatus) !== -1
+                                width: Math.min(180, parent.width)
+                                text: I18n.trFor("trellisDms", "Retry archive search")
+                                buttonHeight: 40
+                                onActiveFocusChanged: { if (activeFocus) popoutFlickable.revealControl(this); }
+                                onClicked: root.requestSearch(false)
+                            }
+                        }
+                    }
+
+                    Column {
+                        visible: root.recentChangesMode
+                        width: parent.width
+                        spacing: Theme.spacingM
+
+                        DankButton {
+                            id: historyBack
+                            width: Math.min(120, parent.width)
+                            clip: true
+                            text: I18n.trFor("trellisDms", "Back")
+                            iconName: "arrow_back"
+                            buttonHeight: 40
+                            onActiveFocusChanged: {
+                                if (activeFocus) {
+                                    popoutFlickable.historyFocusIndex = -1;
+                                    popoutFlickable.revealControl(this);
+                                }
+                            }
+                            onClicked: {
+                                root.recentChangesMode = false;
+                                popoutFlickable.contentY = root.recentReturnContentY;
+                                Qt.callLater(function () { recentChangesEntry.forceActiveFocus(); });
+                            }
+                        }
+
+                        StyledText {
+                            width: parent.width
+                            text: I18n.trFor("trellisDms", "History lasts for this plugin session. Observations begin after the initial baseline.")
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceVariantText
+                            wrapMode: Text.WordWrap
+                        }
+
+                        StyledText {
+                            visible: root.popoutProjection.degraded
+                            width: parent.width
+                            text: I18n.trFor("trellisDms", "Some source data is unavailable. Reliable earlier observations remain visible.")
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.warning
+                            wrapMode: Text.WordWrap
+                        }
+
+                        StyledText {
+                            visible: !root.recentChangesProjection.ready
+                                || !root.recentChangesProjection.synchronized
+                            width: parent.width
+                            text: !root.recentChangesProjection.ready
+                                ? I18n.trFor("trellisDms", "Recent changes are unavailable in this DMS session.")
+                                : I18n.trFor("trellisDms", "History is waiting for the latest Snapshot publication.")
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceVariantText
+                            wrapMode: Text.WordWrap
+                        }
+
+                        StyledText {
+                            visible: root.recentChangesProjection.ready
+                                && root.recentChangesProjection.events.length === 0
+                            width: parent.width
+                            text: I18n.trFor("trellisDms", "No changes observed after the initial baseline.")
+                            font.pixelSize: Theme.fontSizeMedium
+                            color: Theme.surfaceVariantText
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Repeater {
+                            id: historyRows
+                            model: root.recentChangesMode ? root.recentChangesProjection.events : []
+
+                            FocusScope {
+                                id: historyRow
+                                required property var modelData
+                                required property int index
+                                width: parent.width
+                                height: historyRowBody.implicitHeight + Theme.spacingXS * 2
+                                activeFocusOnTab: root.recentChangesMode
+                                Accessible.role: Accessible.StaticText
+                                Accessible.name: (root.recentChangeLabels[modelData.event_type] || "")
+                                    + " " + modelData.project_name + " " + modelData.task_title
+                                    + " " + root.recentChangeSummary(modelData)
+                                onActiveFocusChanged: {
+                                    if (activeFocus) {
+                                        popoutFlickable.historyFocusIndex = index;
+                                        popoutFlickable.revealControl(this);
+                                    }
+                                }
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: "transparent"
+                                    radius: Theme.cornerRadius
+                                    border.width: historyRow.activeFocus ? 2 : 0
+                                    border.color: Theme.primary
+                                }
+
+                                Column {
+                                    id: historyRowBody
+                                    readonly property var modelData: historyRow.modelData
+                                    x: Theme.spacingXS
+                                    y: Theme.spacingXS
+                                    width: parent.width - Theme.spacingXS * 2
+                                    spacing: Theme.spacingXS
+
+                                    StyledText {
+                                        width: parent.width
+                                        text: root.recentChangeLabels[parent.modelData.event_type] || ""
+                                        font.pixelSize: Theme.fontSizeMedium
+                                        font.weight: Font.DemiBold
+                                        color: Theme.surfaceText
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                    }
+
+                                    StyledText {
+                                        width: parent.width
+                                        text: (parent.modelData.project_name || (parent.modelData.project_id
+                                            ? I18n.trFor("trellisDms", "Project") : I18n.trFor("trellisDms", "Snapshot")))
+                                            + (parent.modelData.task_id ? " / " + parent.modelData.task_id : "")
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.surfaceVariantText
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                    }
+
+                                    StyledText {
+                                        visible: parent.modelData.task_title !== ""
+                                        width: parent.width
+                                        text: parent.modelData.task_title
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.surfaceText
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                    }
+
+                                    StyledText {
+                                        visible: text !== ""
+                                        width: parent.width
+                                        text: root.recentChangeSummary(parent.modelData)
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.surfaceVariantText
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                    }
+
+                                    StyledText {
+                                        visible: !!parent.modelData.session_key
+                                        width: parent.width
+                                        text: I18n.trFor("trellisDms", "Session: %1").arg(parent.modelData.session_key || "")
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.surfaceVariantText
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                    }
+
+                                    StyledText {
+                                        width: parent.width
+                                        text: (parent.modelData.source === "ui_selection"
+                                            ? I18n.trFor("trellisDms", "UI selection")
+                                            : I18n.trFor("trellisDms", "Trellis data")) + " · "
+                                            + I18n.trFor("trellisDms", "Observed at %1").arg(parent.modelData.observed_at)
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.surfaceVariantText
+                                        wrapMode: Text.WordWrap
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     Column {
                         visible: root.detailMode
@@ -982,7 +1824,71 @@ PluginComponent {
                             text: I18n.trFor("trellisDms", "Back")
                             iconName: "arrow_back"
                             buttonHeight: 40
-                            onClicked: root.closeTaskDetail()
+                            onActiveFocusChanged: {
+                                if (activeFocus) popoutFlickable.revealControl(this);
+                            }
+                            onClicked: {
+                                var fromSearch = root.detailFromSearch;
+                                root.closeTaskDetail();
+                                if (fromSearch) {
+                                    popoutFlickable.contentY = root.searchReturnContentY;
+                                    Qt.callLater(function () { searchInput.forceActiveFocus(); });
+                                }
+                            }
+                        }
+
+                        StyledText {
+                            width: parent.width
+                            text: I18n.trFor("trellisDms", "Task ID: %1").arg(root.detailTaskId)
+                            textFormat: Text.PlainText
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceVariantText
+                            wrapMode: Text.NoWrap
+                            elide: Text.ElideRight
+                        }
+
+                        DankButton {
+                            id: detailActionsToggle
+                            property bool expanded: false
+                            width: Math.min(140, parent.width)
+                            clip: true
+                            text: I18n.trFor("trellisDms", "Actions")
+                            iconName: expanded ? "expand_less" : "expand_more"
+                            buttonHeight: 40
+                            onActiveFocusChanged: { if (activeFocus) popoutFlickable.revealControl(this); }
+                            onClicked: expanded = !expanded
+                        }
+
+                        Flow {
+                            id: detailActionsFlow
+                            visible: detailActionsToggle.expanded
+                            width: parent.width
+                            height: visible ? childrenRect.height : 0
+                            spacing: Theme.spacingXS
+                            Repeater {
+                                model: detailActionsToggle.expanded ? root.taskActions : []
+                                DankButton {
+                                    required property var modelData
+                                    width: Math.min(180, detailActionsFlow.width)
+                                    clip: true
+                                    text: modelData.label
+                                    iconName: modelData.icon
+                                    buttonHeight: 40
+                                    enabled: !root.actionPending && !!root.detailActionContext
+                                    onActiveFocusChanged: { if (activeFocus) popoutFlickable.revealControl(this); }
+                                    onClicked: root.requestAction(modelData.action, root.detailActionContext)
+                                }
+                            }
+                        }
+
+                        StyledText {
+                            visible: root.detailActionFeedbackVisible()
+                            width: parent.width
+                            text: root.actionFeedbackText()
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: root.actionStatus === "error" || root.actionStatus === "superseded"
+                                ? Theme.warning : Theme.surfaceVariantText
+                            wrapMode: Text.WordWrap
                         }
 
                         Flow {
@@ -1330,7 +2236,7 @@ PluginComponent {
                     }
 
                     StyledText {
-                        visible: !root.detailMode && !root.archiveMode
+                        visible: !root.detailMode && !root.archiveMode && !root.recentChangesMode && !root.searchViewActive
                             && !root.popoutProjection.ready
                         width: parent.width
                         text: I18n.trFor("trellisDms", "Loading Trellis status...")
@@ -1340,7 +2246,7 @@ PluginComponent {
                     }
 
                     StyledText {
-                        visible: !root.detailMode && !root.archiveMode
+                        visible: !root.detailMode && !root.archiveMode && !root.recentChangesMode && !root.searchViewActive
                             && root.preferenceStateWarning !== ""
                         width: parent.width
                         text: root.localizedWarningMessages(root.preferenceStateWarning)
@@ -1350,7 +2256,7 @@ PluginComponent {
                     }
 
                     StyledText {
-                        visible: !root.detailMode && !root.archiveMode
+                        visible: !root.detailMode && !root.archiveMode && !root.recentChangesMode && !root.searchViewActive
                             && root.stateWarning !== ""
                         width: parent.width
                         text: root.localizedWarningMessage(root.stateWarning)
@@ -1360,7 +2266,7 @@ PluginComponent {
                     }
 
                     StyledText {
-                        visible: !root.detailMode && !root.archiveMode
+                        visible: !root.detailMode && !root.archiveMode && !root.recentChangesMode && !root.searchViewActive
                             && root.popoutProjection.ready
                             && (root.popoutProjection.invalidPinnedTask
                                 || root.popoutProjection.invalidSelectedProject)
@@ -1377,7 +2283,7 @@ PluginComponent {
                     }
 
                     Column {
-                        visible: !root.detailMode && !root.archiveMode
+                        visible: !root.detailMode && !root.archiveMode && !root.recentChangesMode && !root.searchViewActive
                             && root.popoutProjection.ready
                         width: parent.width
                         spacing: Theme.spacingXS
@@ -1415,7 +2321,44 @@ PluginComponent {
                                 text: I18n.trFor("trellisDms", "Archive")
                                 iconName: "inventory_2"
                                 buttonHeight: 40
-                                onClicked: root.openArchive()
+                                onClicked: { root.closeSearch(); root.openArchive(); }
+                            }
+
+                            DankButton {
+                                id: searchEntry
+                                width: Math.min(120, recoveryActions.width)
+                                clip: true
+                                text: I18n.trFor("trellisDms", "Search")
+                                iconName: "search"
+                                buttonHeight: 40
+                                visible: !root.searchMode
+                                onActiveFocusChanged: {
+                                    if (activeFocus) popoutFlickable.revealControl(this);
+                                }
+                                onClicked: {
+                                    root.searchMode = true;
+                                    popoutFlickable.contentY = 0;
+                                    Qt.callLater(function () { searchInput.forceActiveFocus(); });
+                                }
+                            }
+
+                            DankButton {
+                                id: recentChangesEntry
+                                width: Math.min(180, recoveryActions.width)
+                                clip: true
+                                text: I18n.trFor("trellisDms", "Recent Changes")
+                                iconName: "history"
+                                buttonHeight: 40
+                                onActiveFocusChanged: {
+                                    if (activeFocus) popoutFlickable.revealControl(this);
+                                }
+                                onClicked: {
+                                    root.closeSearch();
+                                    root.recentReturnContentY = popoutFlickable.contentY;
+                                    root.recentChangesMode = true;
+                                    popoutFlickable.contentY = 0;
+                                    Qt.callLater(function () { historyBack.forceActiveFocus(); });
+                                }
                             }
                         }
 
@@ -1439,7 +2382,7 @@ PluginComponent {
                     }
 
                     Column {
-                        visible: !root.detailMode && !root.archiveMode
+                        visible: !root.detailMode && !root.archiveMode && !root.recentChangesMode && !root.searchViewActive
                             && root.popoutProjection.ready
                             && root.popoutProjection.projectCount > 0
                         width: parent.width
@@ -1496,7 +2439,7 @@ PluginComponent {
                     }
 
                     Column {
-                        visible: !root.detailMode && !root.archiveMode
+                        visible: !root.detailMode && !root.archiveMode && !root.recentChangesMode && !root.searchViewActive
                             && root.popoutProjection.ready
                             && root.popoutProjection.warningCount > 0
                         width: parent.width
@@ -1561,7 +2504,7 @@ PluginComponent {
                     }
 
                     StyledText {
-                        visible: !root.detailMode && !root.archiveMode
+                        visible: !root.detailMode && !root.archiveMode && !root.recentChangesMode && !root.searchViewActive
                             && root.popoutProjection.ready
                             && root.popoutProjection.projectCount === 0
                             && root.popoutProjection.unconfigured
@@ -1573,7 +2516,7 @@ PluginComponent {
                     }
 
                     StyledText {
-                        visible: !root.detailMode && !root.archiveMode
+                        visible: !root.detailMode && !root.archiveMode && !root.recentChangesMode && !root.searchViewActive
                             && root.popoutProjection.ready
                             && root.popoutProjection.projectCount === 0
                             && !root.popoutProjection.unconfigured
@@ -1585,7 +2528,7 @@ PluginComponent {
                     }
 
                     Repeater {
-                        model: root.detailMode || root.archiveMode
+                        model: root.detailMode || root.archiveMode || root.recentChangesMode || root.searchViewActive
                             ? [] : root.popoutProjection.projects
 
                         Column {
@@ -1648,6 +2591,52 @@ PluginComponent {
                                     onClicked: root.toggleProjectCollapsed(
                                         projectSection.modelData.id)
                                 }
+                            }
+
+                            DankButton {
+                                id: projectActionsToggle
+                                property bool expanded: false
+                                width: Math.min(140, parent.width)
+                                clip: true
+                                text: I18n.trFor("trellisDms", "Actions")
+                                iconName: expanded ? "expand_less" : "expand_more"
+                                buttonHeight: 40
+                                onActiveFocusChanged: { if (activeFocus) popoutFlickable.revealControl(this); }
+                                onClicked: expanded = !expanded
+                            }
+
+                            Flow {
+                                id: projectActionsFlow
+                                visible: projectActionsToggle.expanded
+                                width: parent.width
+                                height: visible ? childrenRect.height : 0
+                                spacing: Theme.spacingXS
+                                readonly property var context: TrellisProjection.makeActionContext(root.snapshot,
+                                    "project", projectSection.modelData.id)
+                                Repeater {
+                                    model: projectActionsToggle.expanded ? root.projectActions : []
+                                    DankButton {
+                                        required property var modelData
+                                        width: Math.min(180, projectActionsFlow.width)
+                                        clip: true
+                                        text: modelData.label
+                                        iconName: modelData.icon
+                                        buttonHeight: 40
+                                        enabled: !root.actionPending && !!projectActionsFlow.context
+                                        onActiveFocusChanged: { if (activeFocus) popoutFlickable.revealControl(this); }
+                                        onClicked: root.requestAction(modelData.action, projectActionsFlow.context)
+                                    }
+                                }
+                            }
+
+                            StyledText {
+                                visible: root.actionStatus !== "idle" && root.actionFeedbackFor(projectActionsFlow.context)
+                                width: parent.width
+                                text: root.actionFeedbackText()
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: root.actionStatus === "error" || root.actionStatus === "superseded"
+                                    ? Theme.warning : Theme.surfaceVariantText
+                                wrapMode: Text.WordWrap
                             }
 
                             StyledText {
@@ -1879,7 +2868,7 @@ PluginComponent {
                     }
 
                     StyledText {
-                        visible: !root.detailMode && !root.archiveMode
+                        visible: !root.detailMode && !root.archiveMode && !root.recentChangesMode && !root.searchViewActive
                             && root.popoutProjection.hiddenProjectCount > 0
                         width: parent.width
                         text: I18n.trFor("trellisDms", "%1 more projects")

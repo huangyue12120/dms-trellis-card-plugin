@@ -97,3 +97,14 @@ detailRequestVar.set({
     taskId: taskId, document: "prd.md"
 });
 ```
+
+## v1.2 Fresh Authority at the Existing Entry
+
+Retained `currentInputs` is no longer sufficient authority. The daemon freshly
+validates effective configured roots and canonical project/.trellis before
+dispatching this channel. Both process/file queues check captured settings and
+unique project/root at launch and callback. Root changes cancel owned resources
+and publish a local bounded `detail_scope_changed` error. The request schema,
+bounded Markdown reader and renderer remain unchanged. See
+[Global Search](./global-search-contract.md) for signatures and executable
+entry/in-flight authority tests; actions must not borrow this channel's resources.

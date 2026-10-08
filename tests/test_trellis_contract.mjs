@@ -47,14 +47,16 @@ const expectedQmlImports = {
     "lib/trellisPaths.js",
     "lib/trellisParser.js",
     "lib/trellisWatch.js",
-    "lib/trellisdiscovery.js"
+    "lib/trellisdiscovery.js",
+    "lib/trellisprojection.js",
+    "lib/trellischanges.js"
   ],
   "TrellisDms/TrellisSettings.qml": [
     "lib/trellisdiscovery.js",
     "lib/trellisprojection.js",
     "lib/trellisWatch.js"
   ],
-  "TrellisDms/TrellisWidget.qml": ["lib/trellisprojection.js"],
+  "TrellisDms/TrellisWidget.qml": ["lib/trellisprojection.js", "lib/trellischanges.js", "lib/trellisPaths.js"],
   "TrellisDms/TrellisDesktopWidget.qml": ["lib/trellisprojection.js"]
 };
 
@@ -70,6 +72,7 @@ const parser = loadQmlJs("TrellisDms/lib/trellisParser.js");
 const discoveryPolicy = loadQmlJs("TrellisDms/lib/trellisdiscovery.js");
 const projection = loadQmlJs("TrellisDms/lib/trellisprojection.js");
 const watch = loadQmlJs("TrellisDms/lib/trellisWatch.js");
+const changes = loadQmlJs("TrellisDms/lib/trellischanges.js");
 
 assert.deepEqual(Array.from(paths.ancestorPaths(
   "/workspace/project/.trellis/tasks/live-task", 8
@@ -874,7 +877,7 @@ assert.match(widgetSource, /varName:\s*"snapshot"/);
 assert.match(widgetSource, /readonly property var snapshot:\s*snapshotVar\.value/);
 assert.match(widgetSource, /visible:\s*root\.pillProjection\.warningCount > 0/,
   "compatibility warnings remain visible in the pill by default");
-assert.match(widgetSource, /visible:\s*!root\.detailMode && !root\.archiveMode[\s\S]{0,120}root\.popoutProjection\.warningCount > 0/,
+assert.match(widgetSource, /visible:\s*!root\.detailMode && !root\.archiveMode[\s\S]{0,160}root\.popoutProjection\.warningCount > 0/,
   "compatibility warnings remain visible in the popout by default");
 assert.doesNotMatch(daemonSource, /\b(?:setInterval|setTimeout)\s*\(/);
 assert.match(daemonSource, /id:\s*topologyTimer[\s\S]*?repeat:\s*false[\s\S]*?root\.startScan\("interval"\)/);
@@ -2574,8 +2577,1517 @@ assert.ok(legacyDiagnostics.report.includes("snapshot.state=freshness_unavailabl
 assert.ok(legacyDiagnostics.report.includes("snapshot.last_successful_discovery_at=unavailable"));
 assert.ok(legacyDiagnostics.report.includes("host.dms=unavailable"));
 
+// Recent Changes: observations run on actual parser facts, through the same
+// Health projection used by the daemon. Times are fixed; no wall-clock waits.
+const changesTime = "2026-10-08T00:00:00.000Z";
+const changesClone = (value) => JSON.parse(JSON.stringify(value));
+function changesInput(id = "alpha", status = "planning", sessionTasks = []) {
+  return {
+    id, root: `/changes/${id}`, name: `Project ${id}`,
+    taskRecords: ["one", "two"].map((taskId) => ({
+      dirName: taskId, taskDir: `/changes/${id}/${taskId}`,
+      value: { id: taskId, title: `Task ${taskId}`, status }
+    })),
+    sessionRecords: sessionTasks.map((taskId, index) => ({
+      sessionKey: `session-${index}`, value: { current_task: taskId },
+      resolution: { ok: true, taskDir: `/changes/${id}/${taskId}` }
+    }))
+  };
+}
+function changesSnapshot(inputs, warnings = [], runtime = {}) {
+  return parser.makeSnapshot(inputs, warnings, changesTime, Object.assign({
+    snapshotIsCurrent: true, lastGoodFallbackActive: false
+  }, runtime));
+}
+function observeChanges(tracker, snapshot, generation) {
+  const immutable = JSON.stringify(snapshot);
+  const result = changes.observeSnapshot(tracker, snapshot,
+    projection.makeHealthProjection(snapshot), generation, changesTime);
+  assert.equal(JSON.stringify(snapshot), immutable, "observation must leave shared facts intact");
+  return changesClone(result.events);
+}
+const changeTracker = changes.createTracker("epoch-a");
+const initialChanges = changesSnapshot([changesInput()]);
+assert.equal(parser.makeProjectSnapshot(changesInput()).project.tasks[0].progress, null);
+assert.equal(projection.makePillProjection(initialChanges, "auto").ready, true);
+assert.equal(projection.makePopoutProjection(initialChanges).ready, true);
+assert.deepEqual(observeChanges(changeTracker, initialChanges, 1), [], "initial facts are quiet");
+const timestampNoise = changesClone(initialChanges);
+timestampNoise.generatedAt = "2026-10-08T00:00:01.000Z";
+timestampNoise.runtime.scanStartedAt = "2026-10-08T00:00:02.000Z";
+timestampNoise.projects[0].lastSuccessfulReadAt = "2026-10-08T00:00:03.000Z";
+timestampNoise.warnings = [{ code: "version_unverified" }, { code: "topology_interval" }];
+assert.deepEqual(observeChanges(changeTracker, timestampNoise, 2), []);
+timestampNoise.warnings.reverse();
+assert.deepEqual(observeChanges(changeTracker, timestampNoise, 3), [], "warning order is not semantic");
+const changeBatch = changesSnapshot([changesInput("alpha", "in_progress", ["one"]), changesInput("beta")]);
+changeBatch.projects[0].tasks.push({
+  id: "three", title: "New task", storedStatus: "planning", displayState: "planning",
+  activeSessionCount: 0, errors: []
+});
+const changeBatchEvents = observeChanges(changeTracker, changeBatch, 4);
+for (const kind of ["project_discovered", "task_discovered", "task_status_changed",
+  "task_state_changed", "session_attached", "active_session_count_changed"])
+  assert.ok(changeBatchEvents.some((event) => event.event_type === kind), `missing ${kind}`);
+const statusEvent = changeBatchEvents.find((event) => event.event_type === "task_status_changed");
+assert.deepEqual(statusEvent.before, { status: "planning" });
+assert.deepEqual(statusEvent.after, { status: "in_progress" });
+assert.equal(statusEvent.project_id, "alpha");
+assert.equal(statusEvent.source_snapshot_generation, 4);
+assert.equal(statusEvent.epoch, "epoch-a");
+assert.equal(new Set(changeBatchEvents.map((event) => event.event_id)).size, changeBatchEvents.length);
+assert.deepEqual(observeChanges(changeTracker, changesSnapshot([]), 4), changeBatchEvents,
+  "a repeated generation is ignored even with differing payloads");
+assert.deepEqual(observeChanges(changeTracker, changeBatch, 5), changeBatchEvents,
+  "the same facts at a new generation do not duplicate events");
+const reassigned = changesSnapshot([changesInput("alpha", "in_progress", ["two"]), changesInput("beta")]);
+const reassignedEvents = observeChanges(changeTracker, reassigned, 6).slice(changeBatchEvents.length);
+assert.ok(reassignedEvents.some((event) => event.event_type === "session_detached" && event.task_id === "one"));
+assert.ok(reassignedEvents.some((event) => event.event_type === "session_attached" && event.task_id === "two"));
+assert.equal(reassignedEvents.filter((event) => event.event_type === "session_attached").length, 1);
+assert.equal(reassignedEvents.some((event) => event.event_type === "task_discovered"), false,
+  "task absence is retained and never interpreted as completion");
+const sessionClockNoise = changesClone(reassigned);
+sessionClockNoise.projects.reverse();
+for (const project of sessionClockNoise.projects) {
+  project.tasks.reverse();
+  for (const session of project.sessions) {
+    session.lastSeenAt = "2026-10-08T23:00:00.000Z";
+    session.mtime = 999999999;
+  }
+}
+const beforeSessionClockNoise = changeTracker.events.length;
+observeChanges(changeTracker, sessionClockNoise, 7);
+assert.equal(changeTracker.events.length, beforeSessionClockNoise,
+  "timestamp-only and input-order changes never become data events");
+
+// Per-record failure retains old facts; another readable project can change.
+const recoveryTracker = changes.createTracker("recovery");
+observeChanges(recoveryTracker, changesSnapshot([
+  changesInput("alpha", "planning", ["one"]), changesInput("beta")
+]), 1);
+const partial = changesInput("alpha", "planning", ["one"]);
+partial.taskRecords[0].readError = "unreadable";
+partial.sessionRecords[0].readError = "unreadable";
+const failureEvents = observeChanges(recoveryTracker, changesSnapshot([
+  partial, changesInput("beta", "in_progress")
+]), 2);
+assert.ok(failureEvents.some((event) => event.project_id === "beta" && event.event_type === "task_status_changed"));
+assert.ok(failureEvents.some((event) => event.project_id === "alpha" && event.event_type === "health_degraded"));
+assert.equal(failureEvents.some((event) => event.project_id === "alpha"
+  && ["session_detached", "task_state_changed", "active_session_count_changed", "task_discovered"].includes(event.event_type)), false);
+const recoveredEvents = observeChanges(recoveryTracker, changesSnapshot([
+  changesInput("alpha", "in_progress", ["one"]), changesInput("beta", "in_progress")
+]), 3).slice(failureEvents.length);
+assert.ok(recoveredEvents.some((event) => event.project_id === "alpha" && event.event_type === "health_recovered"));
+assert.ok(recoveredEvents.some((event) => event.project_id === "alpha" && event.event_type === "task_status_changed"));
+assert.equal(recoveredEvents.some((event) => ["task_discovered", "session_detached", "session_attached"].includes(event.event_type)), false);
+const fallback = changesSnapshot([changesInput("alpha", "completed"), changesInput("beta")],
+  [{ code: "last_good_snapshot" }, { code: "root_unavailable", root: "/changes" }],
+  { lastGoodFallbackActive: true, snapshotIsCurrent: false });
+const fallbackEvents = observeChanges(recoveryTracker, fallback, 4).slice(failureEvents.length + recoveredEvents.length);
+assert.ok(fallbackEvents.some((event) => event.event_type === "project_unavailable"));
+assert.equal(fallbackEvents.some((event) => ["task_status_changed", "task_state_changed", "session_detached", "task_discovered"].includes(event.event_type)), false);
+const beforeRootRecovery = recoveryTracker.events.length;
+const rootRecovery = observeChanges(recoveryTracker, changesSnapshot([
+  changesInput("alpha", "in_progress", ["one"]), changesInput("beta", "in_progress")
+]), 5).slice(beforeRootRecovery);
+assert.ok(rootRecovery.some((event) => event.event_type === "project_recovered"));
+assert.equal(rootRecovery.some((event) => ["task_discovered", "session_attached", "session_detached"].includes(event.event_type)), false);
+const beforeAbsent = recoveryTracker.events.length;
+observeChanges(recoveryTracker, changesSnapshot([changesInput("beta", "in_progress")]), 6);
+assert.equal(recoveryTracker.events.slice(beforeAbsent).filter((event) => event.event_type === "project_unavailable").length, 1);
+const beforeReturn = recoveryTracker.events.length;
+observeChanges(recoveryTracker, changesSnapshot([
+  changesInput("alpha", "in_progress", ["one"]), changesInput("beta", "in_progress")
+]), 7);
+assert.deepEqual(changesClone(recoveryTracker.events.slice(beforeReturn)).map((event) => event.event_type), ["project_recovered"]);
+const scopedRootTracker = changes.createTracker("scoped-root");
+observeChanges(scopedRootTracker, changesSnapshot([changesInput("alpha"), changesInput("beta")]), 1);
+const scopedRootEvents = observeChanges(scopedRootTracker, changesSnapshot([
+  changesInput("alpha", "completed"), changesInput("beta", "in_progress")
+], [{ code: "root_unavailable", root: "/changes/alpha" }]), 2);
+assert.ok(scopedRootEvents.some((event) => event.project_id === "alpha" && event.event_type === "project_unavailable"));
+assert.equal(scopedRootEvents.some((event) => event.project_id === "alpha" && event.event_type === "task_status_changed"), false);
+assert.ok(scopedRootEvents.some((event) => event.project_id === "beta" && event.event_type === "task_status_changed"),
+  "a failed root gates its own projects while readable roots still compare");
+
+// Session reassignment needs reliable old/new targets. A failed task may not
+// detach its session just because the readable pointer now names another task.
+const reassignmentTracker = changes.createTracker("targets");
+observeChanges(reassignmentTracker, changesSnapshot([changesInput("alpha", "planning", ["one"])]), 1);
+const brokenTarget = changesInput("alpha", "planning", ["two"]);
+brokenTarget.taskRecords[0].readError = "broken";
+observeChanges(reassignmentTracker, changesSnapshot([brokenTarget]), 2);
+assert.equal(reassignmentTracker.events.some((event) => event.event_type === "session_detached"), false);
+observeChanges(reassignmentTracker, changesSnapshot([changesInput("alpha", "planning", ["two"])]), 3);
+assert.ok(reassignmentTracker.events.some((event) => event.event_type === "session_detached"));
+assert.ok(reassignmentTracker.events.some((event) => event.event_type === "session_attached"));
+const incompleteSessionTracker = changes.createTracker("session-discovery");
+const activeChanges = changesSnapshot([changesInput("alpha", "planning", ["one", "one"])]);
+observeChanges(incompleteSessionTracker, activeChanges, 1);
+const discoveryError = changesSnapshot([changesInput("alpha", "planning", ["one"])],
+  [{ code: "session_discovery_failed", projectId: "alpha" }]);
+observeChanges(incompleteSessionTracker, discoveryError, 2);
+assert.equal(incompleteSessionTracker.events.some((event) => ["session_detached", "task_state_changed",
+  "active_session_count_changed"].includes(event.event_type)), false);
+const malformedSession = changesInput("alpha", "planning", ["one", "one"]);
+malformedSession.sessionRecords[1].value = { current_task: null };
+observeChanges(incompleteSessionTracker, changesSnapshot([malformedSession]), 3);
+const duplicateSession = changesClone(activeChanges);
+duplicateSession.projects[0].sessions.push(changesClone(duplicateSession.projects[0].sessions[1]));
+observeChanges(incompleteSessionTracker, duplicateSession, 4);
+const beforeSessionRecovery = incompleteSessionTracker.events.length;
+observeChanges(incompleteSessionTracker, activeChanges, 5);
+assert.equal(incompleteSessionTracker.events.slice(beforeSessionRecovery).some((event) =>
+  ["session_attached", "session_detached", "task_discovered", "active_session_count_changed"].includes(event.event_type)), false);
+observeChanges(incompleteSessionTracker, changesSnapshot([changesInput("alpha", "planning", ["one"])]), 6);
+assert.equal(incompleteSessionTracker.events.filter((event) => event.event_type === "session_detached").length, 1,
+  "a later reliable session absence is a detachment");
+
+const pin = projection.parsePinnedTaskToken(projection.makePinnedTaskToken("alpha", "two"));
+const emptySelection = changes.selectionSummary(null, { projectId: "alpha", taskId: null });
+const beforeInitialSelection = changeTracker.events.length;
+changes.observeSelection(changeTracker, emptySelection, changesTime);
+assert.equal(changeTracker.events.length, beforeInitialSelection, "initial DMS preferences are quiet");
+const beforeSelection = changeTracker.events.length;
+changes.observeSelection(changeTracker, changes.selectionSummary(pin, {
+  projectId: "alpha", taskId: "two"
+}), changesTime);
+const selectionEvents = changesClone(changeTracker.events.slice(beforeSelection));
+assert.deepEqual(selectionEvents.map((event) => event.event_type), ["pin_changed", "primary_changed"]);
+assert.ok(selectionEvents.every((event) => event.source === "ui_selection" && event.source_snapshot_generation === 7));
+assert.deepEqual(selectionEvents[0].after, { project_id: "alpha", task_id: "two" });
+changes.observeSelection(changeTracker, changes.selectionSummary(pin, {
+  projectId: "alpha", taskId: "two"
+}), changesTime);
+assert.equal(changeTracker.events.length, beforeSelection + 2);
+
+const archiveTracker = changes.createTracker("archive");
+observeChanges(archiveTracker, initialChanges, 1);
+const archiveProject = { id: "alpha", name: "Project alpha" };
+const archiveRow = (id) => ({ id, dirName: id, title: `Archived ${id}`,
+  available: true, storedStatus: "completed", error: "" });
+const archivePage = (rows, page = 0) => ({ kind: "archive-page", status: rows.length ? "ready" : "empty",
+  selectedMonth: "2026-10", page, pageSize: 16, warnings: [], tasks: rows });
+changes.observeArchivePage(archiveTracker, archiveProject, archivePage([archiveRow("old")]), changesTime);
+assert.equal(archiveTracker.events.length, 0, "first archive coverage is quiet");
+changes.observeArchivePage(archiveTracker, archiveProject, archivePage([archiveRow("old"), archiveRow("new")]), changesTime);
+assert.equal(archiveTracker.events.length, 1);
+assert.equal(archiveTracker.events[0].event_type, "archive_item_observed");
+assert.equal(archiveTracker.events[0].task_id, "new");
+assert.equal(archiveTracker.events[0].source_snapshot_generation, 1);
+changes.observeArchivePage(archiveTracker, archiveProject, archivePage([archiveRow("old")]), changesTime);
+changes.observeArchivePage(archiveTracker, archiveProject, archivePage([archiveRow("new")]), changesTime);
+assert.equal(archiveTracker.events.length, 1, "page shifts preserve observed identity deduplication");
+const archiveBaseline = JSON.stringify(archiveTracker.archiveUnits);
+for (const status of ["error", "cancelled", "loading"])
+  changes.observeArchivePage(archiveTracker, archiveProject, { ...archivePage([]), status }, changesTime);
+changes.observeArchivePage(archiveTracker, archiveProject,
+  { ...archivePage([]), warnings: [{ code: "archive_permission" }] }, changesTime);
+for (const invalid of [{ page: {} }, { page: 64 }, { pageSize: 100 }, { selectedMonth: "secret/path" }])
+  changes.observeArchivePage(archiveTracker, archiveProject, { ...archivePage([]), ...invalid }, changesTime);
+changes.observeArchivePage(archiveTracker, archiveProject,
+  archivePage([{ ...archiveRow("unreadable"), available: false, error: "broken" }]), changesTime);
+for (const malformed of [{ tasks: undefined }, { tasks: {} }, { tasks: [null] },
+  { warnings: undefined }, { warnings: {} }])
+  changes.observeArchivePage(archiveTracker, archiveProject, { ...archivePage([]), ...malformed }, changesTime);
+assert.equal(JSON.stringify(archiveTracker.archiveUnits), archiveBaseline);
+const incompleteArchiveTracker = changes.createTracker("incomplete-archive");
+changes.observeArchivePage(incompleteArchiveTracker, archiveProject,
+  { ...archivePage([]), tasks: undefined }, changesTime);
+assert.equal(incompleteArchiveTracker.archiveUnits.length, 0,
+  "incomplete metadata must not establish a false initial coverage baseline");
+changes.observeArchivePage(incompleteArchiveTracker, archiveProject, archivePage([archiveRow("first")]), changesTime);
+assert.equal(incompleteArchiveTracker.events.length, 0, "first complete archive coverage remains quiet");
+changes.observeArchivePage(archiveTracker, archiveProject, archivePage([archiveRow("new")], 1), changesTime);
+changes.observeArchivePage(archiveTracker, archiveProject, archivePage([archiveRow("new"), archiveRow("another")], 1), changesTime);
+changes.observeArchivePage(archiveTracker, archiveProject, archivePage([archiveRow("another")]), changesTime);
+assert.equal(archiveTracker.events.length, 2, "identity deduplication crosses retained coverage units");
+for (let unit = 0; unit < 140; unit++)
+  changes.observeArchivePage(archiveTracker, { id: `project-${unit}`, name: "bounded" },
+    archivePage(Array.from({ length: 32 }, (_, row) => archiveRow(`row-${row}`))), changesTime);
+assert.equal(archiveTracker.archiveUnits.length, 128);
+assert.equal(archiveTracker.archiveUnits.reduce((total, unit) => total + unit.identities.length, 0), 4096);
+const archiveEventCount = archiveTracker.events.length;
+changes.observeArchivePage(archiveTracker, archiveProject, archivePage([archiveRow("evicted-unit-new")]), changesTime);
+assert.equal(archiveTracker.events.length, archiveEventCount, "evicted coverage rebaselines quietly");
+const archiveGrowth = changes.createTracker("archive-growth");
+for (let batch = 0; batch < 140; batch++)
+  changes.observeArchivePage(archiveGrowth, archiveProject,
+    archivePage(Array.from({ length: 32 }, (_, row) => archiveRow(`batch-${batch}-${row}`))), changesTime);
+assert.ok(archiveGrowth.archiveUnits.reduce((total, unit) => total + unit.identities.length, 0) <= 4096);
+assert.equal(archiveGrowth.events.length, 200);
+
+// Qualified equal IDs, prototype-like keys, invalid/duplicate identities, and
+// bounded summaries must not collide or preserve raw task/session payloads.
+const pathologicalTracker = changes.createTracker("pathological");
+const pathological = changesSnapshot([changesInput("__proto__"), changesInput("constructor")]);
+for (const project of pathological.projects) {
+  project.tasks[0].id = "__proto__";
+  project.tasks[0].title = "x".repeat(600);
+  project.tasks[0].secret = "raw-payload-must-not-escape";
+}
+observeChanges(pathologicalTracker, pathological, 1);
+const pathologicalChanged = changesClone(pathological);
+for (const project of pathologicalChanged.projects)
+  project.tasks[0].storedStatus = "completed";
+const pathologicalEvents = observeChanges(pathologicalTracker, pathologicalChanged, 2);
+assert.equal(pathologicalEvents.length, 2);
+assert.equal(new Set(pathologicalEvents.map((event) => event.project_id)).size, 2);
+assert.ok(pathologicalEvents.every((event) => event.task_title.length === 240));
+assert.equal(JSON.stringify(pathologicalEvents).includes("raw-payload-must-not-escape"), false);
+const duplicates = changesClone(pathologicalChanged);
+duplicates.projects[0].tasks.push({ ...duplicates.projects[0].tasks[0], storedStatus: "conflicting" });
+observeChanges(pathologicalTracker, duplicates, 3);
+observeChanges(pathologicalTracker, pathologicalChanged, 4);
+assert.equal(pathologicalTracker.events.length, 2, "ambiguous task IDs never replace reliable facts");
+const duplicateProjects = changesClone(pathologicalChanged);
+duplicateProjects.projects.push(changesClone(duplicateProjects.projects[0]));
+duplicateProjects.projects.at(-1).errors = [{ code: "task_discovery_failed" }];
+observeChanges(pathologicalTracker, duplicateProjects, 5);
+observeChanges(pathologicalTracker, pathologicalChanged, 6);
+assert.equal(pathologicalTracker.events.length, 2, "duplicate projects do not cause unavailability/recreation");
+const invalidIdentities = changesClone(pathologicalChanged);
+invalidIdentities.projects[0].tasks.push({ id: "x".repeat(1025), storedStatus: "completed" });
+invalidIdentities.projects[0].sessions.push({ sessionKey: "bad\nkey", taskId: "__proto__", error: null });
+observeChanges(pathologicalTracker, invalidIdentities, 7);
+assert.equal(pathologicalTracker.events.length, 2, "invalid IDs do not become observations");
+const prototypeSessions = changesClone(pathologicalChanged);
+prototypeSessions.projects[0].sessions.push({ sessionKey: "constructor", taskId: "__proto__", error: null, stale: false });
+observeChanges(pathologicalTracker, prototypeSessions, 8);
+assert.ok(pathologicalTracker.events.some((event) => event.session_key === "constructor" && event.event_type === "session_attached"));
+
+const ringTracker = changes.createTracker("ring");
+observeChanges(ringTracker, initialChanges, 1);
+for (let generation = 2; generation <= 120; generation++)
+  observeChanges(ringTracker, changesSnapshot([changesInput("alpha",
+    generation % 2 ? "planning" : "in_progress")]), generation);
+assert.equal(ringTracker.events.length, 200);
+assert.equal(new Set(ringTracker.events.map((event) => event.event_id)).size, 200);
+assert.ok(ringTracker.events[0].source_snapshot_generation > 1);
+const hugeSnapshot = changesSnapshot(Array.from({ length: 40 }, (_, i) => changesInput(`bounded-${i}`)));
+for (const project of hugeSnapshot.projects) {
+  project.tasks = Array.from({ length: 150 }, (_, i) => ({ id: `task-${i}`, title: "bounded",
+    storedStatus: "planning", displayState: "active", activeSessionCount: 1, errors: [] }));
+  project.sessions = Array.from({ length: 150 }, (_, i) => ({ sessionKey: `session-${i}`,
+    taskId: `task-${i}`, error: null, stale: false }));
+}
+const boundedTracker = changes.createTracker("bounded");
+observeChanges(boundedTracker, hugeSnapshot, 1);
+assert.equal(boundedTracker.projects.length, 32);
+assert.ok(boundedTracker.projects.every((project) => project.tasks.length <= 128 && project.sessions.length <= 128));
+assert.ok(boundedTracker.health.length <= 33);
+// Full baselines must compare surviving identities before retiring absent
+// ones, even when the new identity sorts before every retained record.
+for (const [dimension, newId] of ["projects", "tasks", "sessions"].flatMap((dimension) =>
+  ["a-new", "zz-new"].map((newId) => [dimension, newId]))) {
+  const tracker = changes.createTracker(`turnover-${dimension}-${newId}`);
+  const cap = dimension === "projects" ? 32 : 128;
+  const oldIds = Array.from({ length: cap }, (_, index) => `z-${String(index).padStart(3, "0")}`);
+  function turnoverSnapshot(ids) {
+    if (dimension === "projects")
+      return changesSnapshot(ids.map((id) => changesInput(id)));
+    const input = changesInput("turnover");
+    if (dimension === "tasks") {
+      input.taskRecords = ids.map((id) => ({ dirName: id, taskDir: `/changes/turnover/${id}`,
+        value: { id, title: id, status: "planning" } }));
+    } else {
+      input.sessionRecords = ids.map((sessionKey) => ({ sessionKey, value: { current_task: "one" },
+        resolution: { ok: true, taskDir: "/changes/turnover/one" } }));
+    }
+    return changesSnapshot([input]);
+  }
+  observeChanges(tracker, turnoverSnapshot(oldIds), 1);
+  const next = turnoverSnapshot([newId, ...oldIds.slice(0, -1)]);
+  if (dimension !== "sessions") {
+    const project = dimension === "projects"
+      ? next.projects.find((project) => project.id === oldIds[0]) : next.projects[0];
+    const survivingTask = dimension === "projects" ? project.tasks[0]
+      : project.tasks.find((task) => task.id === oldIds[0]);
+    survivingTask.storedStatus = "in_progress";
+    survivingTask.displayState = "in_progress";
+    if (dimension === "projects") {
+      project.tasks[1].errors = [{ code: "task_read_failed", projectId: oldIds[0] }];
+      next.warnings.push({ code: "task_read_failed", projectId: oldIds[0] });
+    }
+  }
+  const events = observeChanges(tracker, next, 2);
+  const discoveryKind = dimension === "projects" ? "project_discovered"
+    : dimension === "tasks" ? "task_discovered" : "session_attached";
+  assert.equal(events.filter((event) => event.event_type === discoveryKind).length, 1,
+    `${dimension}: capacity turnover must not rediscover surviving identities`);
+  assert.equal(events.find((event) => event.event_type === discoveryKind)[
+    dimension === "projects" ? "project_id" : dimension === "tasks" ? "task_id" : "session_key"
+  ], newId);
+  if (dimension !== "sessions") {
+    assert.equal(events.filter((event) => event.event_type === "task_status_changed").length, 1,
+      `${dimension}: a surviving identity still compares against its reliable prior status`);
+    assert.deepEqual(events.find((event) => event.event_type === "task_status_changed").before,
+      { status: "planning" });
+  }
+  if (dimension === "projects") {
+    assert.equal(events.filter((event) => event.event_type === "health_degraded").length, 1,
+      "Health at full capacity must retain surviving project comparisons");
+    assert.equal(events.find((event) => event.event_type === "health_degraded").project_id, oldIds[0]);
+  }
+  if (dimension !== "tasks") {
+    const absenceKind = dimension === "projects" ? "project_unavailable" : "session_detached";
+    assert.equal(events.filter((event) => event.event_type === absenceKind).length, 1,
+      `${dimension}: reliable absence must be observed before bounded retirement`);
+    const absent = events.find((event) => event.event_type === absenceKind);
+    assert.equal(absent[dimension === "projects" ? "project_id" : "session_key"], oldIds.at(-1));
+    if (dimension === "sessions") {
+      assert.equal(absent.task_id, "one");
+      assert.deepEqual(absent.before, { attached: true });
+      assert.deepEqual(absent.after, { attached: false });
+    }
+  }
+  const count = tracker.events.length;
+  observeChanges(tracker, next, 3);
+  assert.equal(tracker.events.length, count, `${dimension}: repeated turnover facts stay quiet`);
+  assert.ok(tracker.projects.length <= 32);
+  assert.ok(tracker.projects.every((project) => project.tasks.length <= 128 && project.sessions.length <= 128));
+}
+const beforeScope = ringTracker.events.length;
+changes.resetScope(ringTracker, "new-configured-root-scope");
+observeChanges(ringTracker, changesSnapshot([changesInput("new-root")]), 121);
+assert.equal(ringTracker.events.length, beforeScope, "configured root change creates a quiet scope baseline");
+assert.deepEqual(observeChanges(changes.createTracker("reload"), changeBatch, 1), [], "reload starts quiet");
+const provenSnapshot = changesClone(initialChanges);
+provenSnapshot.runtime.observationEpoch = "epoch-a";
+provenSnapshot.runtime.publicationGeneration = 7;
+assert.equal(changes.makeHistoryProjection(changes.history(changeTracker), provenSnapshot).synchronized, true);
+provenSnapshot.runtime.publicationGeneration = 8;
+const skewedHistory = changes.makeHistoryProjection(changes.history(changeTracker), provenSnapshot);
+assert.equal(skewedHistory.synchronized, false);
+assert.equal(skewedHistory.events.length, changeTracker.events.length, "publication skew preserves coherent prior history");
+assert.equal(changes.makeHistoryProjection(null, initialChanges).ready, false);
+const publishedCopy = changes.history(changeTracker);
+publishedCopy.events.length = 0;
+assert.ok(changeTracker.events.length > 0, "published consumers cannot mutate the daemon's retained history");
+const exercisedKinds = new Set([changeTracker, recoveryTracker, reassignmentTracker, archiveTracker]
+  .flatMap((tracker) => changesClone(tracker.events).map((event) => event.event_type)));
+assert.deepEqual([...exercisedKinds].sort(), Array.from(changes.EVENT_KINDS).sort(),
+  "fixtures exercise every approved Recent Changes kind");
+assert.equal(exercisedKinds.has("task_completed"), false);
+assert.equal(exercisedKinds.has("task_deleted"), false);
+
+// Execute the daemon's actual publisher functions with the host transport
+// replaced by bounded in-memory globals. This catches integration omissions
+// that separately passing parser/comparator fixtures cannot detect.
+const publicationRoot = {
+  scanStartedAt: "", lastSuccessfulDiscoveryAt: "", snapshotIsCurrent: true,
+  lastGoodFallbackActive: false, publicationGeneration: 0,
+  observationEpoch: "publisher", changeTracker: changes.createTracker("publisher"),
+  observationPreferences: { pinnedTaskId: "", selectedProjectId: "" }, pluginId: "trellisDms"
+};
+const publicationGlobals = {};
+publicationRoot.pluginService = {
+  setGlobalVar: (_pluginId, key, value) => { publicationGlobals[key] = value; }
+};
+const publisherSandbox = {
+  root: publicationRoot, TrellisParser: parser, TrellisProjection: projection, TrellisChanges: changes,
+  Date: class extends Date { constructor() { super(changesTime); } },
+  recentChangesVar: { set: (value) => { publicationGlobals.recentChanges = value; } }
+};
+vm.runInNewContext(sourceSection(daemonSource,
+  "    function _publishSnapshot(inputs, warnings) {", "    function _rememberProjects(inputs) {"),
+publisherSandbox);
+publisherSandbox._publishSnapshot([changesInput()], []);
+assert.equal(publicationGlobals.recentChanges.events.length, 0,
+  "initial primary projection is quiet in the actual daemon publisher");
+publisherSandbox._publishSnapshot([changesInput("alpha", "planning", ["one"])], []);
+const publishedPrimaryChange = publicationGlobals.recentChanges.events.find((event) => event.event_type === "primary_changed");
+assert.ok(publishedPrimaryChange, "Snapshot-driven primary selection changes must be observed centrally");
+assert.equal(publishedPrimaryChange.source, "ui_selection");
+assert.deepEqual(changesClone(publishedPrimaryChange.before), { project_id: "alpha", task_id: null });
+assert.deepEqual(changesClone(publishedPrimaryChange.after), { project_id: "alpha", task_id: "one" });
+assert.equal(publicationGlobals.snapshot.runtime.publicationGeneration, 2);
+assert.equal(publicationGlobals.recentChanges.source_snapshot_generation, 2);
+const beforeDuplicatePublication = publicationGlobals.recentChanges.events.length;
+publisherSandbox._publishSnapshot([changesInput("alpha", "planning", ["one"])], []);
+assert.equal(publicationGlobals.recentChanges.events.length, beforeDuplicatePublication);
+publicationRoot.pluginService.loadPluginState = (_pluginId, key) => key === "pinnedTaskId"
+  ? projection.makePinnedTaskToken("alpha", "two") : "";
+publisherSandbox._observeSelectionPreferences();
+assert.ok(publicationGlobals.recentChanges.events.some((event) => event.event_type === "pin_changed"));
+assert.equal(publicationRoot.publicationGeneration, 3, "selection I/O does not publish or scan source facts");
+const beforeNewScopePublication = publicationGlobals.recentChanges.events.length;
+changes.resetScope(publicationRoot.changeTracker, "different-trusted-roots");
+publisherSandbox._publishSnapshot([changesInput("new-project", "planning", ["one"])], []);
+assert.equal(publicationGlobals.recentChanges.events.length, beforeNewScopePublication,
+  "first primary and data observations of a changed root scope are quiet");
+const deterministicTracker = changes.createTracker("epoch-a");
+observeChanges(deterministicTracker, initialChanges, 1);
+observeChanges(deterministicTracker, timestampNoise, 2);
+observeChanges(deterministicTracker, timestampNoise, 3);
+const reversedBatch = changesClone(changeBatch);
+reversedBatch.projects.reverse();
+for (const project of reversedBatch.projects) project.tasks.reverse();
+assert.deepEqual(observeChanges(deterministicTracker, reversedBatch, 4), changeBatchEvents,
+  "event order and IDs are deterministic across reordered qualified inputs");
+
+// Integration shape checks complement fixtures; they do not establish DMS
+// timing, focus, State persistence, reload, or rendered QML behavior.
+assert.equal((daemonSource.match(/setGlobalVar\(root\.pluginId, "snapshot", snapshot\)/g) || []).length, 1);
+assert.match(daemonSource, /property double publicationGeneration: 0/);
+assert.match(daemonSource, /snapshot\.runtime\.observationEpoch = root\.observationEpoch/);
+assert.match(daemonSource, /snapshot\.runtime\.publicationGeneration = root\.publicationGeneration/);
+assert.match(daemonSource, /TrellisChanges\.observeSnapshot[\s\S]*?TrellisProjection\.makeHealthProjection\(snapshot\)/);
+assert.match(daemonSource, /function onPluginStateChanged[\s\S]*?root\._observeSelectionPreferences/);
+const selectionObserverSource = sourceSection(daemonSource,
+  "    function _observeSelectionPreferences() {", "    function _rememberProjects(inputs) {");
+assert.match(selectionObserverSource, /loadPluginState\(root\.pluginId, "pinnedTaskId", ""\)/);
+assert.match(selectionObserverSource, /loadPluginState\(root\.pluginId, "selectedProjectId", ""\)/);
+assert.doesNotMatch(selectionObserverSource, /startScan|savePluginData|savePluginState/);
+const archiveObservationSource = sourceSection(daemonSource,
+  "    function _finishArchivePageRow(context) {", "    function _loadArchivePageRow(context, candidate, slot) {");
+assert.match(archiveObservationSource, /_isCurrentDetail\(context\.generation, context\.request\.requestId\)/);
+assert.match(archiveObservationSource, /observeArchiveMetadata\(context\.project, response\)/);
+assert.doesNotMatch(archiveObservationSource, /_queueDetailFile|_queueDetailProcess|watchChanges/);
+assert.match(daemonSource, /TrellisChanges\.resetScope\(root\.changeTracker, JSON\.stringify\(normalized\.roots/);
+assert.match(widgetSource, /varName: "recentChanges"/);
+assert.match(widgetSource, /TrellisChanges\.makeHistoryProjection/);
+assert.match(widgetSource, /"Recent Trellis Changes"/);
+assert.match(widgetSource, /"UI selection"/);
+assert.match(widgetSource, /id: historyBack[\s\S]*?buttonHeight: 40/);
+assert.match(widgetSource, /id: recentChangesEntry[\s\S]*?buttonHeight: 40/);
+assert.match(widgetSource, /model: root\.recentChangesMode \? root\.recentChangesProjection\.events : \[\]/);
+assert.match(widgetSource, /activeFocusOnTab: root\.recentChangesMode/);
+assert.match(widgetSource, /popoutFlickable\.revealControl\(this\)/);
+assert.match(widgetSource, /border\.width: historyRow\.activeFocus \? 2 : 0/);
+assert.match(widgetSource, /model: root\.detailMode \|\| root\.archiveMode \|\| root\.recentChangesMode/);
+assert.equal((widgetSource.match(/DankFlickable\s*\{/g) || []).length, 1,
+  "history shares the one existing vertical scroll surface");
+const changesTranslations = JSON.parse(fs.readFileSync(path.join(repoRoot,
+  "TrellisDms/translations/zh_CN.json"), "utf8"));
+for (const label of new Set(Array.from(widgetSource.matchAll(
+  /I18n\.trFor\("trellisDms", "([^"]+)"\)/g), (match) => match[1])))
+  assert.ok(changesTranslations[label]?.[label], `missing history translation: ${label}`);
+
+// Execute actual daemon search handlers/traversal with only host Process/FileView
+// transport mocked. These fixtures are repository evidence, not a QML host load.
+const searchClone = (value) => JSON.parse(JSON.stringify(value));
+const searchInputs = [{ id: "__proto__", root: "/trusted/alpha", name: "Alpha" }];
+function searchHarness(inputs = searchInputs) {
+  const pending = [], commands = [], reads = [], observations = [], responses = [];
+  const dirs = new Map(), files = new Map(), canonical = new Map(), sizes = new Map();
+  const host = { currentInputs: searchClone(inputs), pluginData: { scanRoots: ["/trusted"] },
+    maxScanRoots: 16, maxProjects: 32, maxAncestorCandidates: 8,
+    maxArchiveMonths: 48, maxArchiveTaskDirectories: 2048, maxArchiveWarnings: 8,
+    archiveLimits: paths.archiveLimits(), maxCommandBytes: 256 * 1024, maxJsonBytes: 1024 * 1024,
+    changeTracker: changes.createTracker("search-harness"), maxSearchJsonPerBatch: 128, maxSearchListingsPerBatch: 16, maxSearchResults: 64,
+    actionGeneration: 0, currentAction: null, pendingActionRequest: null, ownedActionProcesses: [], ownedActionReaders: [],
+    searchGeneration: 0, currentSearchRequestId: "", searchSession: null,
+    ownedSearchProcesses: [], ownedSearchReaders: [], searchCursorSerial: 0, publicationGeneration: 7 };
+  dirs.set("/trusted", []);
+  for (const project of inputs) {
+    dirs.set(project.root, []); dirs.set(`${project.root}/.trellis`, []);
+    dirs.set(paths.archiveRootPath(project.root), []);
+  }
+  const globals = { value: null };
+  const sandbox = { root: host, TrellisPaths: paths, TrellisParser: parser, TrellisProjection: projection,
+    TrellisChanges: changes, recentChangesVar: { set: () => {} }, TrellisDiscovery: discoveryPolicy, Qt: { callLater: (fn) => pending.push(fn) }, Math, JSON, Date,
+    actionRequestVar: { value: null }, actionResponseVar: { set: () => {} },
+    searchRequestVar: globals, searchResponseVar: { set: (value) => responses.push(searchClone(value)) },
+    observeArchiveMetadata: (project, response) => observations.push(searchClone({ project, response })) };
+  function transportObject(options, work) {
+    const object = { ...options, destroyed: false, destroy() { this.destroyed = true; } };
+    Object.defineProperty(object, "running", { set(value) { if (value) pending.push(() => work(object)); } });
+    return object;
+  }
+  sandbox.processComponent = { createObject: (_parent, options) => transportObject(options, (object) => {
+    if (object.destroyed) return;
+    const command = options.command; commands.push([...command]);
+    const pathArg = command.at(-1); let output = "", code = 0;
+    if (command[0] === "realpath") {
+      const resolved = canonical.has(pathArg) ? canonical.get(pathArg) : pathArg;
+      if (resolved && (dirs.has(resolved) || files.has(resolved))) output = resolved + "\n";
+      else code = 1;
+    } else if (command[0] === "find") {
+      if (dirs.has(command[1])) output = dirs.get(command[1]).join("\n"); else code = 1;
+    } else if (command[0] === "test") {
+      code = (command[1] === "-d" ? dirs.has(pathArg) : files.has(pathArg)) ? 0 : 1;
+    } else if (command[0] === "stat") {
+      output = String(sizes.has(pathArg) ? sizes.get(pathArg) : Buffer.byteLength(files.get(pathArg) || ""));
+    } else assert.fail(`unexpected search command ${command[0]}`);
+    options.callback(output, code);
+  }) };
+  sandbox.detailFileViewComponent = { createObject: (_parent, options) => {
+    const object = transportObject(options, () => {});
+    pending.push(() => {
+      if (object.destroyed) return;
+      reads.push(options.path);
+      const text = files.get(options.path) || "";
+      options.callback(text, Buffer.byteLength(text) > options.byteLimit ? "archive_task_size_limit" : null);
+    });
+    return object;
+  } };
+  vm.runInNewContext(sourceSection(daemonSource, "    function _cloneValue(value) {", "    function _allowWarning(warning) {"), sandbox);
+  vm.runInNewContext(sourceSection(daemonSource, "    function _archiveWarning(context, code, message) {", "    function _archiveResponse("), sandbox);
+  vm.runInNewContext(sourceSection(daemonSource, "    function _boundedArchiveString(value, fallback, maximum) {", "    function _archiveRowError("), sandbox);
+  vm.runInNewContext(sourceSection(daemonSource, "    function _projectAuthorizedByRoots(", "    function _detailScopeCurrent() {"), sandbox);
+  vm.runInNewContext(sourceSection(daemonSource, "    function observeArchiveMetadata(", "    function _loadArchivePageRow("), sandbox);
+  const actualArchiveObserver = sandbox.observeArchiveMetadata;
+  sandbox.observeArchiveMetadata = (project, response) => {
+    observations.push(searchClone({ project, response }));
+    actualArchiveObserver(project, response);
+  };
+  vm.runInNewContext(sourceSection(daemonSource, "    function _configuredRoots() {", "    function _untrack("), sandbox);
+  let serial = 0;
+  const api = { host, sandbox, dirs, files, canonical, sizes, commands, reads, observations, responses, pending,
+    request(query, cursor = "") {
+      globals.value = { requestId: `widget-${++serial}`, kind: "archive-search", query, cursor };
+      sandbox._handleSearchRequest(globals.value); return globals.value;
+    }, flush() {
+      let count = 0;
+      while (pending.length) { assert.ok(++count < 100000, "bounded search must settle"); pending.shift()(); }
+      return responses.at(-1);
+    }, cancel() { globals.value = null; sandbox._handleSearchRequest(null); },
+    month(month, count, title = "Needle", project = inputs[0]) {
+      const root = paths.archiveRootPath(project.root), dir = `${root}/${month}`;
+      dirs.get(root).push(dir); dirs.set(dir, []);
+      for (let i = 0; i < count; i++) {
+        const task = `${dir}/task-${String(i).padStart(4, "0")}`;
+        dirs.get(dir).push(task); dirs.set(task, []);
+        files.set(`${task}/task.json`, JSON.stringify({ id: "shared-id", title: `${title} ${i}`, status: "completed" }));
+      }
+      return dir;
+    }
+  };
+  return api;
+}
+const searchFixtureSnapshot = changesSnapshot([
+  { ...changesInput("alpha"), name: "ALPHA", taskRecords: [
+    { dirName: "one", value: { id: "shared", title: "Needle", status: "planning" } },
+    { dirName: "two", value: { id: "ID-MATCH", title: "Something", status: "planning" } }] },
+  { ...changesInput("beta"), name: "Beta", taskRecords: [
+    { dirName: "one", value: { id: "shared", title: "Needle", status: "planning" } }] }
+]);
+const searchSnapshotBefore = JSON.stringify(searchFixtureSnapshot);
+assert.equal(projection.makeSearchProjection(searchFixtureSnapshot, "nEeDlE", "all").live.length, 2);
+assert.deepEqual(searchClone(projection.makeSearchProjection(searchFixtureSnapshot, "shared", "live").live.map(row => row.projectId)), ["alpha", "beta"]);
+assert.equal(projection.makeSearchProjection(searchFixtureSnapshot, "id-match", "live").live[0].taskId, "ID-MATCH");
+assert.equal(projection.makeSearchProjection(searchFixtureSnapshot, "alpha", "all").live.length, 3,
+  "project names match project rows and their metadata tasks globally");
+assert.equal(projection.makeSearchProjection(searchFixtureSnapshot, "needle", "archive").live.length, 0);
+assert.equal(projection.makeSearchProjection(searchFixtureSnapshot, " \t ", "all").active, false);
+assert.equal(projection.normalizeSearchQuery("x".repeat(300)).length, 256);
+const largeSearchSnapshot = searchClone(searchFixtureSnapshot);
+largeSearchSnapshot.projects[0].tasks = Array.from({ length: 128 }, (_, i) => ({ id: `unique-${i}`, title: "Needle" }));
+assert.equal(projection.makeSearchProjection(largeSearchSnapshot, "needle", "all").live.length, 64);
+assert.equal(projection.makeSearchProjection(largeSearchSnapshot, "needle", "all").liveOverflow, 65);
+const duplicateSearchSnapshot = searchClone(searchFixtureSnapshot);
+duplicateSearchSnapshot.projects[0].tasks.push({ ...duplicateSearchSnapshot.projects[0].tasks[0] });
+assert.equal(projection.makeSearchProjection(duplicateSearchSnapshot, "needle", "live").live.length, 1,
+  "ambiguous live identities are excluded, not silently selected");
+assert.equal(JSON.stringify(searchFixtureSnapshot), searchSnapshotBefore);
+for (const bad of [{ query: "x".repeat(257) }, { query: "x\n" }, { cursor: "../path" }, { path: "/unsafe" }, { kind: "markdown" }])
+  assert.equal(paths.validateSearchRequest({ requestId: "search", kind: "archive-search", query: "q", ...bad }).ok, false);
+const blankSearch = searchHarness(); blankSearch.request("   ");
+assert.equal(blankSearch.flush().status, "empty");
+assert.equal(blankSearch.commands.length + blankSearch.reads.length, 0, "blank query performs zero archive I/O");
+const pagedSearch = searchHarness(); pagedSearch.month("2026-10", 300, "Other");
+pagedSearch.request("missing"); let batch = pagedSearch.flush();
+assert.equal(batch.batchExamined, 128); assert.equal(batch.examinedCount, 128);
+assert.equal(batch.hasMore, true); assert.equal(batch.partial, true); assert.equal(batch.results.length, 0);
+assert.equal(pagedSearch.observations.length, 4);
+assert.equal(pagedSearch.observations[0].response.tasks.length, 32,
+  "observer gets complete nonmatching pages, not the empty search subset");
+const firstCursor = batch.cursor; pagedSearch.request("missing", batch.cursor); batch = pagedSearch.flush();
+assert.equal(batch.examinedCount, 256); assert.notEqual(batch.cursor, firstCursor);
+pagedSearch.request("missing", batch.cursor); batch = pagedSearch.flush();
+assert.equal(batch.examinedCount, 300); assert.equal(batch.hasMore, false); assert.equal(batch.partial, false);
+assert.ok(pagedSearch.reads.every(file => file.endsWith("/task.json")), "search never reads Markdown");
+assert.equal(pagedSearch.reads.length, new Set(pagedSearch.reads).size, "continuation advances without rereading rows");
+pagedSearch.request("missing", firstCursor); assert.equal(pagedSearch.flush().status, "error");
+const mixedPageSearch = searchHarness();
+mixedPageSearch.month("2026-11", 1, "Other");
+mixedPageSearch.month("2026-10", 256, "Other");
+mixedPageSearch.request("missing"); batch = mixedPageSearch.flush();
+assert.ok(batch.batchExamined <= 128, "a short page in one month must not let the next month exceed the JSON batch cap");
+let mixedContinuations = 0;
+while (batch.hasMore) {
+  assert.ok(++mixedContinuations <= 3, "mixed month page sizes must make deterministic cursor progress");
+  mixedPageSearch.request("missing", batch.cursor); batch = mixedPageSearch.flush();
+  assert.ok(batch.batchExamined <= 128);
+}
+assert.equal(batch.examinedCount, 257);
+assert.equal(batch.partial, false);
+assert.equal(mixedPageSearch.reads.length, new Set(mixedPageSearch.reads).size);
+assert.equal(mixedPageSearch.observations.length, 9, "only complete short/full pages enter Recent Changes across batch boundaries");
+const emptyMonthSearch = searchHarness();
+for (let month = 1; month <= 20; month++) emptyMonthSearch.month(`2025-${String((month - 1) % 12 + 1).padStart(2, "0")}`.replace("2025", month > 12 ? "2026" : "2025"), 0);
+emptyMonthSearch.request("missing"); batch = emptyMonthSearch.flush();
+assert.equal(batch.batchListings, 16); assert.equal(batch.batchExamined, 0); assert.equal(batch.hasMore, true);
+assert.equal(emptyMonthSearch.observations.length, 15, "empty months consume listing budget and produce complete empty pages");
+emptyMonthSearch.request("missing", batch.cursor); batch = emptyMonthSearch.flush(); assert.equal(batch.hasMore, false);
+const cappedSearch = searchHarness(); cappedSearch.month("2026-10", 100, "Needle"); cappedSearch.request("needle"); batch = cappedSearch.flush();
+assert.equal(batch.results.length, 64); assert.equal(batch.hasMore, false); assert.equal(batch.cursor, ""); assert.equal(batch.truncated, true);
+assert.equal(batch.batchExamined, 64); assert.equal(cappedSearch.observations.length, 2);
+const directoryCapSearch = searchHarness(); directoryCapSearch.month("2026-10", 2060, "Other"); directoryCapSearch.request("missing"); batch = directoryCapSearch.flush();
+let continuations = 0;
+while (batch.hasMore) { assert.ok(++continuations <= 16); directoryCapSearch.request("missing", batch.cursor); batch = directoryCapSearch.flush(); }
+assert.equal(batch.examinedCount, 2048); assert.equal(batch.truncated, true); assert.equal(batch.partial, true);
+assert.equal(directoryCapSearch.observations.length, 0, "capped listings cannot establish complete observation pages");
+const malformedSearch = searchHarness(); const malformedMonth = malformedSearch.month("2026-10", 5, "Needle");
+const malformedEntries = malformedSearch.dirs.get(malformedMonth);
+malformedSearch.files.set(`${malformedEntries[0]}/task.json`, "{");
+malformedSearch.sizes.set(`${malformedEntries[1]}/task.json`, 1024 * 1024 + 1);
+malformedSearch.canonical.set(malformedEntries[2], "/outside/task"); malformedSearch.dirs.set("/outside/task", []);
+malformedSearch.canonical.set(`${malformedEntries[3]}/task.json`, "/outside/task.json"); malformedSearch.files.set("/outside/task.json", "{}");
+malformedSearch.request("needle"); batch = malformedSearch.flush();
+assert.equal(batch.results.length, 1); assert.equal(batch.partial, true); assert.equal(batch.hasMore, false);
+assert.equal(malformedSearch.observations.length, 0, "failed pages do not feed observations");
+assert.ok(!malformedSearch.reads.includes("/outside/task.json"));
+assert.ok(!malformedSearch.reads.includes(`${malformedEntries[1]}/task.json`), "oversized JSON is rejected before FileView");
+const cancelSearch = searchHarness(); cancelSearch.month("2026-10", 20); cancelSearch.request("needle"); cancelSearch.cancel(); cancelSearch.flush();
+assert.equal(cancelSearch.reads.length, 0); assert.equal(cancelSearch.responses.at(-1), null); assert.equal(cancelSearch.host.searchSession, null);
+const changedRootsSearch = searchHarness(); changedRootsSearch.month("2026-10", 150); changedRootsSearch.request("missing"); batch = changedRootsSearch.flush();
+changedRootsSearch.host.pluginData.scanRoots = [];
+changedRootsSearch.request("missing", batch.cursor); assert.equal(changedRootsSearch.flush().status, "error");
+const midReadRootSearch = searchHarness(); midReadRootSearch.month("2026-10", 1); midReadRootSearch.request("needle");
+midReadRootSearch.host.pluginData.scanRoots = []; assert.equal(midReadRootSearch.flush().status, "error"); assert.equal(midReadRootSearch.reads.length, 0);
+const supersededSearch = searchHarness(); supersededSearch.month("2026-10", 5); supersededSearch.request("needle"); const newer = supersededSearch.request("other"); batch = supersededSearch.flush();
+assert.equal(batch.requestId, newer.requestId); assert.equal(batch.results.length, 0);
+assert.ok(supersededSearch.responses.every(response => response.requestId === newer.requestId), "old owner cannot publish after supersession");
+const staleProjectsSearch = searchHarness(); staleProjectsSearch.month("2026-10", 2); staleProjectsSearch.request("needle");
+staleProjectsSearch.host.currentInputs = []; assert.equal(staleProjectsSearch.flush().status, "error");
+assert.equal(staleProjectsSearch.reads.length, 0);
+const untrustedSearch = searchHarness([{ id: "escape", name: "Escape", root: "/outside" }]); untrustedSearch.month("2026-10", 1); untrustedSearch.request("needle");
+assert.equal(untrustedSearch.flush().results.length, 0); assert.equal(untrustedSearch.reads.length, 0);
+const duplicateProjectsSearch = searchHarness([searchInputs[0], searchInputs[0]]); duplicateProjectsSearch.request("q");
+assert.equal(duplicateProjectsSearch.flush().examinedCount, 0);
+const bridgeSearch = searchHarness(); const bridgeMonth = bridgeSearch.month("2026-10", 10, "Other");
+bridgeSearch.request("missing"); bridgeSearch.flush();
+assert.equal(changes.history(bridgeSearch.host.changeTracker).events.length, 0,
+  "the actual archive observer bridge quietly baselines complete nonmatching metadata pages");
+const bridgeNewTask = `${bridgeMonth}/task-9999`;
+bridgeSearch.dirs.get(bridgeMonth).push(bridgeNewTask); bridgeSearch.dirs.set(bridgeNewTask, []);
+bridgeSearch.files.set(`${bridgeNewTask}/task.json`, JSON.stringify({ id: "new-task", title: "Other", status: "completed" }));
+bridgeSearch.request("missing"); bridgeSearch.flush();
+assert.equal(changes.history(bridgeSearch.host.changeTracker).events.filter(event => event.event_type === "archive_item_observed").length, 1,
+  "a later complete search page feeds newly observed metadata through the real Recent Changes bridge");
+const incompleteBridgeSearch = searchHarness();
+const incompleteBridgeMonth = incompleteBridgeSearch.month("2026-10", 2, "Other");
+incompleteBridgeSearch.request("missing"); incompleteBridgeSearch.flush();
+const bridgeCoverageBefore = JSON.stringify(incompleteBridgeSearch.host.changeTracker.archiveUnits);
+const delayedArchiveTask = `${incompleteBridgeMonth}/task-9999`;
+incompleteBridgeSearch.dirs.get(incompleteBridgeMonth).push(delayedArchiveTask, `${incompleteBridgeMonth}/bad\u0001line`);
+incompleteBridgeSearch.dirs.set(delayedArchiveTask, []);
+incompleteBridgeSearch.files.set(`${delayedArchiveTask}/task.json`, JSON.stringify({ id: "delayed-new", title: "Other" }));
+incompleteBridgeSearch.request("missing"); batch = incompleteBridgeSearch.flush();
+assert.equal(batch.partial, true);
+assert.equal(JSON.stringify(incompleteBridgeSearch.host.changeTracker.archiveUnits), bridgeCoverageBefore,
+  "month-level malformed listing warnings must not become a complete page with empty warnings");
+assert.equal(changes.history(incompleteBridgeSearch.host.changeTracker).events.length, 0);
+incompleteBridgeSearch.dirs.get(incompleteBridgeMonth).pop();
+incompleteBridgeSearch.request("missing"); incompleteBridgeSearch.flush();
+assert.equal(changes.history(incompleteBridgeSearch.host.changeTracker).events.filter(event => event.event_type === "archive_item_observed").length, 1,
+  "recovered complete page compares with the retained coverage rather than an incomplete baseline");
+const monthCapSearch = searchHarness();
+for (let i = 0; i < 50; i++) monthCapSearch.month(`${2020 + Math.floor(i / 12)}-${String(i % 12 + 1).padStart(2, "0")}`, 0);
+monthCapSearch.request("missing"); batch = monthCapSearch.flush(); continuations = 0;
+while (batch.hasMore) { assert.ok(++continuations <= 4); monthCapSearch.request("missing", batch.cursor); batch = monthCapSearch.flush(); }
+assert.equal(monthCapSearch.observations.length, 48); assert.equal(batch.truncated, true); assert.equal(batch.partial, true);
+assert.equal(batch.hasMore, false, "48-month cap terminates instead of repeating a capped month");
+const warningCapSearch = searchHarness(); const warningMonth = warningCapSearch.month("2026-10", 20);
+for (const dir of warningCapSearch.dirs.get(warningMonth)) warningCapSearch.files.set(`${dir}/task.json`, "{");
+warningCapSearch.request("needle"); batch = warningCapSearch.flush(); assert.equal(batch.warnings.length, 8);
+const nonDirectorySearch = searchHarness();
+const fileMonth = `${paths.archiveRootPath(searchInputs[0].root)}/2026-10`;
+nonDirectorySearch.dirs.get(paths.archiveRootPath(searchInputs[0].root)).push(fileMonth);
+nonDirectorySearch.files.set(fileMonth, "not a directory"); nonDirectorySearch.request("needle"); batch = nonDirectorySearch.flush();
+assert.equal(batch.partial, true); assert.equal(nonDirectorySearch.observations.length, 0);
+const malformedMonthSearch = searchHarness();
+malformedMonthSearch.dirs.get(paths.archiveRootPath(searchInputs[0].root)).push("/outside/2026-10", `${paths.archiveRootPath(searchInputs[0].root)}/bad-month`);
+malformedMonthSearch.request("needle"); batch = malformedMonthSearch.flush(); assert.equal(batch.partial, true); assert.equal(malformedMonthSearch.reads.length, 0);
+const outputCapSearch = searchHarness(); const outputMonth = outputCapSearch.month("2026-10", 1);
+outputCapSearch.host.maxCommandBytes = outputMonth.length + 2;
+outputCapSearch.dirs.get(paths.archiveRootPath(searchInputs[0].root)).push("x".repeat(200));
+outputCapSearch.request("needle"); batch = outputCapSearch.flush(); assert.equal(batch.truncated, true); assert.equal(batch.partial, true);
+const retargetRootSearch = searchHarness(); retargetRootSearch.month("2026-10", 150, "Other"); retargetRootSearch.request("missing"); batch = retargetRootSearch.flush();
+retargetRootSearch.canonical.set("/trusted", "/retargeted"); retargetRootSearch.dirs.set("/retargeted", []);
+retargetRootSearch.request("missing", batch.cursor); batch = retargetRootSearch.flush(); assert.equal(batch.status, "error"); assert.equal(retargetRootSearch.reads.length, 128);
+const retargetProjectSearch = searchHarness(); retargetProjectSearch.month("2026-10", 150, "Other"); retargetProjectSearch.request("missing"); batch = retargetProjectSearch.flush();
+retargetProjectSearch.canonical.set(searchInputs[0].root, "/outside/project"); retargetProjectSearch.dirs.set("/outside/project", []);
+retargetProjectSearch.request("missing", batch.cursor); batch = retargetProjectSearch.flush();
+assert.equal(batch.partial, true); assert.equal(batch.hasMore, false); assert.equal(retargetProjectSearch.reads.length, 128);
+const cancelFileSearch = searchHarness(); cancelFileSearch.month("2026-10", 1); cancelFileSearch.request("needle");
+while (!cancelFileSearch.host.ownedSearchReaders.length) { assert.ok(cancelFileSearch.pending.length); cancelFileSearch.pending.shift()(); }
+cancelFileSearch.cancel(); cancelFileSearch.flush(); assert.equal(cancelFileSearch.reads.length, 0); assert.equal(cancelFileSearch.observations.length, 0);
+assert.equal(cancelFileSearch.host.ownedSearchProcesses.length + cancelFileSearch.host.ownedSearchReaders.length, 0);
+const protoTaskSearchSnapshot = searchClone(searchFixtureSnapshot);
+protoTaskSearchSnapshot.projects[0].tasks = [{ id: "__proto__", title: "Needle" }];
+assert.equal(projection.makeSearchProjection(protoTaskSearchSnapshot, "__proto__", "live").live[0].taskId, "__proto__");
+const duplicateProjectSearchSnapshot = searchClone(searchFixtureSnapshot);
+duplicateProjectSearchSnapshot.projects.push(searchClone(duplicateProjectSearchSnapshot.projects[0]));
+assert.equal(projection.makeSearchProjection(duplicateProjectSearchSnapshot, "needle", "live").live.length, 1);
+
+function detailAuthorityHarness() {
+  const api = searchHarness(); const host = api.host, sandbox = api.sandbox, responses = [];
+  Object.assign(host, { detailGeneration: 0, currentDetailRequestId: "", currentDetailRequest: null,
+    currentDetailRootsKey: "", currentDetailProjectRoot: "", ownedDetailProcesses: [], ownedDetailReaders: [],
+    maxMarkdownBytes: paths.markdownByteLimit() });
+  sandbox.detailResponseVar = { set: (response) => responses.push(searchClone(response)) };
+  vm.runInNewContext(sourceSection(daemonSource, "    function _isCurrentDetail(", "    function _cloneValue("), sandbox);
+  vm.runInNewContext(sourceSection(daemonSource, "    function _cancelDetailRead(", "    function _configuredRoots() {"), sandbox);
+  const project = host.currentInputs[0], taskDir = `${project.root}/.trellis/tasks/live-one`;
+  project.taskRecords = [{ dirName: "live-one", taskDir, value: { id: "shared-id", title: "Needle" } }];
+  api.dirs.set(taskDir, []); api.files.set(`${taskDir}/prd.md`, "Safe Markdown");
+  api.detailResponses = responses;
+  api.open = (archive = false) => sandbox._handleDetailRequest(archive
+    ? { requestId: "archive-detail-authority", kind: "archive-task", projectId: project.id,
+        taskId: "shared-id", month: "2026-10", dirName: "task-0000", document: "prd.md" }
+    : { requestId: "live-detail-authority", kind: "markdown", projectId: project.id, taskId: "shared-id", document: "prd.md" });
+  return api;
+}
+const acceptedDetail = detailAuthorityHarness(); const acceptedDetailInputsBefore = JSON.stringify(acceptedDetail.host.currentInputs);
+acceptedDetail.open(); acceptedDetail.flush(); assert.equal(acceptedDetail.detailResponses.at(-1).status, "ready");
+assert.equal(acceptedDetail.detailResponses.at(-1).content, "Safe Markdown");
+assert.equal(JSON.stringify(acceptedDetail.host.currentInputs), acceptedDetailInputsBefore);
+const removedRootDetail = detailAuthorityHarness(); removedRootDetail.host.pluginData.scanRoots = [];
+removedRootDetail.open(); removedRootDetail.flush(); assert.equal(removedRootDetail.detailResponses.at(-1).status, "error");
+assert.equal(removedRootDetail.commands.length + removedRootDetail.reads.length, 0,
+  "retained Snapshot/input identity never authorizes detail after all roots are removed");
+const redirectedRootDetail = detailAuthorityHarness(); redirectedRootDetail.canonical.set("/trusted", "/retargeted"); redirectedRootDetail.dirs.set("/retargeted", []);
+redirectedRootDetail.open(); redirectedRootDetail.flush(); assert.equal(redirectedRootDetail.detailResponses.at(-1).status, "error");
+assert.equal(redirectedRootDetail.reads.length, 0);
+const removedWhileAuthorizing = detailAuthorityHarness(); removedWhileAuthorizing.open(); removedWhileAuthorizing.pending.shift()();
+removedWhileAuthorizing.host.pluginData.scanRoots = []; removedWhileAuthorizing.flush();
+assert.equal(removedWhileAuthorizing.detailResponses.at(-1).status, "error"); assert.equal(removedWhileAuthorizing.reads.length, 0);
+const removedWhileReading = detailAuthorityHarness(); removedWhileReading.open();
+while (!removedWhileReading.host.ownedDetailReaders.length) { assert.ok(removedWhileReading.pending.length); removedWhileReading.pending.shift()(); }
+removedWhileReading.host.pluginData.scanRoots = []; removedWhileReading.flush();
+assert.equal(removedWhileReading.detailResponses.at(-1).status, "error"); assert.ok(!removedWhileReading.detailResponses.some(reply => reply.status === "ready"));
+assert.equal(removedWhileReading.host.currentDetailRequestId, "");
+const redirectedProjectDetail = detailAuthorityHarness(); redirectedProjectDetail.canonical.set(searchInputs[0].root, "/outside/project"); redirectedProjectDetail.dirs.set("/outside/project", []);
+redirectedProjectDetail.open(); redirectedProjectDetail.flush(); assert.equal(redirectedProjectDetail.detailResponses.at(-1).status, "error"); assert.equal(redirectedProjectDetail.reads.length, 0);
+const duplicateLiveDetail = detailAuthorityHarness(); duplicateLiveDetail.host.currentInputs[0].taskRecords.push(searchClone(duplicateLiveDetail.host.currentInputs[0].taskRecords[0]));
+duplicateLiveDetail.open(); duplicateLiveDetail.flush(); assert.equal(duplicateLiveDetail.detailResponses.at(-1).status, "error"); assert.equal(duplicateLiveDetail.reads.length, 0);
+const archivedAuthorityDetail = detailAuthorityHarness(); const archivedAuthorityMonth = archivedAuthorityDetail.month("2026-10", 1);
+archivedAuthorityDetail.files.set(`${archivedAuthorityMonth}/task-0000/prd.md`, "Archive Markdown");
+archivedAuthorityDetail.open(true); archivedAuthorityDetail.flush(); assert.equal(archivedAuthorityDetail.detailResponses.at(-1).content, "Archive Markdown");
+archivedAuthorityDetail.host.pluginData.scanRoots = []; const archiveAuthorityReadsBefore = archivedAuthorityDetail.reads.length;
+archivedAuthorityDetail.open(true); archivedAuthorityDetail.flush(); assert.equal(archivedAuthorityDetail.detailResponses.at(-1).status, "error"); assert.equal(archivedAuthorityDetail.reads.length, archiveAuthorityReadsBefore);
+const settingsCancelledDetail = detailAuthorityHarness();
+settingsCancelledDetail.host.topologyIntervalDefault = 60;
+settingsCancelledDetail.sandbox.TrellisWatch = watch;
+settingsCancelledDetail.sandbox.topologyTimer = { running: false };
+settingsCancelledDetail.sandbox.settingsRefreshTimer = { restarted: false, restart() { this.restarted = true; } };
+vm.runInNewContext(sourceSection(daemonSource, "    function _topologySettingsSnapshot(", "    function startScan(reason) {"), settingsCancelledDetail.sandbox);
+settingsCancelledDetail.host._topologySettingsSnapshot = settingsCancelledDetail.sandbox._topologySettingsSnapshot;
+settingsCancelledDetail.host.observedTopologySettings = settingsCancelledDetail.sandbox._topologySettingsSnapshot(settingsCancelledDetail.host.pluginData);
+settingsCancelledDetail.open();
+while (!settingsCancelledDetail.host.ownedDetailReaders.length) { assert.ok(settingsCancelledDetail.pending.length); settingsCancelledDetail.pending.shift()(); }
+settingsCancelledDetail.host.pluginData.scanRoots = [];
+settingsCancelledDetail.sandbox._observePluginSettingsChange();
+assert.equal(settingsCancelledDetail.host.ownedDetailProcesses.length + settingsCancelledDetail.host.ownedDetailReaders.length, 0,
+  "settings root change destroys owned detail readers/processes immediately");
+settingsCancelledDetail.flush();
+assert.equal(settingsCancelledDetail.detailResponses.at(-1).status, "error");
+assert.equal(settingsCancelledDetail.reads.length, 0, "cancelled old FileView cannot complete or update a detail view");
+assert.equal(settingsCancelledDetail.sandbox.settingsRefreshTimer.restarted, true);
+const detailSurvivesSearchCancel = detailAuthorityHarness();
+detailSurvivesSearchCancel.month("2026-10", 1);
+detailSurvivesSearchCancel.open();
+while (!detailSurvivesSearchCancel.host.ownedDetailReaders.length) {
+  assert.ok(detailSurvivesSearchCancel.pending.length); detailSurvivesSearchCancel.pending.shift()();
+}
+const independentDetailGeneration = detailSurvivesSearchCancel.host.detailGeneration;
+detailSurvivesSearchCancel.request("needle"); detailSurvivesSearchCancel.cancel();
+assert.equal(detailSurvivesSearchCancel.host.detailGeneration, independentDetailGeneration);
+assert.equal(detailSurvivesSearchCancel.host.ownedDetailReaders.length, 1);
+detailSurvivesSearchCancel.flush();
+assert.equal(detailSurvivesSearchCancel.detailResponses.at(-1).content, "Safe Markdown",
+  "search cancellation must not cancel the independent detail reader");
+const searchSurvivesDetailCancel = detailAuthorityHarness(); searchSurvivesDetailCancel.month("2026-10", 1);
+searchSurvivesDetailCancel.request("needle");
+while (!searchSurvivesDetailCancel.host.ownedSearchReaders.length) {
+  assert.ok(searchSurvivesDetailCancel.pending.length); searchSurvivesDetailCancel.pending.shift()();
+}
+const independentSearchGeneration = searchSurvivesDetailCancel.host.searchGeneration;
+searchSurvivesDetailCancel.open(); searchSurvivesDetailCancel.sandbox._cancelDetailRead(false);
+assert.equal(searchSurvivesDetailCancel.host.searchGeneration, independentSearchGeneration);
+assert.equal(searchSurvivesDetailCancel.host.ownedSearchReaders.length, 1);
+assert.equal(searchSurvivesDetailCancel.flush().results.length, 1,
+  "detail cancellation must not cancel independent metadata search");
+console.log("global search caps and fresh-detail-authority fixtures: ok");
+
+console.log("global search actual-daemon lifecycle fixtures: ok");
+
+// Widget lifecycle functions run against shared in-memory transport, including
+// ownership convergence. QML focus/layout remain separate host checks.
+function searchWidgetHarness(shared = { value: null }, instance = "search-widget-a") {
+  shared.listeners ||= [];
+  shared.set ||= function (value) { this.value = value; for (const listener of this.listeners) listener(); };
+  const response = { value: null }, detailRequests = [], projectSelections = [];
+  const host = { searchMode: true, searchQuery: "needle", searchScope: "all", snapshot: searchClone(searchFixtureSnapshot),
+    searchInstanceId: instance, searchRequestSerial: 0, searchRequestId: "", searchStatus: "idle",
+    searchArchiveResults: [], searchCursor: "", searchHasMore: false, searchPartial: false,
+    searchTruncated: false, searchExamined: 0, searchWarnings: [], detailMode: false,
+    detailFromSearch: false, detailRequestSerial: 0, detailArchive: false,
+    selectedProjectId: "beta", pinnedTaskId: projection.makePinnedTaskToken("beta", "shared"),
+    selectProject: (id) => projectSelections.push(id) };
+  Object.defineProperty(host, "searchProjection", { get() { return projection.makeSearchProjection(host.snapshot, host.searchQuery, host.searchScope); } });
+  const timer = { running: false, stop() { this.running = false; }, restart() { this.running = true; } };
+  const sandbox = { root: host, TrellisProjection: projection, searchDebounceTimer: timer,
+    searchRequestVar: shared, searchResponseVar: response,
+    detailRequestVar: { set: (value) => detailRequests.push(searchClone(value)) }, Date, Math, JSON };
+  host.cancelAction = () => {};
+  const functions = sourceSection(widgetSource, "    function cancelSearch(preserveResults) {", "    function observeDetailResponse() {");
+  vm.runInNewContext(functions, sandbox);
+  for (const match of functions.matchAll(/function (\w+)\(/g)) host[match[1]] = sandbox[match[1]];
+  shared.listeners.push(() => host.observeSearchOwnership());
+  return { host, sandbox, shared, timer, response, detailRequests, projectSelections,
+    deliver(value) { response.value = searchClone(value); host.observeSearchResponse(); } };
+}
+const widgetSearch = searchWidgetHarness();
+const pinnedSearchBefore = widgetSearch.host.pinnedTaskId, selectedSearchBefore = widgetSearch.host.selectedProjectId;
+widgetSearch.host.updateSearch(); assert.equal(widgetSearch.timer.running, true);
+assert.equal(widgetSearch.shared.value, null, "debounced typing starts no immediate archive I/O");
+widgetSearch.host.requestSearch(false); const widgetSearchId = widgetSearch.host.searchRequestId;
+assert.equal(widgetSearch.host.pinnedTaskId, pinnedSearchBefore); assert.equal(widgetSearch.host.selectedProjectId, selectedSearchBefore);
+const widgetArchiveRow = { kind: "archive", projectId: "alpha", projectName: "Alpha", taskId: "shared-id",
+  title: "Needle archive", month: "2026-10", dirName: "task-one" };
+const widgetArchiveReply = { requestId: widgetSearchId, kind: "archive-search", query: "needle", status: "ready",
+  results: [widgetArchiveRow], partial: true, hasMore: true, cursor: "s-1-opaque",
+  examinedCount: 128, warnings: [], truncated: false };
+widgetSearch.deliver(widgetArchiveReply); assert.equal(widgetSearch.host.searchHasMore, true);
+widgetSearch.host.selectSearchResult(widgetSearch.host.searchArchiveResults[0]);
+assert.equal(widgetSearch.host.detailMode, true); assert.equal(widgetSearch.host.detailFromSearch, true);
+assert.equal(widgetSearch.detailRequests.at(-1).kind, "archive-task");
+assert.equal(widgetSearch.detailRequests.at(-1).dirName, "task-one");
+assert.equal(widgetSearch.host.searchCursor, "", "detail cancels the daemon-owned cursor");
+assert.equal(widgetSearch.host.searchHasMore, false); assert.equal(widgetSearch.host.searchStatus, "paused");
+assert.equal(widgetSearch.host.searchArchiveResults.length, 1, "detail retains only the bounded displayed result view");
+assert.equal(widgetSearch.shared.value, null, "owned I/O is cancelled before opening detail");
+widgetSearch.host.closeTaskDetail(); assert.equal(widgetSearch.host.detailMode, false);
+assert.equal(widgetSearch.host.searchQuery, "needle"); assert.equal(widgetSearch.host.searchScope, "all");
+const priorSerial = widgetSearch.host.searchRequestSerial;
+widgetSearch.host.requestSearch(true);
+assert.equal(widgetSearch.host.searchRequestSerial, priorSerial, "Back cannot reuse a dropped cursor");
+widgetSearch.host.snapshot.projects[0].tasks.push({ id: "fresh-live", title: "Needle new", storedStatus: "planning" });
+assert.ok(widgetSearch.host.searchProjection.live.some(row => row.taskId === "fresh-live"),
+  "Back uses current live Snapshot instead of retaining an obsolete second Snapshot");
+widgetSearch.host.requestSearch(false); assert.equal(widgetSearch.shared.value.cursor, "");
+assert.equal(widgetSearch.host.searchArchiveResults.length, 0, "explicit Retry starts a new bounded search");
+assert.equal(widgetSearch.host.pinnedTaskId, pinnedSearchBefore); assert.equal(widgetSearch.host.selectedProjectId, selectedSearchBefore);
+const clearedSearchOldId = widgetSearch.host.searchRequestId;
+widgetSearch.host.searchQuery = "   "; widgetSearch.host.updateSearch();
+assert.equal(widgetSearch.timer.running, false); assert.equal(widgetSearch.shared.value, null);
+assert.equal(widgetSearch.host.searchProjection.active, false);
+widgetSearch.deliver({ ...widgetArchiveReply, requestId: clearedSearchOldId });
+assert.equal(widgetSearch.host.searchArchiveResults.length, 0, "cleared query ignores late replies");
+const widgetOwnerA = searchWidgetHarness(undefined, "search-widget-a");
+const widgetOwnerB = searchWidgetHarness(widgetOwnerA.shared, "search-widget-b");
+widgetOwnerA.host.requestSearch(false); const oldWidgetOwner = widgetOwnerA.host.searchRequestId;
+widgetOwnerB.host.requestSearch(false);
+assert.equal(widgetOwnerA.host.searchStatus, "superseded"); assert.equal(widgetOwnerA.host.searchRequestId, "");
+assert.notEqual(widgetOwnerB.host.searchRequestId, oldWidgetOwner);
+widgetOwnerA.host.cancelSearch(false);
+assert.equal(widgetOwnerA.shared.value.requestId, widgetOwnerB.host.searchRequestId,
+  "closing an old widget cannot cancel another widget's owned work");
+widgetOwnerB.deliver({ ...widgetArchiveReply, requestId: widgetOwnerB.host.searchRequestId, query: "obsolete" });
+assert.equal(widgetOwnerB.host.searchStatus, "error"); assert.equal(widgetOwnerB.host.searchHasMore, false);
+const liveDetailSearch = searchWidgetHarness(); liveDetailSearch.host.searchScope = "live";
+liveDetailSearch.host.selectSearchResult(liveDetailSearch.host.searchProjection.live[0]);
+assert.equal(liveDetailSearch.detailRequests.at(-1).kind, "markdown");
+assert.equal(liveDetailSearch.host.pinnedTaskId, pinnedSearchBefore); assert.equal(liveDetailSearch.host.selectedProjectId, selectedSearchBefore);
+liveDetailSearch.host.closeTaskDetail();
+liveDetailSearch.host.selectSearchResult({ kind: "live", projectId: "alpha", taskId: "removed" });
+assert.equal(liveDetailSearch.host.searchStatus, "stale"); assert.equal(liveDetailSearch.host.detailMode, false);
+const projectSearchNavigation = searchWidgetHarness(); projectSearchNavigation.host.selectSearchResult({ kind: "project", projectId: "alpha" });
+assert.deepEqual(projectSearchNavigation.projectSelections, ["alpha"]); assert.equal(projectSearchNavigation.host.searchMode, false);
+assert.equal(projectSearchNavigation.host.pinnedTaskId, pinnedSearchBefore);
+// Couple the actual daemon settings cancellation and actual widget response
+// observer. A null terminal global must end loading even when the shared
+// request still holds the old widget's identity and all callbacks are gone.
+const settingsSearchDaemon = detailAuthorityHarness(); settingsSearchDaemon.month("2026-10", 1);
+const settingsSearchWidget = searchWidgetHarness(settingsSearchDaemon.sandbox.searchRequestVar, "settings-search-widget");
+settingsSearchWidget.shared.listeners.push(() => {
+  const value = settingsSearchWidget.shared.value;
+  settingsSearchDaemon.pending.push(() => settingsSearchDaemon.sandbox._handleSearchRequest(value));
+});
+const originalSettingsSearchResponse = settingsSearchDaemon.sandbox.searchResponseVar.set;
+settingsSearchDaemon.sandbox.searchResponseVar.set = (value) => {
+  originalSettingsSearchResponse(value); settingsSearchWidget.deliver(value);
+};
+settingsSearchDaemon.host.topologyIntervalDefault = 60;
+settingsSearchDaemon.sandbox.TrellisWatch = watch;
+settingsSearchDaemon.sandbox.topologyTimer = { running: false };
+settingsSearchDaemon.sandbox.settingsRefreshTimer = { restart() {} };
+vm.runInNewContext(sourceSection(daemonSource, "    function _topologySettingsSnapshot(", "    function startScan(reason) {"), settingsSearchDaemon.sandbox);
+settingsSearchDaemon.host._topologySettingsSnapshot = settingsSearchDaemon.sandbox._topologySettingsSnapshot;
+settingsSearchDaemon.host.observedTopologySettings = settingsSearchDaemon.sandbox._topologySettingsSnapshot(settingsSearchDaemon.host.pluginData);
+const settingsSearchInputsBefore = JSON.stringify(settingsSearchDaemon.host.currentInputs);
+settingsSearchWidget.host.requestSearch(false);
+while (!settingsSearchDaemon.host.ownedSearchReaders.length) {
+  assert.ok(settingsSearchDaemon.pending.length); settingsSearchDaemon.pending.shift()();
+}
+const obsoleteSettingsReader = settingsSearchDaemon.host.ownedSearchReaders[0];
+const retainedSettingsRequestId = settingsSearchWidget.shared.value.requestId;
+settingsSearchDaemon.host.pluginData.scanRoots = [];
+settingsSearchDaemon.sandbox._observePluginSettingsChange();
+assert.equal(settingsSearchWidget.shared.value.requestId, retainedSettingsRequestId);
+assert.equal(settingsSearchWidget.host.searchStatus, "superseded");
+assert.equal(settingsSearchWidget.host.searchHasMore, false);
+assert.equal(settingsSearchWidget.host.searchCursor, "");
+assert.equal(settingsSearchDaemon.host.ownedSearchReaders.length + settingsSearchDaemon.host.ownedSearchProcesses.length, 0);
+const settingsResponseCount = settingsSearchDaemon.responses.length;
+obsoleteSettingsReader.callback('{"id":"obsolete","title":"Needle"}', null);
+settingsSearchDaemon.flush();
+assert.equal(settingsSearchDaemon.responses.length, settingsResponseCount, "obsolete callbacks cannot undo scope cancellation");
+assert.equal(settingsSearchWidget.host.searchStatus, "superseded");
+assert.equal(settingsSearchDaemon.reads.length, 0);
+assert.equal(JSON.stringify(settingsSearchDaemon.host.currentInputs), settingsSearchInputsBefore);
+assert.match(widgetSource, /id: searchInput[\s\S]*?maximumLength: 256/);
+assert.match(widgetSource, /onSearchQueryChanged: root\.updateSearch\(\)/);
+assert.match(widgetSource, /onShouldBeVisibleChanged[\s\S]*?root\.closeSearch\(\)/);
+assert.match(widgetSource, /onAccepted:[\s\S]*?group\.focusFirst\(\)/);
+assert.match(widgetSource, /id: searchResultButton[\s\S]*?buttonHeight: 40[\s\S]*?revealControl/);
+assert.equal((widgetSource.match(/DankFlickable\s*\{/g) || []).length, 1);
+assert.match(daemonSource, /ownedList: "ownedSearchReaders"/);
+assert.match(daemonSource, /ownedList: "ownedSearchProcesses"/);
+assert.match(daemonSource, /_cancelSearchRead\(true\);[\s\S]*?_destroyOwned\(\);/);
+console.log("global search widget lifecycle fixtures: ok");
+
 assert.equal(fs.readFileSync(archivedSeptemberJson, "utf8"), archivedBefore);
 assert.equal(fs.statSync(archivedSeptemberJson).mtimeMs, archivedMtimeBefore);
 
 fs.rmSync(fixture, { recursive: true, force: true });
 console.log("trellis contract fixtures: ok");
+
+// Identity-only Quick Action policy, before any host execution wiring.
+const actionRequest = { requestId: "action-policy", action: "copy-task-id", kind: "live",
+  projectId: "__proto__", taskId: "--help" };
+assert.equal(paths.validateActionRequest(actionRequest).ok, true);
+for (const field of ["path", "command", "url", "executable", "document", "month"])
+  assert.equal(paths.validateActionRequest({ ...actionRequest, [field]: "arbitrary" }).ok, false);
+for (const taskId of ["bad\n", "bad\0id", "x".repeat(257), "", null])
+  assert.equal(paths.validateActionRequest({ ...actionRequest, taskId }).ok, false);
+for (const action of ["delete", "start", "terminal", "open-url", "constructor"])
+  assert.equal(paths.validateActionRequest({ ...actionRequest, action }).ok, false);
+assert.equal(paths.validateActionRequest({ requestId: "project", kind: "project", projectId: "constructor", action: "open-project-folder" }).ok, true);
+assert.equal(paths.validateActionRequest({ ...actionRequest, kind: "project" }).ok, false);
+for (const dirName of ["../task", "..", "a/b", "a\\b", "bad\n"])
+  assert.equal(paths.validateActionRequest({ ...actionRequest, kind: "archive", month: "2026-10", dirName }).ok, false);
+assert.equal(paths.actionFileUrl("/trusted/空 格/%#?"), "file:///trusted/%E7%A9%BA%20%E6%A0%BC/%25%23%3F");
+for (const unsafe of ["relative", "/bad\n", "/x/../y", "x".repeat(4097)])
+  assert.equal(paths.actionFileUrl(unsafe), "");
+console.log("quick action pure request and URL fixtures: ok");
+
+// Execute the real Quick Action lifecycle, authority, path checks, JSON reads,
+// and launch functions. Only host Process/FileView/opener are replaced.
+function actionHarness(taskId = "shared-id") {
+  const api = detailAuthorityHarness(), host = api.host, sandbox = api.sandbox;
+  const responses = [], launches = [], objects = [];
+  sandbox.actionRequestVar = { value: null, set(value) { this.value = value; } };
+  sandbox.actionResponseVar = { value: null, set: value => {
+    sandbox.actionResponseVar.value = value; responses.push(searchClone(value));
+  } };
+  const project = host.currentInputs[0], record = project.taskRecords[0];
+  record.value.id = taskId;
+  api.dirs.set(paths.tasksRootPath(project.root), []);
+  api.files.set(`${record.taskDir}/task.json`, JSON.stringify(record.value));
+  const controls = { copyExit: 0, openAccepted: true, beforeProcess: null, afterProcess: null,
+    beforeFile: null, missingProcess: false, missingReader: false, throwProcess: false, throwOpen: false };
+  function untrack(object) {
+    const list = host[object.ownedList] || [];
+    host[object.ownedList] = list.filter(item => item !== object);
+  }
+  sandbox.processComponent = { createObject(_parent, options) {
+    if (controls.missingProcess || (controls.missingCopy && options.command[0] === "dms")) return null;
+    if (controls.throwProcess) throw Error("process absent");
+    const object = { ...options, destroyed: false, destroy() { this.destroyed = true; untrack(this); } };
+    objects.push(object);
+    if (controls.onCreate) controls.onCreate(options);
+    Object.defineProperty(object, "running", { set(value) {
+      if (!value) return;
+      api.pending.push(() => {
+        if (object.destroyed) return;
+        const command = options.command, pathArg = command.at(-1);
+        if (controls.beforeProcess) controls.beforeProcess(command);
+        api.commands.push([...command]);
+        let text = "", code = 0;
+        if (command[0] === "dms") { launches.push([...command]); code = controls.copyExit; }
+        else if (command[0] === "realpath") {
+          const resolved = api.canonical.has(pathArg) ? api.canonical.get(pathArg) : pathArg;
+          if (resolved && (api.dirs.has(resolved) || api.files.has(resolved))) text = resolved + "\n";
+          else code = 1;
+        } else if (command[0] === "test") {
+          code = (command[1] === "-d" ? api.dirs.has(pathArg) : api.files.has(pathArg)) ? 0 : 1;
+        } else if (command[0] === "find") {
+          if (api.dirs.has(command[1])) text = api.dirs.get(command[1]).join("\n"); else code = 1;
+        } else if (command[0] === "stat") {
+          text = String(api.sizes.has(pathArg) ? api.sizes.get(pathArg) : Buffer.byteLength(api.files.get(pathArg) || ""));
+        } else assert.fail(`unexpected action command ${command[0]}`);
+        if (controls.afterProcess) controls.afterProcess(command);
+        untrack(object);
+        options.callback(text, code);
+        object.destroy();
+      });
+    } });
+    return object;
+  } };
+  sandbox.detailFileViewComponent = { createObject(_parent, options) {
+    if (controls.missingReader) return null;
+    const object = { ...options, destroyed: false, destroy() { this.destroyed = true; untrack(this); } };
+    objects.push(object);
+    api.pending.push(() => {
+      if (object.destroyed) return;
+      if (controls.beforeFile) controls.beforeFile(options);
+      api.reads.push(options.path);
+      const text = api.files.get(options.path);
+      untrack(object);
+      options.callback(text || "", text === undefined ? "read_failed"
+        : Buffer.byteLength(text) > options.byteLimit ? "size_limit" : null);
+      object.destroy();
+    });
+    return object;
+  } };
+  sandbox.Qt.openUrlExternally = url => {
+    if (controls.throwOpen) throw Error("opener unavailable");
+    launches.push(url); return controls.openAccepted;
+  };
+  let serial = 0;
+  api.action = (action = "copy-task-id", kind = "live", extra = {}) => {
+    const request = { requestId: `action-${++serial}`, action, kind, projectId: project.id,
+      ...(kind !== "project" ? { taskId } : {}),
+      ...(kind === "archive" ? { month: "2026-10", dirName: "task-0000" } : {}), ...extra };
+    sandbox.actionRequestVar.value = request;
+    sandbox._handleActionRequest(request); return request;
+  };
+  api.cancelAction = () => { sandbox.actionRequestVar.value = null; sandbox._handleActionRequest(null); };
+  api.finishAction = () => { api.flush(); return responses.at(-1); };
+  Object.assign(api, { actionResponses: responses, launches, objects, controls, project, record });
+  return api;
+}
+for (const taskId of ["--help", "-d", "--type", "constructor", "__proto__", "空 格 % # ?"]) {
+  const api = actionHarness(taskId);
+  const inputBefore = JSON.stringify(api.host.currentInputs);
+  const snapshot = parser.makeSnapshot(api.host.currentInputs, [], changesTime);
+  const healthBefore = JSON.stringify(projection.makeHealthProjection(snapshot));
+  api.action();
+  assert.equal(api.actionResponses.length, 0, "no success at click time");
+  assert.equal(api.finishAction().status, "copied");
+  assert.deepEqual(api.launches, [["dms", "cl", "copy", "--", taskId]]);
+  assert.equal(JSON.stringify(api.host.currentInputs), inputBefore);
+  assert.equal(JSON.stringify(projection.makeHealthProjection(snapshot)), healthBefore);
+  assert.equal(api.host.ownedActionProcesses.length + api.host.ownedActionReaders.length, 0);
+}
+for (const [action, kind] of [["copy-project-path", "project"], ["copy-task-path", "live"],
+  ["open-project-folder", "project"], ["open-task-folder", "live"],
+  ["copy-project-path", "archive"], ["copy-task-path", "archive"], ["open-task-folder", "archive"]]) {
+  const api = actionHarness(); api.month("2026-10", 1);
+  api.action(action, kind); const response = api.finishAction();
+  assert.equal(response.status, action.startsWith("copy") ? "copied" : "accepted");
+  const expected = action.includes("project") ? api.project.root
+    : kind === "archive" ? `${paths.archiveRootPath(api.project.root)}/2026-10/task-0000` : api.record.taskDir;
+  assert.equal(response.value, expected);
+  assert.deepEqual(api.launches, [action.startsWith("copy") ? ["dms", "cl", "copy", "--", expected] : paths.actionFileUrl(expected)]);
+}
+const unicodeAction = actionHarness();
+const unicodeDir = `${paths.tasksRootPath(unicodeAction.project.root)}/空 格 % # ?`;
+unicodeAction.record.taskDir = unicodeDir; unicodeAction.record.dirName = "空 格 % # ?";
+unicodeAction.dirs.set(unicodeDir, []); unicodeAction.files.set(`${unicodeDir}/task.json`, JSON.stringify(unicodeAction.record.value));
+unicodeAction.action("open-task-folder"); assert.equal(unicodeAction.finishAction().status, "accepted");
+assert.equal(unicodeAction.launches[0], "file:///trusted/alpha/.trellis/tasks/%E7%A9%BA%20%E6%A0%BC%20%25%20%23%20%3F");
+// Effective identity follows existing parser/archive semantics rather than a
+// newly invented requirement for a stored string id.
+for (const value of [{}, { id: "  " }, { id: 4 }, null, [], "primitive", 4, false]) {
+  const api = actionHarness("live-one"); api.record.value = value;
+  api.files.set(`${api.record.taskDir}/task.json`, JSON.stringify(value));
+  api.action(); assert.equal(api.finishAction().status, "copied");
+}
+const trimmedAction = actionHarness("shared-id"); trimmedAction.record.value.id = "  shared-id  ";
+trimmedAction.files.set(`${trimmedAction.record.taskDir}/task.json`, JSON.stringify(trimmedAction.record.value));
+trimmedAction.action(); assert.equal(trimmedAction.finishAction().value, "shared-id");
+const archiveFallback = actionHarness("task-0000"); archiveFallback.month("2026-10", 1);
+archiveFallback.files.set(`${paths.archiveRootPath(archiveFallback.project.root)}/2026-10/task-0000/task.json`, "{}");
+archiveFallback.action("copy-task-id", "archive"); assert.equal(archiveFallback.finishAction().value, "task-0000");
+function actionRejected(change, action = "copy-task-id", kind = "live") {
+  const api = actionHarness(); api.month("2026-10", 1); change(api);
+  api.action(action, kind); assert.equal(api.finishAction().status, "error");
+  assert.equal(api.launches.length, 0, "rejected authority/identity performs no external execution");
+  return api;
+}
+actionRejected(api => { api.host.pluginData.scanRoots = []; });
+actionRejected(api => { api.canonical.set("/trusted", "/outside"); api.dirs.set("/outside", []); });
+actionRejected(api => { api.host.currentInputs.push(searchClone(api.project)); });
+actionRejected(api => { api.project.taskRecords.push(searchClone(api.record)); });
+actionRejected(api => { api.record.taskDir = "/outside/task"; });
+actionRejected(api => { api.record.taskDir = `${paths.tasksRootPath(api.project.root)}/../escape`; });
+actionRejected(api => { api.record.readError = "read_failed"; });
+actionRejected(api => { api.files.set(`${api.record.taskDir}/task.json`, '{"id":"changed"}'); });
+actionRejected(api => { api.files.set(`${api.record.taskDir}/task.json`, "malformed"); });
+actionRejected(api => { api.sizes.set(`${api.record.taskDir}/task.json`, 1024 * 1024 + 1); });
+actionRejected(api => { api.files.set(`${api.record.taskDir}/task.json`, JSON.stringify({ id: "shared-id", text: "界".repeat(400000) })); api.sizes.set(`${api.record.taskDir}/task.json`, 4); });
+actionRejected(api => { api.controls.missingReader = true; });
+for (const kind of ["live", "archive", "project"]) {
+  for (const part of kind === "project" ? ["project", "trellis"]
+    : kind === "live" ? ["project", "trellis", "tasks", "task", "json"]
+      : ["project", "trellis", "tasks", "archive", "month", "task", "json"]) {
+    actionRejected(api => {
+      const archive = paths.archiveRootPath(api.project.root), month = `${archive}/2026-10`;
+      const task = kind === "archive" ? `${month}/task-0000` : api.record.taskDir;
+      const targets = { project: api.project.root, trellis: `${api.project.root}/.trellis`,
+        tasks: paths.tasksRootPath(api.project.root), archive, month, task, json: `${task}/task.json` };
+      const outside = part === "json" ? "/outside/task.json" : "/outside/directory";
+      (part === "json" ? api.files : api.dirs).set(outside, part === "json" ? '{"id":"shared-id"}' : []);
+      api.canonical.set(targets[part], outside);
+    }, kind === "project" ? "open-project-folder" : "copy-task-id", kind);
+  }
+}
+// Trusted descendants retain discovery's bounded ancestor-promotion policy.
+const descendantAction = actionHarness(); descendantAction.host.pluginData.scanRoots = [descendantAction.record.taskDir];
+descendantAction.action("copy-project-path", "project"); assert.equal(descendantAction.finishAction().status, "copied");
+const tooDeepAction = actionHarness(); const deepRoot = `${tooDeepAction.project.root}/a/b/c/d/e/f/g/h`;
+tooDeepAction.dirs.set(deepRoot, []); tooDeepAction.host.pluginData.scanRoots = [deepRoot];
+tooDeepAction.action("copy-project-path", "project"); assert.equal(tooDeepAction.finishAction().status, "error");
+for (const stage of ["process", "reader", "prelaunch"]) {
+  const api = actionHarness(); api.action();
+  if (stage === "reader") {
+    while (!api.host.ownedActionReaders.length) { assert.ok(api.pending.length); api.pending.shift()(); }
+    api.host.pluginData.scanRoots = [];
+  } else if (stage === "process") api.host.pluginData.scanRoots = [];
+  else api.controls.onCreate = options => { if (options.command[0] === "dms") api.host.pluginData.scanRoots = []; };
+  assert.equal(api.finishAction().status, "error"); assert.equal(api.launches.length, 0);
+}
+const redirectedAfterRead = actionHarness(); redirectedAfterRead.controls.beforeFile = () => {
+  redirectedAfterRead.canonical.set("/trusted", "/redirected"); redirectedAfterRead.dirs.set("/redirected", []);
+}; redirectedAfterRead.action(); assert.equal(redirectedAfterRead.finishAction().status, "error"); assert.equal(redirectedAfterRead.launches.length, 0);
+const staleAtRead = actionHarness(); staleAtRead.controls.beforeFile = options => staleAtRead.files.set(options.path, '{"id":"changed-during-io"}');
+staleAtRead.action(); assert.equal(staleAtRead.finishAction().status, "error"); assert.equal(staleAtRead.launches.length, 0);
+const retargetAfterRead = actionHarness(); retargetAfterRead.controls.beforeFile = () => {
+  retargetAfterRead.canonical.set(retargetAfterRead.record.taskDir, "/elsewhere"); retargetAfterRead.dirs.set("/elsewhere", []);
+}; retargetAfterRead.action(); assert.equal(retargetAfterRead.finishAction().status, "error"); assert.equal(retargetAfterRead.launches.length, 0);
+for (const settings of [{ copyExit: 1 }, { missingCopy: true }, { throwProcess: true }, { missingProcess: true }]) {
+  const api = actionHarness(); Object.assign(api.controls, settings); api.action(); assert.equal(api.finishAction().status, "error");
+}
+for (const settings of [{ openAccepted: false }, { throwOpen: true }, { missingOpener: true }]) {
+  const api = actionHarness(); Object.assign(api.controls, settings);
+  if (settings.missingOpener) delete api.sandbox.Qt.openUrlExternally;
+  api.action("open-project-folder", "project"); assert.equal(api.finishAction().status, "error");
+}
+const cancelAction = actionHarness(); cancelAction.action();
+while (!cancelAction.host.ownedActionReaders.length) { assert.ok(cancelAction.pending.length); cancelAction.pending.shift()(); }
+const obsoleteActionReader = cancelAction.host.ownedActionReaders[0];
+cancelAction.cancelAction(); const cancelReplyCount = cancelAction.actionResponses.length;
+obsoleteActionReader.callback('{"id":"shared-id"}', null); cancelAction.flush();
+assert.equal(cancelAction.actionResponses.length, cancelReplyCount); assert.equal(cancelAction.launches.length, 0);
+assert.equal(cancelAction.host.ownedActionProcesses.length + cancelAction.host.ownedActionReaders.length, 0);
+const supersededAction = actionHarness(); const olderAction = supersededAction.action();
+const obsoleteActionProcess = supersededAction.host.ownedActionProcesses[0];
+const newerAction = supersededAction.action("copy-project-path", "project");
+supersededAction.sandbox._handleActionRequest(olderAction);
+obsoleteActionProcess.callback("/trusted\n", 0);
+assert.equal(supersededAction.finishAction().requestId, newerAction.requestId);
+assert.equal(supersededAction.launches.length, 1);
+const independentAction = actionHarness();
+const independentDetailReader = { destroy() { assert.fail("actions must not destroy detail readers"); } };
+const independentSearchProcess = { destroy() { assert.fail("actions must not destroy Search processes"); } };
+independentAction.host.ownedDetailReaders.push(independentDetailReader);
+independentAction.host.ownedSearchProcesses.push(independentSearchProcess);
+independentAction.action(); independentAction.cancelAction(); independentAction.flush();
+assert.ok(independentAction.host.ownedDetailReaders.includes(independentDetailReader));
+assert.ok(independentAction.host.ownedSearchProcesses.includes(independentSearchProcess));
+console.log("quick actions actual-daemon lifecycle fixtures: ok");
+
+function actionWidgetHarness(shared = { value: null, listeners: [] }, instance = "action-widget-a") {
+  const response = { value: null }, detailRequests = [];
+  const host = { snapshot: searchClone(searchFixtureSnapshot), actionInstanceId: instance,
+    actionSerial: 0, actionIdentity: null, actionRequestId: "", actionStatus: "idle", actionCode: "",
+    pinnedTaskId: "retain-pin", selectedProjectId: "retain-filter", detailMode: true,
+    detailProjectId: "alpha", detailTaskId: "shared", detailArchive: false };
+  Object.defineProperty(host, "actionPending", { get() { return host.actionStatus === "pending"; } });
+  if (!shared.listeners) shared.listeners = [];
+  shared.set = value => { shared.value = searchClone(value); shared.listeners.forEach(fn => fn()); };
+  const sandbox = { root: host, actionRequestVar: shared, actionResponseVar: response,
+    TrellisPaths: paths, TrellisProjection: projection, I18n: { trFor: (_plugin, text) => text } };
+  vm.runInNewContext(sourceSection(widgetSource, "    function cancelAction() {", "    function cancelSearch(preserveResults) {"), sandbox);
+  vm.runInNewContext(sourceSection(widgetSource, "    function closeTaskDetail() {", "    function observeDetailResponse() {"), sandbox);
+  sandbox.detailRequestVar = { set: value => detailRequests.push(value) };
+  for (const key of Object.keys(sandbox)) if (typeof sandbox[key] === "function") host[key] = sandbox[key];
+  shared.listeners.push(() => host.observeActionOwnership());
+  return { host, sandbox, shared, detailRequests, deliver(value) {
+    response.value = searchClone(value); host.observeActionResponse();
+  } };
+}
+const actionViewContext = projection.makeActionContext(searchFixtureSnapshot, "live", "alpha", "shared");
+assert.deepEqual(searchClone(actionViewContext), { kind: "live", projectId: "alpha", taskId: "shared" });
+assert.equal(projection.makeActionContext(searchFixtureSnapshot, "live", "alpha", "removed"), null);
+const ambiguousActionSnapshot = searchClone(searchFixtureSnapshot);
+ambiguousActionSnapshot.projects[0].tasks.push({ ...ambiguousActionSnapshot.projects[0].tasks[0] });
+assert.equal(projection.makeActionContext(ambiguousActionSnapshot, "live", "alpha", "shared"), null);
+ambiguousActionSnapshot.projects.push(searchClone(ambiguousActionSnapshot.projects[0]));
+assert.equal(projection.makeActionContext(ambiguousActionSnapshot, "project", "alpha"), null);
+const actionWidget = actionWidgetHarness(); actionWidget.host.requestAction("copy-task-id", actionViewContext);
+assert.equal(actionWidget.host.actionPending, true);
+assert.deepEqual(Object.keys(actionWidget.shared.value).sort(), ["action", "kind", "projectId", "requestId", "taskId"]);
+const widgetActionRequest = searchClone(actionWidget.shared.value);
+actionWidget.host.requestAction("copy-task-path", actionViewContext);
+assert.equal(actionWidget.host.actionSerial, 1, "pending controls do not start another action");
+actionWidget.deliver({ ...widgetActionRequest, requestId: "obsolete", status: "copied", code: "action_copied" });
+assert.equal(actionWidget.host.actionPending, true);
+actionWidget.deliver({ ...widgetActionRequest, taskId: "wrong", status: "copied", code: "action_copied" });
+assert.equal(actionWidget.host.actionStatus, "error"); assert.equal(actionWidget.host.actionPending, false);
+actionWidget.host.requestAction("copy-task-id", actionViewContext);
+actionWidget.deliver({ ...actionWidget.shared.value, status: "copied", code: "action_copied" });
+assert.equal(actionWidget.host.actionStatus, "copied"); assert.equal(actionWidget.host.actionFeedbackText(), "Copied to clipboard.");
+assert.equal(actionWidget.host.pinnedTaskId, "retain-pin"); assert.equal(actionWidget.host.selectedProjectId, "retain-filter");
+assert.equal(actionWidget.host.actionFeedbackFor(actionViewContext), true);
+assert.equal(actionWidget.host.actionFeedbackFor({ ...actionViewContext, projectId: "beta" }), false);
+const archiveActionWidget = actionWidgetHarness();
+const archiveActionContext = projection.makeActionContext(searchFixtureSnapshot, "archive", "alpha", "archive-id", "2026-10", "archive-folder");
+archiveActionWidget.host.requestAction("open-task-folder", archiveActionContext);
+assert.deepEqual(Object.keys(archiveActionWidget.shared.value).sort(), ["action", "dirName", "kind", "month", "projectId", "requestId", "taskId"]);
+archiveActionWidget.deliver({ ...archiveActionWidget.shared.value, status: "accepted", code: "action_open_accepted" });
+assert.equal(archiveActionWidget.host.actionFeedbackText(), "Folder launch request accepted.");
+const invalidActionWidget = actionWidgetHarness(); invalidActionWidget.host.requestAction("copy-task-id", { ...actionViewContext, path: "/arbitrary" });
+assert.equal(invalidActionWidget.host.actionStatus, "error"); assert.equal(invalidActionWidget.shared.value, null);
+const throwingActionWidget = actionWidgetHarness(); throwingActionWidget.shared.set = () => { throw Error("global API missing"); };
+throwingActionWidget.host.requestAction("copy-task-id", actionViewContext);
+assert.equal(throwingActionWidget.host.actionStatus, "error"); assert.equal(throwingActionWidget.host.actionPending, false);
+const widgetActionOwnerA = actionWidgetHarness(), widgetActionOwnerB = actionWidgetHarness(widgetActionOwnerA.shared, "action-widget-b");
+widgetActionOwnerA.host.requestAction("copy-task-id", actionViewContext);
+widgetActionOwnerB.host.requestAction("copy-task-path", actionViewContext);
+assert.equal(widgetActionOwnerA.host.actionStatus, "superseded"); assert.equal(widgetActionOwnerA.host.actionPending, false);
+const widgetActionBRequest = searchClone(widgetActionOwnerB.shared.value);
+widgetActionOwnerA.host.cancelAction(); assert.deepEqual(widgetActionOwnerA.shared.value, widgetActionBRequest,
+  "closing a superseded widget cannot cancel the current owner");
+widgetActionOwnerB.host.closeTaskDetail(); assert.equal(widgetActionOwnerB.shared.value, null);
+assert.equal(widgetActionOwnerB.host.actionPending, false); assert.equal(widgetActionOwnerB.host.detailMode, false);
+// Couple the actual daemon root-change lifecycle with the actual widget
+// observer. Root cancellation consumes the old request and ends pending.
+const rootChangedActionDaemon = actionHarness(), rootChangedActionWidget = actionWidgetHarness(rootChangedActionDaemon.sandbox.actionRequestVar, "root-change-action");
+rootChangedActionWidget.shared.listeners.push(() => {
+  const value = rootChangedActionWidget.shared.value;
+  rootChangedActionDaemon.pending.push(() => rootChangedActionDaemon.sandbox._handleActionRequest(value));
+});
+const publishActionResponse = rootChangedActionDaemon.sandbox.actionResponseVar.set;
+rootChangedActionDaemon.sandbox.actionResponseVar.set = value => { publishActionResponse(value); rootChangedActionWidget.deliver(value); };
+Object.assign(rootChangedActionDaemon.sandbox, { TrellisWatch: watch, topologyTimer: { running: false }, settingsRefreshTimer: { restart() {} } });
+rootChangedActionDaemon.host.topologyIntervalDefault = 60;
+vm.runInNewContext(sourceSection(daemonSource, "    function _topologySettingsSnapshot(", "    function startScan(reason) {"), rootChangedActionDaemon.sandbox);
+rootChangedActionDaemon.host._topologySettingsSnapshot = rootChangedActionDaemon.sandbox._topologySettingsSnapshot;
+rootChangedActionDaemon.host.observedTopologySettings = rootChangedActionDaemon.sandbox._topologySettingsSnapshot(rootChangedActionDaemon.host.pluginData);
+const daemonActionContext = { kind: "live", projectId: rootChangedActionDaemon.project.id, taskId: "shared-id" };
+rootChangedActionWidget.host.requestAction("copy-task-id", daemonActionContext);
+while (!rootChangedActionDaemon.host.ownedActionReaders.length) { assert.ok(rootChangedActionDaemon.pending.length); rootChangedActionDaemon.pending.shift()(); }
+const obsoleteRootReader = rootChangedActionDaemon.host.ownedActionReaders[0];
+rootChangedActionDaemon.host.pluginData.scanRoots = [];
+rootChangedActionDaemon.sandbox._observePluginSettingsChange();
+assert.equal(rootChangedActionWidget.shared.value, null);
+assert.equal(rootChangedActionWidget.host.actionPending, false); assert.equal(rootChangedActionWidget.host.actionStatus, "superseded");
+const rootActionResponseCount = rootChangedActionDaemon.actionResponses.length;
+obsoleteRootReader.callback('{"id":"shared-id"}', null); rootChangedActionDaemon.flush();
+assert.equal(rootChangedActionDaemon.actionResponses.length, rootActionResponseCount);
+assert.equal(rootChangedActionDaemon.launches.length, 0);
+assert.equal(rootChangedActionWidget.host.actionPending, false);
+assert.match(widgetSource, /id: detailActionsToggle[\s\S]*?buttonHeight: 40/);
+assert.match(widgetSource, /model: detailActionsToggle.expanded \? root.taskActions : \[\]/);
+assert.match(widgetSource, /id: detailActionsFlow[\s\S]*?enabled: !root.actionPending && !!root.detailActionContext/);
+assert.match(widgetSource, /id: projectActionsFlow[\s\S]*?enabled: !root.actionPending && !!projectActionsFlow.context/);
+assert.match(widgetSource, /onShouldBeVisibleChanged[\s\S]*?root.cancelAction\(\)/);
+assert.match(widgetSource, /Component.onDestruction: \{ root.cancelSearch\(false\); root.cancelAction\(\); \}/);
+const actualActionDaemonSource = sourceSection(daemonSource, "    function _cancelAction(", "    function _untrack(");
+assert.doesNotMatch(actualActionDaemonSource, /savePlugin|setGlobalVar|watchChanges|currentWarnings|_cancelDetail|_cancelSearch/);
+assert.match(actualActionDaemonSource, /\["dms", "cl", "copy", "--", value\]/);
+assert.match(actualActionDaemonSource, /typeof Qt.openUrlExternally !== "function"/);
+for (const key of ["requestId", "projectId", "taskId"]) {
+  for (const control of ["\n", "\t", "\r", "\0", "\x7f"]) {
+    for (const atStart of [true, false]) assert.equal(paths.validateActionRequest({ ...actionRequest,
+      [key]: atStart ? control + actionRequest[key] : actionRequest[key] + control }).ok, false);
+  }
+}
+console.log("quick actions actual-widget ownership and control fixtures: ok");
+
+// Existing detail and Search execute successfully while an action fails or is
+// cancelled; their own generations/resources remain intact.
+for (const outcome of ["cancel", "failure"]) {
+  const api = actionHarness(); api.month("2026-10", 1);
+  api.open(); api.request("needle");
+  const detailGeneration = api.host.detailGeneration, searchGeneration = api.host.searchGeneration;
+  api.action();
+  if (outcome === "cancel") api.cancelAction(); else api.controls.copyExit = 1;
+  api.flush();
+  assert.equal(api.detailResponses.at(-1).status, "ready");
+  assert.equal(api.responses.at(-1).status, "ready");
+  assert.equal(api.host.detailGeneration, detailGeneration); assert.equal(api.host.searchGeneration, searchGeneration);
+  if (outcome === "failure") assert.equal(api.actionResponses.at(-1).status, "error");
+}
+const staleArchiveAction = actionRejected(api => {
+  api.files.set(`${paths.archiveRootPath(api.project.root)}/2026-10/task-0000/task.json`, '{"id":"changed"}');
+}, "copy-task-id", "archive");
+assert.equal(staleArchiveAction.reads.length, 1);
+for (const value of [null, [], "primitive"])
+  actionRejected(api => { api.files.set(`${paths.archiveRootPath(api.project.root)}/2026-10/task-0000/task.json`, JSON.stringify(value)); }, "copy-task-id", "archive");
+actionRejected(api => { api.files.delete(`${api.record.taskDir}/task.json`); });
+actionRejected(api => { api.dirs.delete(api.record.taskDir); });
+actionRejected(api => { api.record.taskDir = `${paths.archiveRootPath(api.project.root)}/2026-10/task-0000`; });
+const identityChangeAction = actionHarness(); identityChangeAction.action();
+identityChangeAction.record.value.id = "new-id";
+assert.equal(identityChangeAction.finishAction().status, "error"); assert.equal(identityChangeAction.launches.length, 0);
+const duplicateDuringAction = actionHarness(); duplicateDuringAction.action();
+duplicateDuringAction.project.taskRecords.push(searchClone(duplicateDuringAction.record));
+assert.equal(duplicateDuringAction.finishAction().status, "error"); assert.equal(duplicateDuringAction.launches.length, 0);
+const changedRequestAction = actionHarness(); const currentRequestAction = changedRequestAction.action();
+changedRequestAction.sandbox.actionRequestVar.value = { ...currentRequestAction, action: "open-task-folder" };
+assert.equal(changedRequestAction.finishAction().status, "error"); assert.equal(changedRequestAction.launches.length, 0);
+const cancelClipboardAction = actionHarness(); cancelClipboardAction.action();
+while (!cancelClipboardAction.host.ownedActionProcesses.some(object => object.command[0] === "dms")) {
+  assert.ok(cancelClipboardAction.pending.length); cancelClipboardAction.pending.shift()();
+}
+const obsoleteClipboard = cancelClipboardAction.host.ownedActionProcesses.find(object => object.command[0] === "dms");
+cancelClipboardAction.cancelAction(); obsoleteClipboard.callback("", 0); cancelClipboardAction.flush();
+assert.equal(cancelClipboardAction.launches.length, 0); assert.equal(cancelClipboardAction.actionResponses.at(-1), null);
+const invalidActionDaemon = actionHarness();
+const invalidActionRaw = { requestId: "invalid-action", action: "open-project-folder", kind: "project", projectId: invalidActionDaemon.project.id, url: "file:///arbitrary" };
+invalidActionDaemon.sandbox.actionRequestVar.value = invalidActionRaw;
+invalidActionDaemon.sandbox._handleActionRequest(invalidActionRaw);
+assert.equal(invalidActionDaemon.finishAction().status, "error"); assert.equal(invalidActionDaemon.commands.length, 0);
+console.log("quick actions channel isolation and stale-execution fixtures: ok");
+assert.match(widgetSource, /model: projectActionsToggle.expanded \? root.projectActions : \[\]/);
+assert.match(widgetSource, /"Task ID: %1"\).arg\(root.detailTaskId\)/);
+const staleFeedbackWidget = actionWidgetHarness();
+staleFeedbackWidget.host.requestAction("copy-task-id", actionViewContext);
+staleFeedbackWidget.host.snapshot.projects[0].tasks = [];
+staleFeedbackWidget.deliver({ ...staleFeedbackWidget.shared.value, status: "error", code: "action_scope_changed" });
+assert.equal(staleFeedbackWidget.host.detailActionFeedbackVisible(), true,
+  "stale task detail retains local failure feedback even when its controls lose current validity");
+const jsonRedirectAfterRead = actionHarness();
+jsonRedirectAfterRead.controls.beforeFile = options => {
+  jsonRedirectAfterRead.files.set("/outside/task.json", '{"id":"shared-id"}');
+  jsonRedirectAfterRead.canonical.set(options.path, "/outside/task.json");
+};
+jsonRedirectAfterRead.action(); assert.equal(jsonRedirectAfterRead.finishAction().status, "error");
+assert.equal(jsonRedirectAfterRead.launches.length, 0);
+const changedBeforeOpen = actionHarness(); let projectAuthorityChecks = 0;
+changedBeforeOpen.controls.afterProcess = command => {
+  if (command[0] === "test" && command[1] === "-d" && command.at(-1) === `${changedBeforeOpen.project.root}/.trellis`
+      && ++projectAuthorityChecks === 2) changedBeforeOpen.host.pluginData.scanRoots = [];
+};
+changedBeforeOpen.action("open-project-folder", "project");
+assert.equal(changedBeforeOpen.finishAction().status, "error"); assert.equal(changedBeforeOpen.launches.length, 0);
+
+// DMS keeps globalVars after unloadPlugin. Execute the real deferred request
+// observer and destruction body, then recreate a daemon against those globals.
+const actionGlobalRequestSource = sourceSection(daemonSource,
+  '        varName: "actionRequest"', '    PluginGlobalVar {\n        id: actionResponseVar');
+const actionDeferredBody = sourceSection(actionGlobalRequestSource,
+  "        onValueChanged: {\n", "\n        }\n    }")
+  .slice("        onValueChanged: {\n".length);
+function coupleActionWidget(api, instance = "reload-action", notifyResponse = true) {
+  const widget = actionWidgetHarness(api.sandbox.actionRequestVar, instance);
+  api.host._handleActionRequest = api.sandbox._handleActionRequest;
+  vm.runInNewContext(`function _testActionRequestChanged(value) {\n${actionDeferredBody}\n}`, api.sandbox);
+  widget.shared.listeners.push(() => api.sandbox._testActionRequestChanged(widget.shared.value));
+  const publish = api.sandbox.actionResponseVar.set;
+  api.sandbox.actionResponseVar.set = value => {
+    publish(value);
+    widget.sandbox.actionResponseVar.value = searchClone(value);
+    if (notifyResponse) widget.host.observeActionResponse();
+  };
+  return widget;
+}
+function destroyActionDaemon(api) {
+  // Other generations/pools have separate coverage above; keep only the
+  // action teardown real here, without requiring a scan/watcher host.
+  Object.assign(api.sandbox, { _cancelDetailRead() {}, _cancelSearchRead() {}, _destroyOwned() {} });
+  vm.runInNewContext(`function _testDaemonDestruction() {\n${destructionSource
+    .slice("Component.onDestruction: {".length)}\n}`, api.sandbox);
+  api.sandbox._testDaemonDestruction();
+}
+function assertActionGlobalsDoNotReplay(api) {
+  const recreated = actionHarness();
+  recreated.sandbox.actionRequestVar.value = api.sandbox.actionRequestVar.value;
+  recreated.sandbox.actionResponseVar.value = api.sandbox.actionResponseVar.value;
+  recreated.sandbox._handleActionRequest(recreated.sandbox.actionRequestVar.value);
+  recreated.flush();
+  assert.equal(recreated.commands.length + recreated.reads.length + recreated.launches.length, 0,
+    "recreated daemon must not revalidate or execute a completed/cancelled request");
+  assert.equal(recreated.host.currentAction, null);
+}
+for (const notifyResponse of [true, false]) {
+  for (const outcome of ["copied", "accepted", "host-error", "validation-error"]) {
+    const api = actionHarness(), widget = coupleActionWidget(api, `completion-${outcome}`, notifyResponse);
+    if (outcome === "host-error") api.controls.copyExit = 1;
+    if (outcome === "validation-error") api.files.set(`${api.record.taskDir}/task.json`, "{broken");
+    widget.host.requestAction(outcome === "accepted" ? "open-task-folder" : "copy-task-id", daemonActionContext);
+    api.flush();
+    const expected = outcome.endsWith("error") ? "error" : outcome;
+    assert.equal(widget.host.actionStatus, expected,
+      "matching completion survives ownership-null even if its response observer runs later");
+    assert.equal(widget.host.actionPending, false);
+    assert.equal(widget.shared.value, null);
+    assert.equal(api.sandbox.actionResponseVar.value.status, expected,
+      "deferred null acknowledgement retains the published completion");
+    const replies = api.actionResponses.length, launches = api.launches.length;
+    for (const object of api.objects) object.callback("obsolete callback", 0);
+    api.flush();
+    assert.equal(api.actionResponses.length, replies); assert.equal(api.launches.length, launches);
+    assertActionGlobalsDoNotReplay(api);
+  }
+}
+for (const phase of ["deferred", "reader", "clipboard"]) {
+  const api = actionHarness(), widget = coupleActionWidget(api, `destroy-${phase}`);
+  widget.host.requestAction("copy-task-id", daemonActionContext);
+  if (phase !== "deferred") {
+    while (phase === "reader" ? !api.host.ownedActionReaders.length
+      : !api.host.ownedActionProcesses.some(object => object.command[0] === "dms")) {
+      assert.ok(api.pending.length); api.pending.shift()();
+    }
+  } else assert.equal(api.host.pendingActionRequest, widget.shared.value);
+  destroyActionDaemon(api);
+  assert.equal(widget.shared.value, null);
+  assert.equal(widget.host.actionPending, false);
+  assert.equal(widget.host.actionStatus, "superseded");
+  assert.equal(api.host.ownedActionProcesses.length + api.host.ownedActionReaders.length, 0);
+  const replies = api.actionResponses.length;
+  for (const object of api.objects) object.callback("obsolete callback", 0);
+  api.flush();
+  assert.equal(api.actionResponses.length, replies); assert.equal(api.launches.length, 0);
+  assertActionGlobalsDoNotReplay(api);
+}
+const deferredRootAction = actionHarness(), deferredRootWidget = coupleActionWidget(deferredRootAction);
+deferredRootWidget.host.requestAction("copy-task-id", daemonActionContext);
+deferredRootAction.host.pluginData.scanRoots = [];
+deferredRootAction.sandbox._cancelAction(true);
+deferredRootAction.flush();
+assert.equal(deferredRootWidget.shared.value, null); assert.equal(deferredRootWidget.host.actionPending, false);
+assert.equal(deferredRootAction.commands.length, 0); assertActionGlobalsDoNotReplay(deferredRootAction);
+
+const replacedRawAction = actionHarness(), originalRawAction = replacedRawAction.action();
+const replacementRawAction = searchClone(originalRawAction);
+replacedRawAction.sandbox.actionRequestVar.value = replacementRawAction;
+assert.equal(replacedRawAction.finishAction().code, "action_scope_changed");
+assert.equal(replacedRawAction.launches.length, 0);
+assert.equal(replacedRawAction.sandbox.actionRequestVar.value, replacementRawAction,
+  "an equal-content replacement is a different raw owner and must be retained");
+
+// A newer widget can publish while the previous completion is being delivered.
+// Consuming/cancelling the previous raw owner must preserve that newer request.
+const completionRaceAction = actionHarness(), completionRaceOwner = coupleActionWidget(completionRaceAction, "race-owner");
+const completionRaceNext = actionWidgetHarness(completionRaceOwner.shared, "race-next");
+const publishRaceResponse = completionRaceAction.sandbox.actionResponseVar.set;
+let raceRequested = false, raceRequest = null;
+completionRaceAction.sandbox.actionResponseVar.set = value => {
+  publishRaceResponse(value); completionRaceNext.deliver(value);
+  if (value?.requestId.startsWith("race-owner") && !raceRequested) {
+    raceRequested = true;
+    completionRaceNext.host.requestAction("copy-project-path", { kind: "project", projectId: completionRaceAction.project.id });
+    raceRequest = completionRaceNext.shared.value;
+    assert.equal(completionRaceOwner.host.actionStatus, "copied");
+    completionRaceOwner.host.cancelAction();
+    assert.equal(completionRaceNext.shared.value, raceRequest);
+  }
+};
+completionRaceOwner.host.requestAction("copy-task-id", daemonActionContext);
+completionRaceAction.flush();
+assert.equal(completionRaceNext.host.actionStatus, "copied");
+assert.equal(completionRaceNext.shared.value, null); assert.equal(completionRaceAction.launches.length, 2);
+assert.equal(completionRaceAction.actionResponses.at(-1).requestId, raceRequest.requestId);
+assertActionGlobalsDoNotReplay(completionRaceAction);
+console.log("quick actions retained-global completion, cancellation and daemon recreation fixtures: ok");

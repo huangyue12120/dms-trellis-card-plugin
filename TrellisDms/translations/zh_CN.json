@@ -898,5 +898,191 @@
     },
     "Trellis version could not be verified": {
         "Trellis version could not be verified": "无法验证 Trellis 版本"
+    },
+    "Recent Changes": {
+        "Recent Changes": "最近变化"
+    },
+    "Recent Trellis Changes": {
+        "Recent Trellis Changes": "最近的 Trellis 变化"
+    },
+    "Project discovered": {
+        "Project discovered": "发现项目"
+    },
+    "Project unavailable": {
+        "Project unavailable": "项目不可用"
+    },
+    "Project recovered": {
+        "Project recovered": "项目恢复可用"
+    },
+    "Task discovered": {
+        "Task discovered": "发现任务"
+    },
+    "Stored task status changed": {
+        "Stored task status changed": "任务存储状态变化"
+    },
+    "Displayed task state changed": {
+        "Displayed task state changed": "任务显示状态变化"
+    },
+    "Session attached": {
+        "Session attached": "会话关联任务"
+    },
+    "Session detached": {
+        "Session detached": "会话解除关联"
+    },
+    "Active session count changed": {
+        "Active session count changed": "活跃会话数变化"
+    },
+    "Archive item newly observed": {
+        "Archive item newly observed": "新观察到归档条目"
+    },
+    "Pinned task selection changed": {
+        "Pinned task selection changed": "固定任务选择变化"
+    },
+    "Primary selection changed": {
+        "Primary selection changed": "主显示选择变化"
+    },
+    "Trellis health degraded": {
+        "Trellis health degraded": "Trellis 健康状态降级"
+    },
+    "Trellis health recovered": {
+        "Trellis health recovered": "Trellis 健康状态恢复"
+    },
+    "UI selection": {
+        "UI selection": "界面选择"
+    },
+    "Trellis data": {
+        "Trellis data": "Trellis 数据"
+    },
+    "Observed at %1": {
+        "Observed at %1": "观察时间：%1"
+    },
+    "History lasts for this plugin session. Observations begin after the initial baseline.": {
+        "History lasts for this plugin session. Observations begin after the initial baseline.": "历史仅保留于本次插件运行期间。首次建立基线后开始记录变化。"
+    },
+    "Some source data is unavailable. Reliable earlier observations remain visible.": {
+        "Some source data is unavailable. Reliable earlier observations remain visible.": "部分源数据不可用。此前可靠的观察记录仍然可见。"
+    },
+    "Recent changes are unavailable in this DMS session.": {
+        "Recent changes are unavailable in this DMS session.": "本次 DMS 会话中最近变化不可用。"
+    },
+    "History is waiting for the latest Snapshot publication.": {
+        "History is waiting for the latest Snapshot publication.": "历史正在等待最新快照发布。"
+    },
+    "No changes observed after the initial baseline.": {
+        "No changes observed after the initial baseline.": "首次建立基线后尚未观察到变化。"
+    },
+    "None": {
+        "None": "无"
+    },
+    "Session: %1": {
+        "Session: %1": "会话：%1"
+    },
+    "Snapshot": {
+        "Snapshot": "快照"
+    },
+    "Search": {
+        "Search": "搜索"
+    },
+    "Live": {
+        "Live": "实时"
+    },
+    "All scopes": {
+        "All scopes": "所有范围"
+    },
+    "Clear search": {
+        "Clear search": "清除搜索"
+    },
+    "Search projects and tasks": {
+        "Search projects and tasks": "搜索项目与任务"
+    },
+    "Project name, task title or ID": {
+        "Project name, task title or ID": "项目名称、任务标题或 ID"
+    },
+    "Search covers all trusted discovered projects. Archive metadata loads only for a nonempty query.": {
+        "Search covers all trusted discovered projects. Archive metadata loads only for a nonempty query.": "搜索覆盖已发现的全部受信任项目。仅在查询非空时加载归档元数据。"
+    },
+    "No live metadata matches.": {
+        "No live metadata matches.": "没有匹配的实时元数据。"
+    },
+    "%1 more live matches. Narrow the query.": {
+        "%1 more live matches. Narrow the query.": "还有 %1 条实时匹配。请缩小查询范围。"
+    },
+    "Searching archive metadata…": {
+        "Searching archive metadata…": "正在搜索归档元数据…"
+    },
+    "Archive search was superseded or its trusted scope changed. Retry the query.": {
+        "Archive search was superseded or its trusted scope changed. Retry the query.": "归档搜索已被其他请求取代，或受信任范围已改变。请重试查询。"
+    },
+    "Archive search was paused for details. Retry to search again; earlier results remain visible.": {
+        "Archive search was paused for details. Retry to search again; earlier results remain visible.": "打开详情已暂停归档搜索。可重试重新查询；已有结果仍然显示。"
+    },
+    "Archive search or the selected identity is unavailable. Retry the query.": {
+        "Archive search or the selected identity is unavailable. Retry the query.": "归档搜索或选中的对象不可用。请重试查询。"
+    },
+    "Archive search reached a finite cap. Coverage is incomplete; narrow the query.": {
+        "Archive search reached a finite cap. Coverage is incomplete; narrow the query.": "归档搜索已达到有限上限。覆盖不完整，请缩小查询范围。"
+    },
+    "Archive coverage is incomplete. No match within the checked metadata does not mean no match in all archives.": {
+        "Archive coverage is incomplete. No match within the checked metadata does not mean no match in all archives.": "归档覆盖尚不完整。已检查的元数据中没有匹配，不代表所有归档中都没有匹配。"
+    },
+    "No archive metadata matches within the complete checked coverage.": {
+        "No archive metadata matches within the complete checked coverage.": "在完整的已检查范围内，没有匹配的归档元数据。"
+    },
+    "Archive metadata search completed.": {
+        "Archive metadata search completed.": "归档元数据搜索已完成。"
+    },
+    "%1 archive records examined.": {
+        "%1 archive records examined.": "已检查 %1 条归档记录。"
+    },
+    "%1 bounded archive warnings.": {
+        "%1 bounded archive warnings.": "有 %1 条有界归档警告。"
+    },
+    "Continue archive search": {
+        "Continue archive search": "继续搜索归档"
+    },
+    "Retry archive search": {
+        "Retry archive search": "重试归档搜索"
+    },
+    "The selected search result is no longer available.": {
+        "The selected search result is no longer available.": "选中的搜索结果已不可用。"
+    },
+    "The selected project is no longer authorized or available. Retry from the current view.": {
+        "The selected project is no longer authorized or available. Retry from the current view.": "选中的项目已不在授权范围内或已不可用。请从当前视图重试。"
+    },
+    "Copy task ID": {
+        "Copy task ID": "复制任务 ID"
+    },
+    "Copy task path": {
+        "Copy task path": "复制任务路径"
+    },
+    "Open task folder": {
+        "Open task folder": "打开任务文件夹"
+    },
+    "Copy project path": {
+        "Copy project path": "复制项目路径"
+    },
+    "Open project folder": {
+        "Open project folder": "打开项目文件夹"
+    },
+    "Actions": {
+        "Actions": "操作"
+    },
+    "Validating action…": {
+        "Validating action…": "正在验证操作…"
+    },
+    "Copied to clipboard.": {
+        "Copied to clipboard.": "已复制到剪贴板。"
+    },
+    "Folder launch request accepted.": {
+        "Folder launch request accepted.": "文件夹打开请求已接受。"
+    },
+    "Action cancelled or superseded. Retry from the current view.": {
+        "Action cancelled or superseded. Retry from the current view.": "操作已取消或被其他请求取代。请从当前视图重试。"
+    },
+    "Action unavailable or validation failed. Retry from the current view.": {
+        "Action unavailable or validation failed. Retry from the current view.": "操作不可用或验证失败。请从当前视图重试。"
+    },
+    "Task ID: %1": {
+        "Task ID: %1": "任务 ID：%1"
     }
 }

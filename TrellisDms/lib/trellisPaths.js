@@ -129,6 +129,74 @@ function validateMarkdownRequest(value) {
     };
 }
 
+// Search is a metadata-only side channel. Paths are never supplied by its UI.
+function validateSearchRequest(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+        return _failure("search_request", "Search request must be an object");
+    var requestId = _requestString(value.requestId, 128, "search_request_id");
+    if (!requestId.ok)
+        return requestId;
+    var keys = ["requestId", "kind", "query", "cursor"];
+    for (var key in value) {
+        if (keys.indexOf(key) === -1)
+            return _failure("search_request_field", "Unsupported search field", { requestId: requestId.value });
+    }
+    if (value.kind !== "archive-search" || typeof value.query !== "string"
+            || value.query.length > 256 || hasControlCharacters(value.query))
+        return _failure("search_query", "Invalid search query", { requestId: requestId.value });
+    var cursor = value.cursor === undefined ? "" : value.cursor;
+    if (typeof cursor !== "string" || cursor.length > 128
+            || (cursor && !/^[a-zA-Z0-9-]+$/.test(cursor)))
+        return _failure("search_cursor", "Invalid search cursor", { requestId: requestId.value });
+    return { ok: true, request: { requestId: requestId.value,
+        kind: "archive-search", query: value.query.trim(), cursor: cursor } };
+}
+
+// Quick Actions carry identities only. No caller supplies a path or command.
+function validateActionRequest(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+        return _failure("action_request");
+    var keys = ["requestId", "action", "kind", "projectId"];
+    var actions = value.kind === "project"
+        ? ["copy-project-path", "open-project-folder"]
+        : ["copy-task-id", "copy-task-path", "open-task-folder", "copy-project-path", "open-project-folder"];
+    if (value.kind === "live" || value.kind === "archive") keys.push("taskId");
+    if (value.kind === "archive") keys = keys.concat(["month", "dirName"]);
+    if (!_hasOnlyKeys(value, keys) || ["project", "live", "archive"].indexOf(value.kind) === -1
+            || actions.indexOf(value.action) === -1)
+        return _failure("action_request");
+    var request = { action: value.action, kind: value.kind };
+    var fields = ["requestId", "projectId"];
+    if (value.kind !== "project") fields.push("taskId");
+    for (var i = 0; i < fields.length; i++) {
+        var key = fields[i], maximum = key === "projectId" ? 4096 : (key === "taskId" ? 256 : 128);
+        if (typeof value[key] !== "string" || hasControlCharacters(value[key])
+                || !value[key].trim() || value[key].length > maximum)
+            return _failure("action_request");
+        request[key] = value[key].trim();
+    }
+    if (value.kind === "archive") {
+        if (!isArchiveMonth(value.month) || !isArchiveTaskDirectoryName(value.dirName))
+            return _failure("action_request");
+        request.month = value.month;
+        request.dirName = value.dirName;
+    }
+    return { ok: true, request: request };
+}
+
+function actionFileUrl(path) {
+    var normalized = normalizeAbsolutePath(path);
+    if (!normalized.ok || normalized.path !== path || path.length > 4096)
+        return "";
+    try {
+        return "file://" + path.split("/").map(function (segment) {
+            return encodeURIComponent(segment);
+        }).join("/");
+    } catch (error) {
+        return "";
+    }
+}
+
 function archiveLimits() {
     return {
         monthLimit: ARCHIVE_LIMITS.monthLimit,

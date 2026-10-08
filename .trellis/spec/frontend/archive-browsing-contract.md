@@ -107,3 +107,13 @@ directory enumeration itself; keep the path helper's default rejection:
 
 // resolveTaskDir still rejects archive paths unless allowArchive is explicit.
 ```
+
+## v1.2 Search and Fresh Detail Entry
+
+Global Archive search is a separate metadata channel, not an archive detail
+request or a parser input. Preserve this browser's schemas/readers. All existing
+archive detail kinds now pass fresh configured-root/project authority before
+dispatch, and reject root changes at queue/callback time. Search page coverage
+feeds Recent Changes only when complete/reliable; short pages across months must
+not exceed its per-batch budget. See [Global Search](./global-search-contract.md)
+and [Recent Changes](./recent-changes-contract.md) for exact contracts/tests.

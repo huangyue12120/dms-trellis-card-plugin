@@ -26,6 +26,9 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [Desktop Projection Contract](./desktop-projection-contract.md) | Shared Snapshot desktop modes, health projection, and warning presentation | Complete |
 | [Launcher Projection Contract](./launcher-projection-contract.md) | v0.9.3 bounded Snapshot search, navigation State, and DMS result ordering | Complete |
 | [Settings and UI State Contract](./settings-state-contract.md) | v0.7.3 settings migration and key-scoped State; v1.0 desktop instance settings, geometry reset, and trusted-folder picker boundary | Complete |
+| [Recent Changes Contract](./recent-changes-contract.md) | v1.2 runtime semantic observations, reliable baselines, publication provenance, bounded archive coverage, and selection events | Complete |
+| [Global Search Contract](./global-search-contract.md) | v1.2 bounded metadata search, continuation/cancellation, complete-page observations, and fresh detail authority | Complete |
+| [Quick Actions Contract](./quick-actions-contract.md) | v1.2 identity-only actions, fresh root/canonical/JSON validation, argv/URL execution, owned consumption, and local feedback | Complete |
 | [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
 
 ---
