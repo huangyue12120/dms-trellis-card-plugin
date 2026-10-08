@@ -1,0 +1,31 @@
+{
+  "id": "v12-observation-search-navigation",
+  "name": "v12-observation-search-navigation",
+  "title": "v1.2 Recent Changes, Search, and Read-only Navigation",
+  "description": "Plan and deliver roadmap tasks 1.2.1 through 1.2.4 with read-only boundaries, regression evidence, and release gates.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "huangyue12120",
+  "assignee": "huangyue12120",
+  "createdAt": "2026-10-08",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-08-v12-recent-changes",
+    "10-08-v12-global-search",
+    "10-08-v12-quick-actions",
+    "10-08-v12-acceptance-release"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

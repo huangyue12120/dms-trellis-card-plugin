@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/state-matrix-contract.md","reason":"Preserve parser/Snapshot/projection and evidence boundaries"}
+{"file":".trellis/spec/frontend/recovery-responsive-contract.md","reason":"Preserve refresh, degraded recovery, and responsive behavior"}
+{"file":".trellis/spec/frontend/settings-state-contract.md","reason":"Use current trusted-root authority and key-scoped UI preferences"}
+{"file":".trellis/spec/frontend/archive-browsing-contract.md","reason":"Keep archive metadata independent, canonical, lazy, and bounded"}
+{"file":".trellis/tasks/10-08-v12-observation-search-navigation/research/implementation-evidence.md","reason":"Verified repository/host facts, provenance gap, read-only and release boundaries"}
+{"file":".trellis/tasks/10-08-v12-observation-search-navigation/research/ui-interaction-plan.md","reason":"Proposed popout UX gate, keyboard, partial-result, action-feedback contracts"}
+{"file":".trellis/spec/frontend/recent-changes-contract.md","reason":"Preserve verified observation/provenance/complete archive coverage and reliable baseline contracts"}

@@ -31,6 +31,15 @@
 - 2026-09-26 桌面显示设置与挂载目录入口修正已通过仓库契约测试。用户将最新 `TrellisSettings.qml` 与中文翻译复制到 DMS 插件目录并重启后，确认桌面显示设置及进入 `/run/media`、`/mnt` 的入口正常；此前也报告 archive 警告消失且任务/进度仍正常。此为用户报告，无运行日志；双实例持久化、重置效果、选择后可信目录变化及无效路径警告保留尚未逐项确认。
 - 2026-09-25 按用户要求归档了当时全部 7 个 active Trellis task；各归档任务保留归档前状态及行政归档说明。归档不代表未完成的 DMS host gates 已通过，也不代表 v1.0 已正式发布。
 
+## v1.2 执行状态（2026-10-08）
+
+- task 1.2.1–1.2.3 已完成仓库实现与独立检查：runtime Recent Trellis Changes、Live / Archive / All metadata search、复制 ID / 安全路径与打开可信文件夹。Quick Actions 补充了重载后请求不能重放的回归；terminal/editor 增强继续延后。
+- task 1.2.4 的完整 Node 契约测试、JavaScript 语法、JSON、资源大小写及只读边界检查通过；夹具/静态证据不代表真实剪贴板、窗口目标、键盘或多 surface 行为已通过。
+- DMS 1.6.2 首次候选热重载因新增 `lib/trellischanges.js` 的 Qt `File name case mismatch` 报错失败，尽管文件名、导入和安装字节一致；独立新 Qt 引擎可导入该库。运行中目录缓存是待确认原因，完整 DMS 候选加载仍待验证。
+- 原有 13 文件插件已从完整备份恢复，字节校验与宿主重载通过；当前宿主运行原版本。候选包仅用于未发布集成审阅，manifest 仍为 `1.0.0`，没有创建 `v1.2.0` tag 或 Release。
+- 真实 clipboard/folder、focus/layout、multi-widget/Desktop、refresh、locale、disable/enable/restart 等运行态门槛及既有 DMS State 写入问题仍待逐项确认，因此 task 1.2.4 和 v1.2 稳定发布保持未完成。
+- 证据：[综合验收矩阵](.trellis/tasks/10-08-v12-acceptance-release/acceptance-evidence.md)、[剩余宿主检查](.trellis/tasks/10-08-v12-acceptance-release/host-checklist.md)、[v1.2 候选说明](docs/releases/v1.2.0-candidate.md)。
+
 # v0（规划基线与范围冻结）
 
 ## 版本目标

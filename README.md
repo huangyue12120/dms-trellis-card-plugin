@@ -13,13 +13,41 @@ remain open for core lifecycle behavior and the retained Desktop, Simplified
 Chinese, and `!trellis` Launcher surfaces. In particular, Launcher search and
 selection have not yet been verified in the DMS Launcher UI.
 
-As of 2026-09-25, no GitHub Release or DMS registry submission has happened.
+On 2026-10-08, the v1.2 hot reload failed to resolve its newly added JavaScript
+library despite matching disk/import case. The original installed plugin was
+restored and successfully reloaded. A fresh isolated Qt engine imports that
+exact library successfully; the full candidate still needs a fresh DMS load.
+
+The v1.2 integration adds runtime Recent Trellis Changes, popout metadata
+search, and read-only copy/folder actions. Its supported-host acceptance and
+stable release remain open; the manifest has not been bumped to `1.2.0`.
+As of 2026-10-08, no v1.2 tag, GitHub Release, or DMS registry submission has
+happened.
 
 The candidate manifest declares these DMS permissions: `settings_read`,
 `settings_write`, and `process`. It does not declare network access. The
 package includes a bar widget/popout, Desktop widget, Simplified Chinese
 translations, and the optional Launcher trigger `!trellis`; these surfaces
 remain subject to the host acceptance above.
+
+## Recent changes, search, and quick actions
+
+Open the popout's **Recent Trellis Changes** to inspect bounded runtime
+observations. Initial/reloaded data establishes a quiet baseline. History is
+not persisted, and task disappearance does not imply completion or deletion.
+
+Search matches project names, task titles, and task IDs in **Live**, **Archive**,
+or **All**. Live uses the current shared snapshot; Archive reads bounded metadata
+on demand. Partial coverage and continuation limits are shown explicitly.
+Clearing the query restores the current view. Selecting a task opens its
+existing detail; typing does not change the saved project filter or pin.
+
+Project headers and live/archive task details offer **Actions** to copy IDs or
+canonical paths and open folders. Each operation checks current trusted roots,
+identity, and filesystem containment again. Folder feedback reports an accepted
+launch request; verify the opened window separately. Action failures stay local.
+Terminal/editor launching is deferred. Real clipboard, folder targets, rendered
+keyboard navigation, and layout still require supported-host acceptance.
 
 ## Install a candidate
 
@@ -30,7 +58,10 @@ remain subject to the host acceptance above.
    set, the usual location is `~/.config/DankMaterialShell/plugins/TrellisDms`.
    Back up any existing plugin directory before replacing it.
 3. Enable or reload **Trellis DMS** in DMS Plugin settings. Restart DMS if its
-   plugin scanner does not pick up the directory change.
+   plugin scanner does not pick up the directory change or a newly added
+   library is reported unavailable during hot reload. The running Qt loader's
+   directory cache is a suspected cause of the observed v1.2 failure; a full
+   supported-host restart has not verified that diagnosis.
 4. To try the candidate Launcher surface, open the DMS Launcher and enter
    `!trellis` in its search field. The trigger and its interactions have not
    completed host acceptance yet.
@@ -57,13 +88,17 @@ plugin state only. Do not delete the whole DMS settings store.
 
 ## Distribution and project listing
 
-After the candidate is merged to `main`, a matching `v1.0.0-rc.N` tag runs the
+After the candidate is merged to `main`, a matching `vMAJOR.MINOR.PATCH-rc.N` tag runs the
 tagged-release workflow, which validates and packages a ZIP and creates a
 GitHub **pre-release**. No tag or release has been created for this candidate.
+The tag version must equal the manifest version and have matching candidate
+notes. An unreleased v1.2 integration ZIP retaining manifest `1.0.0` is not a
+versioned v1.2 release. Stable publication is not automated by this workflow.
 The workflow does not submit the package to the DMS online plugin
 registry/search list. Registry requirements and publication remain separate
 and pending.
 
-See [the v1.0.0 candidate notes](docs/releases/v1.0.0-candidate.md) and
+See [the v1.2 integration notes](docs/releases/v1.2.0-candidate.md),
+[the v1.0.0 candidate notes](docs/releases/v1.0.0-candidate.md), and
 [local registry readiness](docs/registry-readiness.md) for acceptance and
 distribution details.
