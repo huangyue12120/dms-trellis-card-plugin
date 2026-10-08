@@ -473,3 +473,40 @@ Implemented and checked Recent Changes, Global Search and safe Quick Actions. Ca
 ### Next Steps
 
 - Keep original installed plugin as requested; complete manual supported-host interaction and fresh-load acceptance before a v1.2 version/tag/release decision. Tasks remain active and unarchived.
+
+
+## Session 15: v1.2 manual acceptance and task archival
+<!-- trellis-session: v=2 fp=13ff2a45440e267e -->
+
+**Date**: 2026-10-08
+**Task**: v1.2 manual acceptance and task archival
+**Branch**: `feat/v11-health-freshness`
+
+### Summary
+
+User reported overall manual acceptance and requested archival/commit. Recorded native candidate load evidence and archived all five v1.2 tasks; stable release remains unreleased.
+
+### Main Changes
+
+- Recorded user-reported acceptance separately from independently verified 14-file candidate equality, widget/daemon load logs and current loaded IPC status.
+- Archived parent and four children, preserving pre-archive status, administrative closure reason and remaining detailed host/release evidence limits; repaired archived links/context paths.
+- Updated only the owned v1.2 roadmap status block; original 957 added roadmap lines remain unstaged.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bfccd74` | docs: record v1.2 manual acceptance and closure |
+
+### Testing
+
+- [OK] All five archived task validators, metadata/JSON/UTF-8/LF, local links and final committed whitespace checks PASS; product/tests/specs unchanged.
+- [OK] Refreshed unreleased ZIP matches committed source, retains manifest 1.0.0 and 16 exact members; repeated builds equal SHA-256 76a69c51b7e546d67fcad530fd4685574e58e33e5c4037e9006d76cb46da03a5.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Stable v1.2.0 remains unpublished; retain detailed host/restart/persistence and version/tag/publication evidence limits for any later release work.
