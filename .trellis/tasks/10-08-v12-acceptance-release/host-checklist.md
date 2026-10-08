@@ -3,7 +3,10 @@
 Record the candidate file hashes, DMS version, locale, surface instances, and
 time with each result. A user-observed result is recorded as such; repository
 fixtures and successful component loading remain separate evidence classes.
-The current status of every unexecuted item is UNVERIFIED.
+The current status of every unexecuted item is UNVERIFIED. The user later
+reported overall manual acceptance and requested archival; detailed item-level
+results were not supplied. Installed candidate bytes and later native loading
+were independently verified. Archival does not infer passes for this checklist.
 
 1. Open the normal popout at normal and narrow widths. Traverse query, scope,
    clear, results, continuation, history, Back, and quick actions with Tab and

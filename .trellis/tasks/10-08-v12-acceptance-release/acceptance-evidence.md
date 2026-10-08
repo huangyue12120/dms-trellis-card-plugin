@@ -67,7 +67,7 @@ Update rows as checks execute; NOT RUN is not a pass.
 | Automatic topology refresh follows interval | PASS — fixture/static regression | N/A | UNVERIFIED | Carry-forward v1.1 host regression |
 | v1.0 bar/popout/filter/pin/archive/detail/Launcher | PASS — full fixture/static suite | NOT RUN | UNVERIFIED | Existing core and source regression suite |
 | Narrow/normal widths, long names, locale | PASS — source/fixtures only | NOT RUN | UNVERIFIED | English/Chinese copy and visible focus |
-| Multi-widget, reload, disable/enable, restart | PASS — full suite, including action replay regression | NOT RUN | FAIL — candidate hot reload; baseline restored; other interactions UNVERIFIED | Sharing, pending-operation cleanup, State behavior |
+| Multi-widget, reload, disable/enable, restart | PASS — full suite, including action replay regression | NOT RUN | PASS — subsequent candidate load; first reload failed and was rolled back; detailed interactions/restart UNVERIFIED | Sharing, pending-operation cleanup, State behavior |
 | Read-only, no network/permission/watcher increase | PASS — source/boundary review | N/A | UNVERIFIED | Diff/source review and host resource observations |
 | Package contents/version/import case/tag contract | PASS — local ZIP and exact workflow verifier; release ancestry/tag NOT RUN | N/A | N/A | ZIP inspection and matching release metadata |
 
@@ -122,7 +122,8 @@ with `File name case mismatch`. The exact library executes in a fresh Qt engine;
 a stale running loader directory cache is a hypothesis, not a verified root
 cause. No source workaround or DMS patch was made. Full fresh DMS load remains
 unverified. The original backup was restored, verified, and successfully loaded.
-The host currently runs its original baseline. No real clipboard content was
+At the end of the earlier rollback, the host ran its original baseline;
+the later manual acceptance update below records the subsequent candidate load. No real clipboard content was
 read/written and no folder was opened during these checks.
 
 Local logs: `/tmp/trellis-v12-host-first-load.log` and
@@ -152,20 +153,49 @@ The workflow explicitly requires source ancestry on origin/main and uses
 release tag/ancestry check, remote publication or stable automation was run.
 This package is an unreleased integration artifact, not a v1.2.0 release.
 
+
+## User acceptance and archival decision
+
+The user reports: "验收了，看着没什么问题，归档并提交吧".
+This records overall manual acceptance and explicit archival/commit authority.
+No per-scenario observations were supplied, so the unverified individual rows
+remain unverified rather than being converted to independently measured passes.
+
+Read-only follow-up verifies all 14 installed plugin files equal the checked
+repository candidate. On instance `0d5cnzihmt`, native logs show widget and daemon
+loading at 17:21:10 after a later manual reload; current `plugins status trellisDms`
+returns `loaded`. This supersedes the earlier restored-baseline *current-state*
+claim, while preserving the first failed reload and successful rollback history.
+No restart/reinstallation or clipboard/folder action was performed by main in
+this close-out. The original import failure's root cause remains unconfirmed.
+
+The parent and four children are archived at the user's explicit request. Their
+metadata preserves pre-archive status and records user-requested closure. The
+stable-release checkbox remains open: manifest `1.0.0`, no v1.2 tag/publication,
+and detailed lifecycle/restart/persistence evidence limits are unchanged.
+
+## Close-out package refresh
+
+The unreleased ZIP was rebuilt with the updated acceptance README. It still
+contains 16 exact members, retains manifest 1.0.0, passes CRC/source equality,
+and produces identical bytes twice. Current SHA-256: `76a69c51b7e546d67fcad530fd4685574e58e33e5c4037e9006d76cb46da03a5`.
+The original independently reviewed ZIP is retained at
+`/tmp/trellis-dms-v1.2-before-archive.zip` with its earlier recorded checksum.
+Plugin source bytes are unchanged; only the packaged README changed.
+
 ## Release decision
 
 The checked feature source/spec/tests were committed as `dc76d7a` in the first
 approved batch. Documentation and the session journal follow in separate batches.
 
-The user approved the three-batch commit plan and chose to retain the restored
-original plugin for later manual host acceptance. Do not reinstall the candidate
-or restart DMS in this session. This decision does not close any remaining host
-or stable-release gate; the acceptance task stays in progress and unarchived.
+The earlier user decision retained the restored baseline while awaiting manual
+acceptance. The subsequent acceptance/archival request above closes task tracking
+at the user's direction; it does not waive the remaining stable-release gates.
 
-Stable v1.2.0 is NOT RELEASED. Required v1.2 live checks remain unverified;
-an existing DMS 1.6.2 host is reachable using explicit reviewed read-only IPC.
-Independent implementation and local checks continue; missing feature checks
-are not waived by passing fixture/static tests or by an older plugin being loaded.
+Stable v1.2.0 is NOT RELEASED. Detailed remaining host/release checks retain
+their unverified status. Repository implementation/checks and overall manual
+acceptance are recorded, and the checked candidate's current native load is
+verified. Unreported per-scenario results are not inferred from those facts.
 
 The current manifest is 1.0.0. Before the reviewed version decision, any local
 draft package retains/reports this version and is labeled an unreleased

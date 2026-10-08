@@ -29,4 +29,11 @@ and executable spec are complete. See implementation-evidence.md, check-evidence
 and the frontend Quick Actions contract. Supported-host clipboard/folder/rendering
 gates remain open in the acceptance child; candidate hot reload failed and the
 baseline was restored. Feature source/spec/tests are committed in the approved batch (`dc76d7a`).
-Archive remains open pending the remaining host acceptance.
+The user later reported overall manual acceptance and explicitly requested
+archival; detailed host/release evidence limits remain in the acceptance record.
+
+## User-requested close-out
+
+Overall manual acceptance was reported on 2026-10-08 and the user requested
+archival/commit. This closes task tracking; it does not claim all individual
+host cases or stable v1.2.0 publication passed. See the parent closure.md.

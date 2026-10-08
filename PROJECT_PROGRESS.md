@@ -34,11 +34,10 @@
 ## v1.2 执行状态（2026-10-08）
 
 - task 1.2.1–1.2.3 已完成仓库实现与独立检查：runtime Recent Trellis Changes、Live / Archive / All metadata search、复制 ID / 安全路径与打开可信文件夹。Quick Actions 补充了重载后请求不能重放的回归；terminal/editor 增强继续延后。
-- task 1.2.4 的完整 Node 契约测试、JavaScript 语法、JSON、资源大小写及只读边界检查通过；夹具/静态证据不代表真实剪贴板、窗口目标、键盘或多 surface 行为已通过。
-- DMS 1.6.2 首次候选热重载因新增 `lib/trellischanges.js` 的 Qt `File name case mismatch` 报错失败，尽管文件名、导入和安装字节一致；独立新 Qt 引擎可导入该库。运行中目录缓存是待确认原因，完整 DMS 候选加载仍待验证。
-- 原有 13 文件插件已从完整备份恢复，字节校验与宿主重载通过；当前宿主运行原版本。候选包仅用于未发布集成审阅，manifest 仍为 `1.0.0`，没有创建 `v1.2.0` tag 或 Release。
-- 真实 clipboard/folder、focus/layout、multi-widget/Desktop、refresh、locale、disable/enable/restart 等运行态门槛及既有 DMS State 写入问题仍待逐项确认，因此 task 1.2.4 和 v1.2 稳定发布保持未完成。
-- 证据：[综合验收矩阵](.trellis/tasks/10-08-v12-acceptance-release/acceptance-evidence.md)、[剩余宿主检查](.trellis/tasks/10-08-v12-acceptance-release/host-checklist.md)、[v1.2 候选说明](docs/releases/v1.2.0-candidate.md)。
+- 完整 Node 契约测试、JavaScript 语法、JSON、资源大小写及只读边界检查通过。用户手动验收后报告“看着没什么问题”，并明确要求归档、提交；该验收是用户报告，不替代未逐项记录的运行态证据。
+- 首次候选热重载的 `File name case mismatch` 失败与原插件恢复保留为历史记录。后续日志确认 17:21:10 widget/daemon 成功加载，IPC 当前返回 `loaded`，安装目录的 14 个文件与已检查候选逐字节一致；首次失败的根因仍未确认。
+- 已按用户要求归档 v1.2 父任务及四个子任务。manifest 仍为 `1.0.0`，没有创建 `v1.2.0` tag 或 Release；归档不代表稳定版已经发布，也不推断所有 clipboard/folder、focus/layout、多实例、restart/persistence 门槛均已通过。
+- 证据：[综合验收矩阵](.trellis/tasks/archive/2026-10/10-08-v12-acceptance-release/acceptance-evidence.md)、[逐项宿主检查](.trellis/tasks/archive/2026-10/10-08-v12-acceptance-release/host-checklist.md)、[归档说明](.trellis/tasks/archive/2026-10/10-08-v12-observation-search-navigation/closure.md)、[v1.2 候选说明](docs/releases/v1.2.0-candidate.md)。
 
 # v0（规划基线与范围冻结）
 

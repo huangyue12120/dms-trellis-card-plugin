@@ -34,3 +34,9 @@ After approval, dispatch Trellis implement/check agents sequentially. Each promp
 ## Rollback points
 
 The primary shared files are TrellisDaemon.qml, TrellisWidget.qml, trellisprojection.js, trellisPaths.js, and the contract harness. Verify each child before the next edits them. Roll back only the failing child's scoped changes; do not reset the workspace or overwrite PROJECT_PROGRESS.md.
+
+## User-requested close-out
+
+Overall manual acceptance was reported on 2026-10-08 and the user requested
+archival/commit. This closes task tracking; it does not claim all individual
+host cases or stable v1.2.0 publication passed. See the parent closure.md.

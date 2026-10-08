@@ -31,15 +31,15 @@ use the same daemon/widget/test files. The manifest stays `1.0.0`.
 - `README.md`
 - `docs/releases/v1.2.0-candidate.md`
 - `PROJECT_PROGRESS.md`: only the new top-level v1.2 execution-status block.
-- `.trellis/tasks/10-08-v12-observation-search-navigation/`: task metadata,
+- `.trellis/tasks/archive/2026-10/10-08-v12-observation-search-navigation/`: task metadata,
   approved plans/context, and research.
-- `.trellis/tasks/10-08-v12-recent-changes/`: task metadata, plans/context,
+- `.trellis/tasks/archive/2026-10/10-08-v12-recent-changes/`: task metadata, plans/context,
   implementation/check evidence.
-- `.trellis/tasks/10-08-v12-global-search/`: task metadata, plans/context,
+- `.trellis/tasks/archive/2026-10/10-08-v12-global-search/`: task metadata, plans/context,
   implementation/check evidence.
-- `.trellis/tasks/10-08-v12-quick-actions/`: task metadata, plans/context,
+- `.trellis/tasks/archive/2026-10/10-08-v12-quick-actions/`: task metadata, plans/context,
   clipboard research, implementation/check evidence.
-- `.trellis/tasks/10-08-v12-acceptance-release/`: task metadata, plans/context,
+- `.trellis/tasks/archive/2026-10/10-08-v12-acceptance-release/`: task metadata, plans/context,
   acceptance/host/final-check evidence and this commit plan.
 
 The roadmap's pre-existing 957 added lines are explicitly excluded. They remain

@@ -13,14 +13,17 @@ remain open for core lifecycle behavior and the retained Desktop, Simplified
 Chinese, and `!trellis` Launcher surfaces. In particular, Launcher search and
 selection have not yet been verified in the DMS Launcher UI.
 
-On 2026-10-08, the v1.2 hot reload failed to resolve its newly added JavaScript
-library despite matching disk/import case. The original installed plugin was
-restored and successfully reloaded. A fresh isolated Qt engine imports that
-exact library successfully; the full candidate still needs a fresh DMS load.
+On 2026-10-08, the first v1.2 hot reload failed and the original plugin was
+restored. A later manual reload succeeded: installed candidate bytes match
+the checked source, host logs confirm widget/daemon loading, and IPC reports
+`loaded`. The user reported that manual acceptance looked fine and requested
+task archival. Detailed host scenarios and restart persistence retain their
+individual evidence limits; the initial import failure's cause is unconfirmed.
 
 The v1.2 integration adds runtime Recent Trellis Changes, popout metadata
-search, and read-only copy/folder actions. Its supported-host acceptance and
-stable release remain open; the manifest has not been bumped to `1.2.0`.
+search, and read-only copy/folder actions. Overall manual acceptance is recorded
+as a user report; stable release remains open and the manifest has not been
+bumped to `1.2.0`.
 As of 2026-10-08, no v1.2 tag, GitHub Release, or DMS registry submission has
 happened.
 
@@ -60,8 +63,8 @@ keyboard navigation, and layout still require supported-host acceptance.
 3. Enable or reload **Trellis DMS** in DMS Plugin settings. Restart DMS if its
    plugin scanner does not pick up the directory change or a newly added
    library is reported unavailable during hot reload. The running Qt loader's
-   directory cache is a suspected cause of the observed v1.2 failure; a full
-   supported-host restart has not verified that diagnosis.
+   directory cache was a suspected cause of the first v1.2 failure; the later
+   successful reload does not establish that diagnosis.
 4. To try the candidate Launcher surface, open the DMS Launcher and enter
    `!trellis` in its search field. The trigger and its interactions have not
    completed host acceptance yet.

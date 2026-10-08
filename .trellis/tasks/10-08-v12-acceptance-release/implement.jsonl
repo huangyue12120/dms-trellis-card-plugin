@@ -4,8 +4,8 @@
 {"file":".trellis/spec/frontend/archive-browsing-contract.md","reason":"Keep archive metadata independent, canonical, lazy, and bounded"}
 {"file":".trellis/spec/frontend/desktop-projection-contract.md","reason":"Regress shared Desktop and v1.1 Health views"}
 {"file":".trellis/spec/frontend/launcher-projection-contract.md","reason":"Preserve existing Launcher search/action behavior"}
-{"file":".trellis/tasks/10-08-v12-observation-search-navigation/research/implementation-evidence.md","reason":"Verified repository/host facts, provenance gap, read-only and release boundaries"}
-{"file":".trellis/tasks/10-08-v12-observation-search-navigation/research/ui-interaction-plan.md","reason":"Proposed popout UX gate, keyboard, partial-result, action-feedback contracts"}
+{"file":".trellis/tasks/archive/2026-10/10-08-v12-observation-search-navigation/research/implementation-evidence.md","reason":"Verified repository/host facts, provenance gap, read-only and release boundaries"}
+{"file":".trellis/tasks/archive/2026-10/10-08-v12-observation-search-navigation/research/ui-interaction-plan.md","reason":"Proposed popout UX gate, keyboard, partial-result, action-feedback contracts"}
 {"file":".trellis/spec/frontend/recent-changes-contract.md","reason":"Preserve verified observation/provenance/complete archive coverage and reliable baseline contracts"}
 {"file":".trellis/spec/frontend/global-search-contract.md","reason":"Preserve checked metadata lifecycle, fresh-root/detail authority, complete-page budgets and identity handoff"}
 {"file": ".trellis/spec/frontend/quick-actions-contract.md", "reason": "Preserve identity-only actions, fresh authority/canonical/JSON validation, separated argv, encoded URLs, owned request consumption and local feedback"}

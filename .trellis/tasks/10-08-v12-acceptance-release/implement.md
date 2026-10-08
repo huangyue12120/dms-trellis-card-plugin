@@ -10,7 +10,7 @@
 - [x] Update executable specs, README/release notes, and source-backed PROJECT_PROGRESS.md completion markers.
 - [ ] Build/inspect candidate ZIP and validate version/tag/source/package contracts.
 - [ ] Release v1.2.0 only after all required gates pass; otherwise preserve explicit incomplete stable-release status.
-- [ ] Follow commit/finish/archive workflow for actually completed deliverables.
+- [x] Follow commit/finish/archive workflow for user-approved deliverables, preserving the outstanding release evidence limits.
 
 ## File responsibility
 
@@ -24,7 +24,7 @@ Acceptance evidence in this child; v1.2 release notes/package automation; necess
 
 Check the implementation diff before release metadata, inspect the local package before any tag/publication, and retain evidence of failed/unverified gates. Do not create a stable tag to bypass an unavailable host check.
 
-## Execution status
+## Execution status before manual acceptance
 
 All feature repository checks passed. Main final fixture/static checks passed.
 Real candidate hot reload failed at the new library import; installed baseline
@@ -34,3 +34,9 @@ Stable release, matching version decision/tag/publication, and archival remain o
 
 Local draft package is built and reproducibility/contents/version/workflow format
 checks passed. Actual release ancestry/tag/publish remains unexecuted.
+
+## User-requested close-out
+
+Overall manual acceptance was reported on 2026-10-08 and the user requested
+archival/commit. This closes task tracking; it does not claim all individual
+host cases or stable v1.2.0 publication passed. See the parent closure.md.

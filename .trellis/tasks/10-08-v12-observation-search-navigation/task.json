@@ -26,6 +26,11 @@
   ],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
-  "meta": {}
+  "notes": "Archived at the explicit user request after overall user-reported manual acceptance. Detailed host cases are not inferred as passed; stable v1.2.0 remains unreleased. See the parent closure.md and acceptance evidence.",
+  "meta": {
+    "archived_from_status": "planning",
+    "closure_kind": "user_requested_archival",
+    "acceptance_evidence": "User reported overall manual acceptance on 2026-10-08; installed candidate bytes and subsequent native load independently verified.",
+    "release_status": "v1.2.0 not released; manifest remains 1.0.0; detailed host/restart/tag/publication gates retain recorded limits."
+  }
 }
