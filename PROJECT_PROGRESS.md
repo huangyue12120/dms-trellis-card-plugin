@@ -1381,3 +1381,968 @@
 - [ ] v0.8 fixture/static 核心矩阵与安全证据已归档，DMS 1.6.2 核心 RC 检查有用户报告；本会话未独立复跑，性能/精确延迟未测，因此包含性能回归的完整 RC 门槛仍未关闭。
 - [ ] v0.9 Desktop、locale 和 Launcher 的 DMS host 检查仍未验证，状态记录在归档的 v1.0.2 acceptance evidence 中；Desktop 实例显示/重置、挂载目录选择和 archive warning 的静态实现及 Node 契约检查已通过，GUI 运行验收仍待完成；Launcher 的导入和根对象错误已修复，最新启动日志显示 bar/daemon 已加载，但需在 DMS Launcher UI 中输入触发词完成复验；其他项逐项通过或关闭/延期，且不成为核心启动依赖。
 - [x] v1.0 候选文档、权限、禁用/回滚路径和已知限制已与 manifest 和验收证据对齐；host acceptance 仍是独立未关闭的发布门槛。
+
+---
+
+# Trellis DMS Plugin：v1.1+ 后续版本任务清单
+
+> 项目：`dms-trellis-card-plugin`  
+> 承接版本：`v1.0 Stable / RC`  
+> 文档用途：在 v1.0 核心能力冻结后，继续规划可诊断性、导航效率、可选通知与实验性 Agent Activity 能力。  
+> 总体原则：后续版本不得破坏 `read-only Trellis observer`、共享 Snapshot、无 Trellis 写操作、无强制 Agent hooks 的核心边界。
+
+---
+
+# 路线图使用约定
+
+- `v1.0` 冻结 P0/P1 稳定基线。
+- `v1.1+` 仅在保持只读 Trellis observer 和共享 Snapshot 架构的前提下增加可诊断性、导航效率和可选扩展。
+- 新增 surface / provider 仍必须先经过对应 UI / Product / Security Gate。
+- 新功能不得反向扩大已经冻结的 v1.0 core contract。
+- 每个版本继续按照 `planning → implementation → verification → archive` 的方式执行。
+- 未经真实 DMS host 验收的行为不得标记为已完成。
+- `Agent Activity` 不属于默认主线能力，除非后续证据足够充分。
+
+---
+
+# v1.1（Health、Diagnostics 与异常体验完善）
+
+## 版本目标
+
+在不改变 Trellis-only、只读 observer 和共享 Snapshot 架构的前提下，把当前以 raw warning / error 为主的异常展示升级为用户可理解、可定位、可复制诊断信息的 Health & Diagnostics 体系。
+
+本版本重点解决：
+
+```text
+插件能发现错误
+        ↓
+升级为
+        ↓
+用户能理解哪里出了问题
+        ↓
+知道当前数据是否仍可信
+        ↓
+能够提供足够诊断信息进行排查
+```
+
+v1.1 不增加新的 Trellis 数据能力，也不扩大插件权限。
+
+## 该版本细分 tasks
+
+### task 1.1.1：Health Incident 聚合与 Snapshot Freshness
+
+#### 任务目标
+
+在保留现有 raw warning / error 的基础上增加用户层 Health Incident projection，将多个由同一根因产生的 warning 合并为可理解的问题，并明确当前界面正在展示实时 Snapshot 还是 last-good Snapshot。
+
+#### 设计原则
+
+- raw warning / error 是诊断事实，不删除、不篡改。
+- user-facing incident 是 projection，不反向改变 parser 数据。
+- 不把多个派生 warning 误导成多个独立故障。
+- freshness 只描述 Snapshot 数据时效性，不推断 Agent 是否活动。
+- 不使用 task mtime、Markdown mtime 或 session mtime 冒充“实时状态”。
+- last-good Snapshot 必须明确标记，不能与正常实时 Snapshot 看起来完全相同。
+
+#### 要求实现
+
+- 新增独立的 Health Incident projection，至少能够按 project / root 和根因聚合：
+  - `task_discovery_failed`
+  - `session_discovery_failed`
+  - `archive_discovery_failed`
+  - permission / read failure
+  - malformed data
+  - discovery limit
+  - last-good fallback
+- 将以下内容分层保存：
+  - 根因
+  - 用户影响
+  - 当前 fallback 行为
+  - raw warning code
+- `last_good_snapshot` 不单独作为“又一个故障”重复计数，而作为当前 incident 的 degradation / fallback 状态展示。
+- Snapshot runtime metadata 至少提供：
+  - current scan time
+  - last successful discovery time
+  - whether current snapshot is live/current
+  - whether last-good fallback is active
+- UI 能展示类似：
+
+```text
+⚠ 2 个项目需要注意
+
+AI-Trading-Pipeline
+无法读取实时任务目录
+当前正在显示上一次有效状态
+最后成功刷新：3 分钟前
+```
+
+- 对于仍然完全健康的其他 project，不因为单项目失败而整体标红。
+- 保留进入 raw diagnostics 的路径。
+
+#### 不要实现
+
+- 不删除现有 raw warnings。
+- 不把所有 warning 简单按字符串去重。
+- 不根据时间间隔推断 Agent hung / stuck。
+- 不把 task mtime 当 Snapshot freshness。
+- 不增加网络、hooks 或外部 daemon。
+- 不修改 `.trellis/`。
+- 不因为 incident aggregation 隐藏真实 parser / resolver 错误。
+
+#### 验收标准
+
+- 同一 discovery 根因产生多个 raw warnings 时，用户界面可聚合为一个 incident。
+- raw warning 数量与 user-facing incident 数量可以不同，且两者都可查看。
+- 单 project 失败不会让健康 project 消失。
+- last-good fallback 激活时界面明确提示。
+- 能显示最后一次成功 discovery 的时间。
+- recovery 后 incident 自动消失或进入 recovered 状态，不残留错误红标。
+- incident aggregation 不改变原 Snapshot 中的 task / session / project 数据。
+- fixture 覆盖：healthy、one-project degraded、multi-warning same root cause、multiple independent failures、last-good fallback、recovery。
+- 不增加任何 Trellis 写操作。
+
+#### 实现边界、前后 task 依赖
+
+- 依赖 v1.0 已冻结的 Snapshot、warning / error 和 last-good recovery contract。
+- 本 task 只增加 runtime metadata 和 presentation projection。
+- 若需要扩展 schema，必须 bump schema version 并保留旧字段兼容。
+- 完成后供 task 1.1.2 Diagnostics Center 与 task 1.1.3 Desktop Health View 使用。
+
+---
+
+### task 1.1.2：About / Diagnostics Center 与脱敏诊断导出
+
+#### 任务目标
+
+提供统一的只读诊断页面，让用户和维护者无需翻 DMS 日志即可了解插件版本、宿主环境、项目健康状态、当前 Snapshot 状态及主要错误，并能复制一份默认脱敏的诊断摘要用于 GitHub Issue。
+
+#### 设计原则
+
+- Diagnostics 以“帮助排错”为目的，不演变为系统管理面板。
+- 默认最小暴露用户信息。
+- 路径、用户名和 Markdown 内容默认不进入复制诊断。
+- 显示“已验证事实”，不把无法检测的信息填成假值。
+- Diagnostics 自身只消费现有 Snapshot / runtime metadata，不另开 watcher。
+
+#### 要求实现
+
+- 提供 About / Diagnostics 入口。
+- 至少展示：
+  - plugin version
+  - DMS version（若 API 可可靠获得）
+  - Quickshell / Qt version（若可靠获得）
+  - detected Trellis versions
+  - loaded project count
+  - healthy / degraded project count
+  - active task / session count
+  - current Snapshot state
+  - last successful scan
+  - current raw warning / error count
+  - user-facing incident count
+  - enabled capabilities / surfaces
+- 提供 project-level diagnostics：
+  - project display name
+  - detected Trellis version
+  - health
+  - incident summary
+  - last successful read
+- 提供 `Copy diagnostics`。
+- 默认不复制：`$HOME`、用户名、绝对项目路径、task Markdown 内容、session 内容、未经确认的敏感环境变量。
+- 如未来需要 full diagnostics，必须单独由用户主动选择。
+
+#### 不要实现
+
+- 不自动上传 diagnostics。
+- 不发送 telemetry。
+- 不自动创建 GitHub Issue。
+- 不读取无关系统信息。
+- 不记录 prompt / assistant / tool I/O。
+- 不以 Diagnostics 页面为理由增加 filesystem 权限。
+- 不把无法获取的 DMS / Trellis 版本猜出来。
+
+#### 验收标准
+
+- 正常状态下 About 页面能稳定打开。
+- degraded Snapshot 下 Diagnostics 仍可使用。
+- copy diagnostics 输出中不包含真实绝对项目路径和用户名。
+- 未知版本显示 `unknown` / `unavailable`，不伪造。
+- raw warning 与 incident summary 可以对应回当前 Snapshot。
+- 多 project 时不会混淆错误归属。
+- Diagnostics 不创建额外 watcher / timer。
+- restart 后不会保留无效 transient incident。
+
+#### 实现边界、前后 task 依赖
+
+- 依赖 task 1.1.1。
+- 继续遵循 v1.0 privacy 和 permission contract。
+- 输出只用于人工复制，不新增网络行为。
+
+---
+
+### task 1.1.3：Desktop Overview / Tasks / Health 三种视图模式
+
+#### 任务目标
+
+让 Desktop Widget 从固定的“一种综合布局”升级为可按实例选择用途的只读视图，同时继续共享同一个 daemon Snapshot。
+
+支持：
+
+```text
+Overview
+Tasks
+Health
+```
+
+#### 设计原则
+
+- 一个 Desktop instance 只是一种 Snapshot projection。
+- 多 Desktop instance 不得增加 watcher 或 filesystem scan。
+- View mode 是 UI preference，不进入 Trellis domain model。
+- 不为了塞更多内容破坏桌面 widget 的可读性。
+- instance preference 与全局设置分离。
+
+#### 要求实现
+
+`Overview`：
+- 展示项目总数。
+- 展示 active task 摘要。
+- 展示 health summary。
+- 保留当前简洁的 project / task 展示方式。
+
+`Tasks`：
+- 以 active task 为核心。
+- 按 project 分组。
+- 展示 task title、display state、priority、active session count。
+- 不显示大段 warning。
+
+`Health`：
+- 展示 healthy / degraded project summary。
+- 展示 incident。
+- 展示 last successful scan。
+- 展示 last-good state。
+- 不重复完整 task 列表。
+
+同时：
+- 每个 Desktop instance 独立保存 view mode。
+- resize 时沿用现有响应式规则。
+- 小尺寸下优先信息降级，而不是文字重叠。
+- 不存在 task 时 Tasks view 有明确 empty state。
+- 全部项目健康时 Health view 有明确 healthy state。
+
+#### 不要实现
+
+- 不让 Desktop 自己读取 `.trellis/`。
+- 不复制 Markdown viewer。
+- 不实现 task 管理操作。
+- 不创建第二套 Health parser。
+- 不增加独立 daemon。
+- 不让每个 widget instance 有自己的 scan interval。
+
+#### 验收标准
+
+- 同时放置两个 Desktop widget，可分别选择 `Tasks` 和 `Health`。
+- 两实例消费同一 Snapshot。
+- 更换 view mode 不触发 filesystem rescan。
+- DMS restart 后实例设置按已验证的 State 语义恢复。
+- 删除一个实例不会影响另一实例。
+- Overview / Tasks / Health 在 minimum / default / larger size 下均无严重溢出。
+- 中文和英文均完成布局复验。
+- degraded / recovery 状态能同步更新到 Health view。
+
+#### 实现边界、前后 task 依赖
+
+- 依赖 task 1.1.1。
+- 复用 v0.9 Desktop component、v1.0 State contract 和现有响应式布局。
+- 不修改 parser。
+
+---
+
+### task 1.1.4：v1.1 Host Acceptance、回归与发布
+
+#### 任务目标
+
+验证 Health、Diagnostics 和 Desktop view modes 在真实 DMS host 中工作，并确认新增能力没有破坏 v1.0 核心只读 observer 行为。
+
+#### 要求实现
+
+真实检查至少覆盖：normal Snapshot、degraded project、last-good fallback、recovery、Diagnostics 页面、Copy diagnostics、Desktop Overview、Desktop Tasks、Desktop Health、双 Desktop instance、DMS restart、locale 切换、plugin disable / enable。
+
+同时回归：bar widget、popout、archive、Markdown、project filter、pin、Launcher、Settings、multi-project。
+
+#### 不要实现
+
+- 不在 release acceptance 阶段临时增加新功能。
+- 不因 UI 不美观修改 core parser contract。
+- 不将未测试环境写入兼容承诺。
+
+#### 验收标准
+
+- v1.0 核心回归全部通过。
+- Health Incident 与 raw warning 对应正确。
+- Diagnostics 默认脱敏。
+- Desktop 多实例无重复 watcher。
+- restart 后状态符合 State contract。
+- 无新的权限需求。
+- release notes 明确新增内容和已知限制。
+
+#### 实现边界、前后 task 依赖
+
+- 依赖 1.1.1～1.1.3。
+- 通过后发布 `v1.1.0`。
+- 未通过项修复留在 v1.1.x，不提前开始 v1.2 feature work。
+
+---
+
+# v1.2（Recent Changes、搜索与导航效率）
+
+## 版本目标
+
+在保持 read-only 的前提下，让插件从“查看当前 Snapshot”进一步具备“理解最近 Trellis 状态变化”和“快速找到目标 task / project”的能力。
+
+本版本仍不尝试回答：
+
+```text
+Agent 此刻正在做什么？
+```
+
+而只回答：
+
+```text
+从插件实际观测到的 Trellis Snapshot 看，
+最近发生了哪些状态变化？
+```
+
+## 该版本细分 tasks
+
+### task 1.2.1：Recent Trellis Changes
+
+#### 任务目标
+
+通过连续 Snapshot 的确定性 diff，形成近期 Trellis 状态变化事件流。
+
+#### 设计原则
+
+- Recent Changes 是“观察到的数据变化”，不是 Agent Activity。
+- 不从 mtime 猜测语义。
+- 不把 task 消失直接解释为“完成”。
+- 只有有明确 archive / status evidence 时才展示对应语义。
+- Event 必须能够追溯到前后 Snapshot。
+
+#### 要求实现
+
+至少识别：
+- project discovered
+- project unavailable / recovered
+- task discovered
+- task stored status changed
+- task display state changed
+- session attached / detached
+- active session count changed
+- archive item newly observed
+- primary / pin projection changed（标记为 UI selection，而不是 Trellis data change）
+- health degraded / recovered
+
+事件建议包含：
+
+```text
+event_id
+observed_at
+project_id
+task_id?
+event_type
+before?
+after?
+source_snapshot_generation
+```
+
+- 使用有界 ring buffer。
+- 首版默认只保留 runtime recent history。
+- restart 后可清空，不要求持久化。
+- 显示标题 `Recent Trellis Changes`，而不是 `Agent Activity`。
+
+#### 不要实现
+
+- 不记录 prompt。
+- 不记录 AI response。
+- 不记录 tool calls。
+- 不推断“Agent 正在思考”。
+- 不推断“任务卡死”。
+- 不把 task disappearance 自动写成 completed。
+- 不建立长期用户行为数据库。
+
+#### 验收标准
+
+- 两个连续 Snapshot 的确定性变化产生稳定 event。
+- 相同 Snapshot 不重复产生 event。
+- daemon reload 不产生大量伪变化。
+- project 暂时读取失败不会把全部 task 错误标记为 deleted。
+- recovery 不产生错误的 task recreation 历史。
+- ring buffer 有明确容量上限。
+- Recent Changes 不增加 filesystem watchers。
+
+#### 实现边界、前后 task 依赖
+
+- 依赖 v1.1 Health 状态和现有 Snapshot generation。
+- 完全位于 daemon Snapshot-diff 层。
+- 不改变 Trellis parser 事实层。
+
+---
+
+### task 1.2.2：Global Task / Project Search
+
+#### 任务目标
+
+在 popout 中提供统一搜索，减少多 project、多 task 和 archive 增长后的导航成本。
+
+#### 设计原则
+
+- 首版搜索 metadata，不默认全文索引 Markdown。
+- live 数据优先即时搜索。
+- archive 继续遵守 lazy-load 和资源上限。
+- Search 不改变 project filter / pin，除非用户明确选择结果。
+
+#### 要求实现
+
+至少支持搜索：
+
+```text
+project name
+task title
+task id
+```
+
+Scope：
+
+```text
+Live
+Archive
+All
+```
+
+- search result 必须显示 project context。
+- task title 相同不能混淆。
+- archive 搜索不得一次无界读取全部 Markdown。
+- 支持 keyboard navigation（若 DMS surface API 已有稳定模式）。
+- 清空搜索立即回到当前 projection。
+- Search result selection 可进入已有 task detail。
+
+#### 不要实现
+
+- 不做全盘 `$HOME` 搜索。
+- 不默认索引 Markdown 正文。
+- 不调用外部 `grep` / `fd` / `ripgrep` 作为硬依赖。
+- 不把搜索结果写回 State 作为 Trellis 数据。
+- 不引入独立数据库。
+
+#### 验收标准
+
+- 多 project 同名 task 可正确区分。
+- live / archive scope 正确。
+- 空查询不会触发昂贵 archive 全量读取。
+- 大量 archive fixture 下受现有数量 / 大小上限保护。
+- malformed archive 不击穿搜索 UI。
+- 搜索不改变 parser Snapshot。
+
+#### 实现边界、前后 task 依赖
+
+- 依赖 v0.7 archive lazy-load、安全 resolver 与 v1.0 detail view。
+- 与 task 1.2.1 松耦合。
+
+---
+
+### task 1.2.3：只读导航 Quick Actions
+
+#### 任务目标
+
+为 task / project 提供高频的只读导航和复制操作，而不把插件升级为 Trellis 管理器。
+
+#### 要求实现
+
+首版优先：
+
+```text
+Copy task ID
+Copy project/task path
+Open task folder
+Open project folder
+```
+
+可评估：
+
+```text
+Open in terminal
+Open in VS Code
+```
+
+但只有目标 DMS / Linux 环境已有稳定、安全且可配置的 launcher contract 时才进入实现。
+
+所有 path action：
+- 必须经过现有 safe resolver。
+- 必须位于可信 project root。
+- archive 仍保持 read-only。
+- traversal / symlink escape 必须拒绝。
+
+#### 不要实现
+
+- 不修改 task。
+- 不执行 Trellis `start` / `finish` / `archive`。
+- 不删除文件。
+- 不打开未经 resolver 验证的 arbitrary path。
+- 不硬编码 VS Code 为必需依赖。
+- 不拼接用户可控 shell 字符串。
+
+#### 验收标准
+
+- Copy task ID 与 UI 展示一致。
+- Copy path 使用规范化安全路径。
+- 非可信路径无法通过 Quick Action 打开。
+- 无外部 launcher 时核心插件行为不受影响。
+- 所有 action 失败均为局部错误，不影响 Snapshot。
+
+#### 实现边界、前后 task 依赖
+
+- 依赖统一 safe resolver。
+- “Open in terminal/editor”属于可选增强，证据不足则只交付 copy / open-folder。
+
+---
+
+### task 1.2.4：v1.2 综合验收与发布
+
+#### 任务目标
+
+验证 Recent Changes、Search 和 Quick Actions 在多 project 与异常状态下不会产生错误语义或破坏安全边界。
+
+#### 验收标准
+
+- Snapshot 不变时无重复 Recent Change。
+- degraded / recovery 不制造虚假 task completed。
+- Search 可处理 live / archive。
+- Quick Actions 均通过 resolver。
+- 所有新功能在无 archive、无 active task、未知 Trellis status 下可降级。
+- v1.1 Health / Diagnostics 和 v1.0 core regression 全部通过。
+- 无新增网络行为。
+- 无 Trellis 写操作。
+- 发布 `v1.2.0`。
+
+---
+
+# v1.3（Notifications 与可选 Surface Product Gate）
+
+## 版本目标
+
+评估并仅实现具有明确增量价值的主动通知和额外 DMS surface；避免因为“DMS 支持某个 surface”而机械增加功能。
+
+本版本采用：
+
+```text
+Product Gate first
+Implementation second
+```
+
+没有明确用户价值的功能允许结论为 `DEFER`，而不是为了填满版本必须实现。
+
+## 该版本细分 tasks
+
+### task 1.3.1：Health Notification
+
+#### 任务目标
+
+为真正需要用户注意的项目健康变化提供低噪声、可关闭的通知。
+
+#### 设计原则
+
+第一版优先通知：
+
+```text
+Project became degraded
+Project recovered
+```
+
+而不是所有 task / session 变化。
+
+#### 要求实现
+
+- Notifications 默认关闭或采用明确 opt-in。
+- 支持至少：project degraded、project recovered。
+- 建立 dedup / cooldown。
+- 同一 incident 持续存在时不反复发送。
+- recovery 只有此前存在对应 incident 时才通知。
+- 点击通知如 DMS API 支持，可打开 Health / Diagnostics。
+- 设置中可独立禁用。
+
+#### 不要实现
+
+- 不对每个 watcher event 发通知。
+- 不对每次 session count 变化发通知。
+- 不发送 Markdown / task 内容。
+- 不使用外部 push service。
+- 不默认发送桌面以外通知。
+- 不把“长时间无变化”定义为故障。
+
+#### 验收标准
+
+- 同一持续故障只产生一次 degraded notification。
+- recovery 只产生一次。
+- restart 不重复轰炸旧 incident。
+- notification disabled 时完全无通知副作用。
+- notification failure 不影响核心 observer。
+
+---
+
+### task 1.3.2：Task Change Notification 可行性与噪声评估
+
+#### 任务目标
+
+基于 v1.2 Recent Changes 的真实使用数据，评估是否需要为少数 Trellis 状态变化提供通知。
+
+可能候选：
+
+```text
+task entered archive
+new active task observed
+```
+
+但只有在用户价值和低噪声可证明时才实现。
+
+#### 不要实现
+
+- 不默认对所有 task changes 发通知。
+- 不根据 inferred activity 发通知。
+- 不把 notification 当 workflow engine。
+- 不替代 Trellis 自身可能已有的工作流能力。
+
+#### 验收标准
+
+task 可以以以下任一结论关闭：
+
+```text
+IMPLEMENT LIMITED SET
+DEFER
+REJECT
+```
+
+`DEFER` / `REJECT` 均视为有效产品结论。
+
+---
+
+### task 1.3.3：Control Center Product Gate
+
+#### 任务目标
+
+重新评估 Control Center 是否提供 Bar / Popout / Desktop / Launcher 无法覆盖的独特用户价值。
+
+#### 评估问题
+
+至少回答：
+- 用户什么场景需要 Control Center？
+- 为什么 Popout 或 Desktop Health 不能解决？
+- 是否需要新的 projection？
+- 是否增加长期维护成本？
+- 是否产生与 DMS Control Center UX 不一致的问题？
+- 能否在不增加 scanner / watcher 的情况下实现？
+
+只有存在明确用途时，才进入新的 UI Gate。
+
+合理候选用途例如：
+
+```text
+Health summary
+Recent Changes
+Quick Settings / Diagnostics entry
+```
+
+#### 不要实现
+
+- 不因为规格曾经列过 Control Center 就自动实现。
+- 不复制完整 Desktop。
+- 不复制完整 Popout。
+- 不增加 parser。
+- 未通过 Product Gate 不写生产 QML。
+
+#### 验收标准
+
+输出明确结论：
+
+```text
+APPROVE
+DEFER
+REJECT
+```
+
+若批准，另开后续独立 implementation task；本 task 本身只负责 Product Gate。
+
+---
+
+### task 1.3.4：v1.3 Release / Defer Decision
+
+#### 任务目标
+
+对 Notifications 和 Control Center 的实际交付范围进行冻结。
+
+#### 验收标准
+
+- Health Notification 若实现，有真实 DMS host 验证。
+- optional notification 不影响核心。
+- Control Center 若未通过 gate，不出现在 manifest。
+- 无新增 Trellis write 权限。
+- release notes 清楚区分 implemented / deferred / rejected。
+- 有实际功能交付时发布 `v1.3.0`；如果所有候选均被延期，则无需人为制造一个空版本。
+
+#### v1.3 当前执行状态（2026-10-09）
+
+- [x] `task 1.3.1` 已实现默认关闭的 Health degraded/recovered 通知、去重、cooldown、隐私边界和失败隔离；纯 helper、静态检查和 Node 契约测试通过。
+- [ ] `task 1.3.1` 的 DMS 1.6.2 host popup、启用/禁用、重启静默、恢复和进程失败隔离仍未验证；不得据此宣称稳定发布。
+- [x] `task 1.3.2` Task Change Notification Gate：`DEFER`；Recent Changes 已覆盖被观察的语义变化，暂无使用证据证明主动提醒值得增加噪声。
+- [x] `task 1.3.3` Control Center Product Gate：`DEFER`；Desktop Health、Popout、Recent Changes、Diagnostics 和 Launcher 已覆盖候选场景，不新增 QML、manifest surface、scanner 或 watcher。
+- [x] `task 1.3.4` 已记录 v1.3 candidate release/defer notes；manifest 仍为 `1.0.0`，无 tag、registry 提交或 stable `v1.3.0` 发布。
+
+---
+
+# v1.4（Agent Activity Provider Experimental Gate，可选）
+
+> 本版本不是既定必做路线。  
+> 只有外部 provider 的协议、部署、隐私、任务映射和故障隔离证据发生实质变化时才启动。
+
+## 版本目标
+
+重新验证 Linux Agent Activity Provider 是否已经具备足够稳定的事实基础，使插件可以**可选地**展示真实 Agent runtime activity，同时保证：
+
+```text
+Agent Activity unavailable
+        ↓
+Trellis DMS core remains fully functional
+```
+
+任何 Agent activity 都必须是显式 opt-in、可关闭、非 P0 / P1 依赖。
+
+## 该版本细分 tasks
+
+### task 1.4.1：Activity Provider 证据刷新与 Go / No-Go Gate
+
+#### 任务目标
+
+重新调查：
+- Linux provider / daemon 是否真实存在并可部署
+- protocol 是否稳定
+- reconnect 语义
+- lifecycle
+- process ownership
+- task / project mapping
+- permission model
+- privacy model
+- agent support matrix
+
+#### 设计原则
+
+- 以当前真实源码、协议和运行结果为准。
+- 不因为 v0.9.4 曾经评估过就复用旧结论。
+- 不把 macOS implementation 当 Linux 事实。
+- Evidence 不够即 `NO-GO`。
+
+#### 验收标准
+
+必须明确输出：
+
+```text
+GO
+或
+NO-GO
+```
+
+只有 `GO` 才允许 task 1.4.2 开始。
+
+---
+
+### task 1.4.2：Optional Activity Provider Contract 与隔离 Adapter
+
+#### 任务目标
+
+若 1.4.1 为 GO，为外部 runtime activity 建立独立 provider boundary。
+
+统一内部对象例如：
+
+```text
+ActivityEvent
+ActivitySnapshot
+```
+
+至少明确：
+
+```text
+provider
+agent
+project?
+task?
+runtime_state
+observed_at
+confidence/mapping_status
+```
+
+#### 设计原则
+
+- Trellis Snapshot 与 Activity Snapshot 严格分开。
+- 没有可靠 mapping 时显示 unmapped，而不是猜 task。
+- provider failure 不污染 Trellis health。
+- runtime activity 不写回 Trellis。
+
+#### 不要实现
+
+- 不把 Agent runtime state 当 task storedStatus。
+- 不自动修改 agent 配置。
+- 不持久化 prompt / assistant / tool payload。
+- 不捕获 credentials。
+- 不让 provider 成为插件启动依赖。
+
+#### 验收标准
+
+- provider 断开后 core UI 正常。
+- mapping failure 不错误关联 task。
+- provider disable 后行为等同 Trellis-only。
+- permission / privacy 文档完整。
+
+---
+
+### task 1.4.3：Agent Activity UI Experimental Surface
+
+#### 任务目标
+
+如果 provider contract 和真实运行均通过，再增加独立、明确标识为 Activity 的 UI，而不污染 Trellis task 状态。
+
+可能显示：
+
+```text
+Codex
+● running
+Mapped task: xxx
+
+Claude
+○ waiting
+
+OpenCode
+? unmapped
+```
+
+#### 不要实现
+
+- 不显示 prompt 内容。
+- 不显示模型回复正文。
+- 不显示 tool I/O payload。
+- 不将 runtime activity 合并进 `progress`。
+- 不把 waiting 等价为 blocked。
+- 不将 disconnected 等价为 task stopped。
+
+#### 验收标准
+
+- UI 明确区分 Trellis State 与 Agent Activity。
+- provider offline 有单独状态。
+- unmapped agent 不强制关联 task。
+- Trellis-only 模式与 v1.3 行为完全一致。
+
+---
+
+### task 1.4.4：Experimental Release Decision
+
+#### 任务目标
+
+根据隐私、安全、稳定性和实际价值决定 Agent Activity 是否：
+
+```text
+保持 experimental
+正式进入主线
+继续延期
+完全放弃
+```
+
+#### 验收标准
+
+- 有真实 host evidence。
+- 无 prompt / tool payload 泄漏。
+- 无强制 hooks。
+- provider 不影响 core startup。
+- Trellis-only regression 全部通过。
+- 如果仍存在协议或 mapping 不稳定，保持 experimental，不进入默认安装路径。
+
+---
+
+# post-v1.x Backlog（暂不分配版本）
+
+以下内容暂时只保留为候选，不提前建立 implementation task：
+
+```text
+更复杂的历史 Recent Changes 持久化
+Markdown 全文搜索
+多用户 / 远程同步
+外部 telemetry
+网络 dashboard
+Trellis 写操作
+task start / finish / archive 操作
+Agent permission interaction
+prompt / tool 内容观察
+```
+
+其中尤其继续保持以下边界：
+
+```text
+Trellis DMS
+=
+read-only observer first
+```
+
+任何需要：
+
+```text
+修改 Trellis
+修改 Agent
+安装 hooks
+长期采集行为数据
+新增网络服务
+```
+
+的能力，都必须重新经过独立 Product / Privacy / Security Gate。
+
+---
+
+# 后续版本优先级建议
+
+| 优先级 | 内容 | 建议版本 |
+|---|---|---|
+| P0 | Health Incident grouping | v1.1 |
+| P0 | Snapshot freshness / last-good UX | v1.1 |
+| P0 | About / Diagnostics | v1.1 |
+| P1 | Desktop Overview / Tasks / Health | v1.1 |
+| P1 | Recent Trellis Changes | v1.2 |
+| P1 | Global Search | v1.2 |
+| P1 | Read-only Quick Actions | v1.2 |
+| P2 | Health Notifications | v1.3 |
+| P2 | Task Change Notifications | v1.3 Gate |
+| P2 | Control Center | v1.3 Product Gate |
+| Experimental | Agent Activity Provider | v1.4+ |
+
+---
+
+# 后续版本总原则
+
+后续迭代优先顺序应保持：
+
+```text
+先让异常可理解
+↓
+再让状态变化可观察
+↓
+再提升查找和导航效率
+↓
+再评估主动通知
+↓
+最后才考虑 Agent Runtime Activity
+```
+
+不要反过来为了增加“酷”的功能，破坏当前已经比较清晰的产品定位。
+
+最终长期定位继续保持：
+
+```text
+Trellis DMS
+=
+a reliable, read-only, low-overhead observer for Trellis state
+```
+

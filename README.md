@@ -27,6 +27,12 @@ bumped to `1.2.0`.
 As of 2026-10-08, no v1.2 tag, GitHub Release, or DMS registry submission has
 happened.
 
+The v1.3 candidate adds an opt-in, default-off Health notification projection
+for degraded and recovered transitions. Static and fixture checks pass, while
+supported DMS 1.6.2 notification delivery and failure-isolation scenarios
+remain unverified. Task Change notifications and a Control Center are deferred;
+the manifest remains `1.0.0` until the host/release gates pass.
+
 The candidate manifest declares these DMS permissions: `settings_read`,
 `settings_write`, and `process`. It does not declare network access. The
 package includes a bar widget/popout, Desktop widget, Simplified Chinese
@@ -101,7 +107,8 @@ The workflow does not submit the package to the DMS online plugin
 registry/search list. Registry requirements and publication remain separate
 and pending.
 
-See [the v1.2 integration notes](docs/releases/v1.2.0-candidate.md),
+See [the v1.3 candidate notes](docs/releases/v1.3.0-candidate.md),
+[the v1.2 integration notes](docs/releases/v1.2.0-candidate.md),
 [the v1.0.0 candidate notes](docs/releases/v1.0.0-candidate.md), and
 [local registry readiness](docs/registry-readiness.md) for acceptance and
 distribution details.

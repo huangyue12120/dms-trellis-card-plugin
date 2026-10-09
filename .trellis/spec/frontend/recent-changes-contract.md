@@ -150,3 +150,88 @@ if (_isCurrentDetail(context.generation, context.request.requestId))
 
 Search uses its own request guard before this same bridge. Neither consumer
 may feed search matches as if they were a complete archive page.
+
+## 8. Health Notification Consumer
+
+### 8.1 Scope / Trigger
+
+`TrellisDaemon.qml` may consume Health transition events after the existing
+Snapshot/Recent Changes publication. Notifications are an optional, runtime-only
+projection; they must not become a second observer or alter the shared
+Snapshot.
+
+### 8.2 Signatures
+
+```javascript
+createState() -> { initialized, scopes }
+observe(state, events, enabled, observedAt)
+  -> { state, requests }
+```
+
+`events` accepts only `health_degraded` and `health_recovered` records. Each
+request contains an internal scope key, event type, bounded display name, and
+observation timestamp. Scope state is capped at 33 project/global entries and
+stores independent degraded/recovered cooldown timestamps.
+
+### 8.3 Contracts
+
+- The first observation and every daemon restart establish a quiet baseline;
+  they never notify existing incidents.
+- A degraded transition sets the scope active and can emit once. A recovery
+  can emit only after that scope was active. Repeated same-kind transitions
+  are suppressed while active or inside the five-minute cooldown.
+- Disabled mode advances the baseline without producing requests. Missing or
+  malformed plugin data is treated as disabled.
+- The daemon passes only events from the current `source_snapshot_generation`.
+  It builds localized bounded text and invokes a fixed argv-only `dms notify`
+  process. No roots, IDs, task/session content, Markdown, network, Trellis
+  writes, watcher, or Snapshot warning may cross this boundary.
+- Process creation/exit failure is a local log outcome. Notification process
+  teardown occurs on disable, trusted-root scope change, and daemon destruction.
+
+### 8.4 Validation & Error Matrix
+
+| Condition | Required result |
+| --- | --- |
+| Initial/restart event history | Quiet baseline; no request |
+| Unknown event kind | Ignore; preserve observer state |
+| Disabled or invalid setting | Baseline advances; no process |
+| Repeated degraded/recovered event | Suppress according to active state/cooldown |
+| DMS process unavailable/non-zero | Log locally; publish Snapshot/Recent Changes normally |
+| Project ID `global` or prototype-like key | Keep project scope separate from fixed global scope |
+| More than 33 scopes | Ignore new scopes after the bounded cap |
+
+### 8.5 Good / Base / Bad Cases
+
+- Good: current-generation project degradation emits one bounded localized
+  request; recovery emits one later request after the incident clears.
+- Base: notifications remain disabled while Health and Recent Changes stay
+  fully functional.
+- Bad: replaying the entire Recent Changes ring on every publication, or
+  sending a project path/task title through the DMS command.
+
+### 8.6 Tests Required
+
+- Pure helper fixtures cover quiet startup/restart, degraded/recovery
+  transitions, duplicate suppression, cooldown, disabled mode, immutability,
+  scope cap, and reserved/prototype-like IDs.
+- Static daemon checks assert current-generation filtering, exact argv, no
+  shell wrapper/raw-content fields, settings default/reset/localization, and
+  publication ordering (`recentChangesVar.set` before the adapter call).
+- Supported-host checks must cover enabled/disabled behavior, restart quietness,
+  duplicate suppression, recovery, and adapter failure isolation; unavailable
+  host evidence remains explicitly unverified.
+
+### 8.7 Wrong vs Correct
+
+```javascript
+// Wrong: replays historical events and lets a project ID collide with global.
+notify(recent.events);
+scopes[event.project_id] = baseline;
+```
+
+```javascript
+// Correct: filter current generation and keep a reserved project prefix.
+observe(state, currentGenerationEvents, notificationsEnabled, Date.now());
+scopeKey = projectId ? "project:" + projectId : "global";
+```

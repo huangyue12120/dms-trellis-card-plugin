@@ -28,9 +28,15 @@ PluginService State keys:
 ```
 
 Plugin-data settings are `pillMode`, `showProgress`, `showArchive`,
-`versionWarning`, `scanRoots`, `topologyInterval`, and the existing
-`refreshToken`. `displayMode` is a read-only migration source when
+`versionWarning`, `scanRoots`, `topologyInterval`, `notificationsEnabled`, and
+the existing `refreshToken`. `displayMode` is a read-only migration source when
 `pillMode` is absent.
+
+`notificationsEnabled` is an explicit opt-in boolean with a safe default of
+`false`. It controls only the daemon's bounded Health notification adapter;
+toggling it must not start a scan, mutate Snapshot data, write Trellis files,
+or enable task/session/Markdown notifications. Restore Defaults writes
+`false`, and malformed or absent values are treated as disabled.
 
 Desktop instance settings use these DMS 1.6.2 fields and APIs:
 

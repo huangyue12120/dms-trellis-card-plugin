@@ -18,7 +18,8 @@ The Launcher surface uses the same DMS locale and plugin translation catalog.
 Search results keep project names, task titles, and unknown status values in
 their original form.
 
-This package is a v1.0.0 candidate. DMS 1.6.2 host acceptance is still pending
+This package is a v1.0.0 candidate with an unreleased v1.3 Health notification
+integration. DMS 1.6.2 host acceptance is still pending
 for core lifecycle behavior and the retained Desktop, locale, and Launcher
 surfaces; in particular, `!trellis` still needs to be tried in the DMS Launcher
 search field. See the repository [README](../README.md) for installation,
