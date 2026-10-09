@@ -252,7 +252,7 @@ Use `SelectionSetting` with visible labels:
   current daemon bounds inputs to 32 projects and 128 tasks per project; do not
   add another project/task cap or discard rows at the surface.
 - Active means `runtimeState === "active"`. It is a Trellis session-derived
-  state, not a new claim about Agent activity. Preserve `progress: null`.
+  state, not a new claim about external runtime activity. Preserve `progress: null`.
 - Show active-task count and live-task count per project. When there are no
   active tasks, say `No active session-backed tasks` while retaining the live
   task count.
@@ -325,7 +325,7 @@ older version as unverified.
   activity collection remain out of scope.
 
 The approved implementation contract is recorded in
-`.trellis/tasks/09-24-dms-v093-launcher-registry/launcher-ui-gate.md`.
+`.trellis/tasks/archive/2026-09/09-24-dms-v093-launcher-registry/launcher-ui-gate.md`.
 
 ## v0.7.3 Settings and State addendum
 

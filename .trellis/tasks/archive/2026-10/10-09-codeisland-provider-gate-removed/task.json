@@ -1,0 +1,29 @@
+{
+  "id": "v14-agent-activity-provider-gate",
+  "name": "v14-agent-activity-provider-gate",
+  "title": "v1.4 Agent Activity Provider Experimental Gate",
+  "description": "Refresh external provider evidence and decide whether optional Agent Activity work can proceed without weakening the Trellis-only core.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "huangyue12120",
+  "assignee": "huangyue12120",
+  "createdAt": "2026-10-09",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-09-v141-activity-provider-evidence",
+    "10-09-v141-evidence-gap-revalidation"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

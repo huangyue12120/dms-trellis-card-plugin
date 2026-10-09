@@ -1,0 +1,6 @@
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-evidence-removed/research/activity-provider-evidence-2026-10.md","reason":"Preserve the original v1.4.1 NO-GO evidence and compare every blocker without overwriting it."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gate-removed/research/v14-release-defer-note.md","reason":"Keep the parent release/defer consequence and reopen conditions consistent."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gap-removed/research/evidence-expansion-plan.md","reason":"Separate source/local evidence that can be supplemented from target-runtime evidence that cannot be inferred."}
+{"file":".trellis/spec/frontend/recent-changes-contract.md","reason":"Keep Agent Activity outside Trellis Recent Changes and task/completion semantics."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply read-only, canonical-path, bounded metadata, and no hooks/network/socket runtime boundaries."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/codeisland-linux.md","reason":"Historical Linux protocol provenance to compare with current upstream source, not reuse as current proof."}

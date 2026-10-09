@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/recent-changes-contract.md","reason":"Verify Agent Activity is not merged into Recent Changes, task status, completion, or deletion semantics."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify no provider introduces forbidden shell interpolation, network, hooks, sockets, unbounded data, or widget-owned readers."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gate-removed/research/current-provider-baseline.md","reason":"Verify provenance labels, current-shell limits, required evidence rows, and the conditional gate boundary."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-evidence-removed/research/activity-provider-evidence-2026-10.md","reason":"Verify the child report answers all v1.4.1 questions and ends with an explicit GO or NO-GO."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gate-removed/research/v14-release-defer-note.md","reason":"Verify the NO-GO consequence is documented without creating provider/UI implementation work."}

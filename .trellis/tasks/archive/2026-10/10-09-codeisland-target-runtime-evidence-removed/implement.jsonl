@@ -1,0 +1,6 @@
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gap-removed/research/evidence-gap-revalidation-2026-10.md","reason":"Preserves the eight-blocker baseline, prior NO-GO gate, source-vs-target-runtime boundary, and reopen evidence requirements."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-target-runtime-evidence-removed/research/target-runtime-preflight-2026-10.md","reason":"Records the current Fedora/DMS/niri host preflight, elevated read-only systemd and DMS IPC results, provider absence, and safety limits."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-target-runtime-evidence-removed/design.md","reason":"Defines evidence layers, blocker mapping, sandbox limitation handling, and non-invasive boundaries."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-target-runtime-evidence-removed/prd.md","reason":"Defines the user-approved read-only target-host scope and acceptance criteria."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gate-removed/research/v14-release-defer-note.md","reason":"Authoritative v1.4 NO-GO consequences and reopen conditions; no provider production surface is authorized."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Project read-only observer, no sockets/hooks/network/writes, runtime evidence classification, and validation boundaries."}

@@ -63,7 +63,7 @@ current project, the newest valid session-backed task, then a project/no-active
 fallback. Equal or missing session times keep Snapshot project/task order.
 
 `last_seen_at` is used only to break primary-selection ties. It is not displayed
-as Agent activity and never becomes progress. A pinned planning or inactive
+as external runtime activity and never becomes progress. A pinned planning or inactive
 task keeps its real state. `+N` counts additional active tasks; multiple
 sessions for one task remain a popout session count.
 

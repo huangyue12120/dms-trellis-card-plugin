@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/recent-changes-contract.md","reason":"Keep observed Trellis changes separate from future Agent Activity and forbid completion/deletion inference."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Preserve canonical path safety, bounded metadata, argv-only process rules, and no network/hooks/socket runtime surface before a gate passes."}
+{"file":".trellis/tasks/archive/2026-09/09-24-dms-v094-activity-eval/research/activity-provider-evaluation.md","reason":"Dated historical provider evidence and explicit gaps to re-check rather than silently reuse."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/codeisland-linux.md","reason":"Prior Linux source/protocol provenance, socket paths, and macOS/Linux separation."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gate-removed/research/current-provider-baseline.md","reason":"Current planning baseline, local-shell observations, and required v1.4.1 evidence matrix."}

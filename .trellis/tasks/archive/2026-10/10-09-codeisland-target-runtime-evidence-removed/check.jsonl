@@ -1,0 +1,6 @@
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-target-runtime-evidence-removed/prd.md","reason":"Acceptance criteria for host evidence, classifications, safety, and final disposition."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-target-runtime-evidence-removed/research/target-runtime-preflight-2026-10.md","reason":"Evidence provenance and scope limitations to verify against the final report."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-target-runtime-evidence-removed/design.md","reason":"Expected evidence layers and blocker mapping for quality review."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gap-removed/research/evidence-gap-revalidation-2026-10.md","reason":"Prior evidence report to ensure this task adds target-host facts without changing unsupported conclusions."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-target-runtime-evidence-removed/research/target-runtime-evidence-2026-10-09.md","reason":"Final target-host report to verify provenance, eight blocker classifications, safety claims, and exact NO-GO disposition."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gate-removed/research/v14-release-defer-note.md","reason":"Parent gate and no-implementation consequence to keep consistent."}

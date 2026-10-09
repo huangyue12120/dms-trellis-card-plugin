@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gap-removed/prd.md","reason":"Verify the report preserves the prior gate, covers every blocker, and forbids product implementation."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gap-removed/research/evidence-gap-revalidation-2026-10.md","reason":"Verify evidence labels, source/test versus target-runtime separation, blocker delta, and final disposition."}
+{"file":".trellis/spec/frontend/recent-changes-contract.md","reason":"Verify no provider evidence is represented as Trellis task status, progress, completion, or deletion."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify no install, hooks, network, socket writes, unbounded payloads, or widget-owned readers were added."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gate-removed/research/v14-release-defer-note.md","reason":"Verify any remaining blocker leaves the parent release decision deferred and reopen conditions explicit."}

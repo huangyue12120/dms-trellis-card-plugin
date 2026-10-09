@@ -4,7 +4,7 @@
 >
 > **最重要的一条规则**：本文档区分了「已核实事实」和「待验证假设」。凡标注 `[待验证]` 的内容，你**必须先实际查证**（读源码、跑命令、看文件），验证结果写入 `.trellis/tasks/<task>/research/` 后再动手实现。**禁止基于本文档的假设直接写代码**。
 >
-> **平台边界**：本项目的目标环境是 **Fedora 44 + niri + DankMaterialShell (DMS) + Wayland**。`payprays/codeIsland-dms` 是可参考的 Linux/DMS 项目；`rifqiakrm/code-island` 是 macOS/SwiftUI 项目，只能作为概念来源，**不得作为 Fedora/DMS 实现依据**。
+> **平台边界**：本项目的目标环境是 **Fedora 44 + niri + DankMaterialShell (DMS) + Wayland**。外部 Agent runtime、daemon 和 hooks 不属于本插件的产品依赖或实现范围。
 >
 > **UI/UX 门禁**：真实前端实现开始前，必须完成第 7 节的 UI/UX Design Gate。优先让用户指定的 `ui-ux-pro-max` 与 `taste` agent plugin/skill 基于真实数据状态和 DMS 约束统一设计，并由用户确认后再写最终 QML UI。
 >
@@ -46,26 +46,9 @@ Trellis 是一个 **AI 编码工程化框架 / agent harness**。它把项目规
 
 **本项目 P0/P1 的原则是只消费 Trellis 在工作目录中生成的数据文件，不链接或复制 Trellis 源代码。** 不在本技术规格中对许可证衍生关系作法律结论；若未来复用 Trellis 源码，再单独进行许可证审查。
 
-### 1.2 trellis-card（参考实现，非依赖）
+### 1.2 trellis-card（历史背景，非依赖）
 
-https://github.com/czm15053/trellis-card —— 一个 Tauri 2 + Rust 的跨平台桌面小工具，以「卡片」和「灵动岛胶囊」形态展示 Trellis 任务进度与 Agent 活动。
-
-**重要定位说明：**
-
-- 本项目**不是** trellis-card 的 fork，**不复用**它的任何代码（它的前端是原生 JS/CSS/GSAP，与 QML 零重叠）。
-- trellis-card 的价值在于：它是一份**功能参考**和**Agent hook 接入方案的参考实现**。当我们需要「Agent 实时活动」这类 `.trellis/` 文件里没有的数据时，去读它的 `src-tauri/` 源码学习做法。
-- ⚠️ **该仓库目前没有 LICENSE 文件**，属于「保留所有权利」状态。因此：**可以阅读学习其思路，禁止复制其代码片段**。如果最终需要复用其 hook 脚本或事件协议，必须先向作者提 issue 取得授权。
-
-它支持的 Agent 接入方式（作为参考）：
-
-| Agent | 接入位置 |
-|---|---|
-| Codex | `~/.codex/hooks.json` |
-| Claude Code | `~/.claude/settings.json` |
-| Cursor | `~/.cursor/hooks.json` |
-| Pi | `~/.pi/agent/extensions/` |
-| OpenCode | `~/.config/opencode/plugins/` |
-| DeepSeek Harness | `~/.config/trellis-card/agents/dsh-trellis-bridge/` |
+`trellis-card` 只作为历史产品背景保留。本项目不是它的 fork，不复用其代码、hooks、事件协议或 Agent runtime 数据；当前插件不依赖它，也不从它推导任何运行时功能。
 
 ### 1.3 DankMaterialShell / DMS（宿主平台）
 
@@ -80,38 +63,9 @@ https://github.com/czm15053/trellis-card —— 一个 Tauri 2 + Rust 的跨平�
 - 共享 QML 组件库：https://github.com/AvengeMedia/dank-qml-common
 - Quickshell 本体文档：https://quickshell.org/docs/
 
-### 1.4 关键 Linux 参考项目：codeIsland-dms
+### 1.4 外部 Agent Runtime（不在产品范围）
 
-https://github.com/payprays/codeIsland-dms
-
-**这是与本项目平台最接近的参考实现，应优先阅读。** 它明确面向 **Linux + Wayland + niri + DankMaterialShell**，当前仓库包含：
-
-```text
-plugin.json
-CodeIslandWidget.qml
-CodeIslandSettings.qml
-components/
-assets/
-lib/
-preview/
-linux-skeleton/
-```
-
-当前已核实的关键事实：
-
-- DMS 侧当前 manifest 是 `type: "widget"`，不是 composite；它证明了 bar widget + popout + settings 的实现方式。
-- QML 侧通过 Unix socket 消费 Linux daemon 的 `snapshot.full` / `snapshot.patch`，业务状态不塞进 QML。
-- `linux-skeleton/` 是 Python 编写的 **Linux/Wayland reference runtime**，包含 daemon、socket server、OpenCode/Codex/Claude adapter、可选 hook installer 和测试。
-- 默认 socket 约定是 `$XDG_RUNTIME_DIR/codeislandd.sock`，无 `XDG_RUNTIME_DIR` 时退化到用户隔离的 `/tmp/codeisland-<uid>/codeislandd.sock`。
-- 该仓库是 MIT，可作为 Linux/DMS 架构与 QML 模式参考；若直接复制代码，仍需遵守 MIT 版权声明要求。
-
-**必须与另一个项目区分：**
-
-- `https://github.com/rifqiakrm/code-island` 是原始 **macOS 14+ / SwiftUI + AppKit** 应用。
-- 它可以解释 Code Island 的交互理念和事件模型，但**不是 Fedora、Wayland、niri 或 DMS 的技术实现参考**。
-- 本项目不得因为 macOS Code Island 的行为而假设 Linux 上存在相同 daemon、hook installer、窗口系统或 IPC 语义。
-
-**我们与 codeIsland-dms 的差异**：它以 AI agent session 为中心；本项目以 **Trellis project / task / session pointer** 为中心。P0/P1 不依赖 CodeIsland daemon。P2 若要接入 Agent 实时活动，可研究它的 Linux daemon 协议，但必须先确认该 `linux-skeleton` 在用户机器上的部署和协议稳定性。
+本项目不接入外部 Agent runtime、provider、daemon、socket 或 hooks。插件只观察 Trellis 自身生成的 project、task、session 和 archive 数据；不因外部 Agent 是否安装或运行而改变启动、Snapshot、Health、Recent Changes 或设置行为。任何未来重新提出的外部运行时集成都必须先创建独立的产品、隐私与安全评审，不能从本规格直接推导实现。
 
 ## 2. 用户环境（目标运行环境）
 
@@ -138,7 +92,7 @@ linux-skeleton/
 
 ### 3.1 一句话目标
 
-做一个 DMS composite 插件，在 DankBar 上以 pill 形态显示 Trellis 当前项目/任务状态，点击展开 popout 查看多项目、多任务与 session；可选提供 desktop widget。**P0/P1 是纯只读 Trellis observer，Agent tool activity 属于后续独立增强。**
+做一个 DMS composite 插件，在 DankBar 上以 pill 形态显示 Trellis 当前项目/任务状态，点击展开 popout 查看多项目、多任务与 session；可选提供 desktop widget。**插件始终是纯只读 Trellis observer，不采集外部 Agent runtime activity。**
 
 ### 3.2 目标（按优先级）
 
@@ -152,7 +106,6 @@ linux-skeleton/
 | **P1** | Popout：项目筛选、live task 列表、多个 active session、父子关系、priority |
 | **P1** | Popout：按需读取 `prd.md` / `design.md` / `implement.md`，Markdown 基础渲染 |
 | **P1** | Archive 浏览（与 live tasks 分开） |
-| **P2** | Agent 实时活动（provider、tool、permission 等），必须通过独立 activity provider 设计 |
 | **P2** | Desktop widget |
 | **P2** | i18n（zh_CN + en） |
 | **P2** | Launcher surface（例如 `!trellis`） |
@@ -163,8 +116,8 @@ linux-skeleton/
 - ❌ **不复刻 trellis-card 的关联网络、规范地图等重量级全屏页面**。
 - ❌ **P0/P1 不修改任何 `.trellis/` 文件**；插件设置/state 写到 DMS 自己的命名空间。
 - ❌ **P0/P1 不安装 Agent hooks、不修改 Codex/Claude/OpenCode 配置**。
+- ❌ **不实现外部 Agent runtime、provider、daemon、socket、hooks 或 Agent Activity UI**。
 - ❌ **不 fork trellis-card，不复制其无明确许可证的代码**。
-- ❌ **不把 macOS `rifqiakrm/code-island` 当成 Linux 实现参考**。
 - ❌ 首版不针对 Hyprland/Sway 做专门验收；若 DMS 抽象天然兼容可以工作，但目标环境仍是 Fedora 44 + niri。
 
 ### 3.4 设计原则
@@ -446,71 +399,13 @@ Trellis 支持 session-scoped active task。**同一仓库可能同时有多个 
 - 可以显示 status、active session 数或可解释的 checklist `x/y`；
 - 若采用 checklist 算法，必须在 UI/README 明确其含义是“implement checklist completion”，不是“Agent 总体完成百分比”。
 
-## 6. P2：Agent 实时活动 — 独立 Activity Provider 层
+## 6. 外部 Agent Runtime（明确排除）
 
-`.trellis/` 可以告诉我们任务和 session pointer，但不能可靠告诉我们“agent 此刻正在调用哪个 tool / 等权限 / 已停止”。**P0/P1 不解决这个问题。**
-
-### 路径 A：Trellis-only（默认、零副作用）
-
-只显示：
-
-- task stored/runtime state；
-- session pointer；
-- `recentlyChanged`（如果文件最近发生变化）。
-
-**禁止把 mtime 映射成“Agent 正在工作”。** 它只能表示 Trellis 数据最近变化。
-
-这是 P0/P1 的默认模式。
-
-### 路径 B：接入 `codeIsland-dms` 的 Linux daemon（P2 候选，需验证）
-
-这里指的是：
-
-- `payprays/codeIsland-dms`
-- 它的 `linux-skeleton/` Python daemon / adapters
-- `$XDG_RUNTIME_DIR/codeislandd.sock`
-
-**不是** macOS 的 `rifqiakrm/code-island`。
-
-Linux skeleton 已展示 OpenCode、Codex、Claude 的 adapter/hook + Unix socket 模型；DMS widget 消费 `snapshot.full` / `snapshot.patch`。它可以成为一个可选 activity source，但必须注意：
-
-- `linux-skeleton` 自己把定位写成 Phase 0 / reference skeleton，不能先验当作稳定公共 API；
-- 当前 codeIsland-dms manifest 是 widget，daemon 不是 DMS 自动内嵌 surface；用户是否实际运行 daemon 必须检测；
-- 我们只需要最小字段：provider、sessionId、cwd/project、event/tool、timestamp、permission state；
-- 默认**不采集、不持久化 prompt、assistant text、tool input/output**；
-- 必须验证如何把 CodeIsland session 的 cwd/session 映射到 Trellis project/task；
-- socket 不存在时无错误降级到 Trellis-only。
-
-如果走这条路，在 `lib/activity/CodeIslandAdapter.*` 中隔离协议，不得污染 Trellis parser。
-
-### 路径 C：自己安装 Linux Agent hooks（P2，高维护成本）
-
-若未来确实需要，不应再假设“hooks 只能指向一处”。不同 agent 配置方式不同，正确目标是：
-
-- 幂等 merge，保留用户已有 hooks/plugins；
-- 安装前 backup；
-- 卸载时只删除本插件自己的条目；
-- 避免 global + project 双重安装造成重复事件；
-- Codex/Claude 的 trust / permission 行为必须实测；
-- daemon 不可用或 interaction timeout 时 fail-open，不阻断 agent 原生流程；
-- hook 功能默认关闭，由用户明确启用。
-
-`codeIsland-dms/linux-skeleton` 可以作为 Linux 合并策略和 socket bridge 的参考；macOS Code Island 只能作概念对照。
-
-### 路径 D：未来的 trellis-card headless / IPC
-
-如果 trellis-card 上游未来提供稳定 headless/IPC，可以增加 adapter。当前不能把这个不存在的接口作为 P0/P1 依赖。
-
-### P2 决策
-
-1. P0/P1：只做 A。
-2. P2 首先评估 B，前提是 Linux daemon 在用户环境可稳定运行并且协议足够明确。
-3. B 不满足时再评估 C。
-4. 所有 P2 provider 都必须实现相同内部 `ActivityEvent` 接口，UI 不直接依赖某个 agent 或某个 daemon。
+`.trellis/` 只提供 Trellis project、task、session pointer 和 archive 数据，不能证明外部 Agent 此刻的运行状态。本插件不尝试补充这条数据链路，也不把文件 mtime、session 数量或 Recent Changes 解释为 Agent Activity。Trellis-only 是唯一支持的运行模式；不存在外部 provider 时不需要额外降级分支。
 
 ## 7. 任务分块与实施计划
 
-原则：技术事实先验证；数据链路先于真实 UI；**UI/UX 设计先于最终前端实现**；Agent activity 最后单独做。
+原则：技术事实先验证；数据链路先于真实 UI；**UI/UX 设计先于最终前端实现**。
 
 ---
 
@@ -533,9 +428,7 @@ Linux skeleton 已展示 OpenCode、Codex、Claude 的 adapter/hook + Unix socke
 | 0.11 | 核实 Quickshell `FileView.watchChanges` 只针对已知文件；调查目录拓扑发现方案（FolderListModel / 其他 QML API / Proc+find） | watcher decision |
 | 0.12 | 读当前 DMS plugin skill/docs 和 ExampleCompositePlugin；核实 directory naming、manifest、global vars、Settings/State | `research/dms-api.md` |
 | 0.13 | 核实 `Theme` 可用语义色、spacing、字体、圆角、motion 相关 API | UI constraints |
-| 0.14 | 完整阅读 `payprays/codeIsland-dms` 的 DMS QML 与 `linux-skeleton/README.md`；明确它是 Linux 参考；记录 socket protocol 是否值得 P2 使用 | `research/codeisland-linux.md` |
-| 0.15 | 明确 `rifqiakrm/code-island` 是 macOS 项目，只记录“非实现参考”，避免后续 agent 混用 | research note |
-| 0.16 | 设计并测试安全 path resolver：`..`、absolute、symlink escape、stale pointer | `research/path-safety.md` |
+| 0.14 | 设计并测试安全 path resolver：`..`、absolute、symlink escape、stale pointer | `research/path-safety.md` |
 
 **阶段 0 验收**：
 
@@ -543,7 +436,6 @@ Linux skeleton 已展示 OpenCode、Codex、Claude 的 adapter/hook + Unix socke
 - `research/dms-api.md`
 - `research/progress-semantics.md`
 - `research/path-safety.md`
-- `research/codeisland-linux.md`
 
 所有后续代码只能引用这些调研后的真实 schema。
 
@@ -668,7 +560,6 @@ Linux skeleton 已展示 OpenCode、Codex、Claude 的 adapter/hook + Unix socke
 13. narrow/normal/wide popout
 14. keyboard focus/selection
 15. desktop widget（若 P2 决定做）
-16. P2 agent activity card（只定义预留槽位，不要求首版实现）
 
 **设计约束：**
 
@@ -732,7 +623,7 @@ Linux skeleton 已展示 OpenCode、Codex、Claude 的 adapter/hook + Unix socke
 
 **不要**因为“当前没有 Trellis project”而让 `startupCheck` 失败。正确行为是插件正常加载并显示 empty state，用户仍能进入设置配置 root。
 
-`startupCheck` 仅用于真正的**硬依赖**，例如未来某个 P2 provider 明确要求的外部 daemon/binary；而且 P2 provider 应尽量可选，不应阻止 Trellis-only 模式启动。
+`startupCheck` 仅用于真正的核心硬依赖；外部 Agent runtime、daemon 和 binary 不在本插件启动链路中。
 
 性能验收：
 
@@ -755,23 +646,6 @@ Linux skeleton 已展示 OpenCode、Codex、Claude 的 adapter/hook + Unix socke
 每增加一个新 surface，先补充 UI/UX spec 对应状态，再实现。
 
 ---
-
-### 阶段 7：Agent Activity Provider（P2，独立项目阶段）
-
-顺序：
-
-1. 定义内部 `ActivityEvent` / `ActivitySnapshot` contract；
-2. 研究 `codeIsland-dms/linux-skeleton` socket adapter（Linux only）；
-3. 若用户环境已有 daemon，做只读 socket adapter prototype；
-4. 评估 cwd/session→Trellis project/task 映射准确性；
-5. 只有 socket 路线不满足需求时才评估自装 hooks；
-6. P2 UI 仍需再次经过 `ui-ux-pro-max` + `taste` 更新设计状态矩阵。
-
-隐私要求：
-
-- 默认不保存 prompt、assistant response、tool input/output；
-- 只保留显示实时状态所需最小 metadata；
-- 所有 interaction/permission 回写功能默认不做，除非用户后续明确改变“只读 observer”范围。
 
 ## 8. DMS 插件 API 速查
 
@@ -879,7 +753,7 @@ ln -sfn ~/repos/trellis-dms/TrellisDms   ~/.config/DankMaterialShell/plugins/Tre
 | Trellis 版本升级 / migration | 旧 parser 静默误读 | 读取 `.trellis/.version`；未知版本 warning；fixture regression |
 | custom status | UI 崩/错误归类 | storedStatus 允许 unknown/custom；display fallback |
 | 多 session 被简化成一个 | 用户看到错误“当前任务” | daemon 永远保存全部 sessions/activeTaskIds；primary 只在 UI 计算 |
-| 把 mtime 当 Agent activity | 误导用户 | 只叫 `recentlyChanged`；真实 tool activity 留 P2 |
+| 把 mtime 当外部 runtime activity | 误导用户 | 只叫 `recentlyChanged`；不推断外部 tool activity |
 | FileView 不能监控目录拓扑 | 新任务/归档不出现 | known-file watcher + topology rescan |
 | 全盘扫描 `$HOME` | 卡 shell / 权限噪声 | 默认不扫 `$HOME`；可信 roots + 限深 + cache |
 | 目录枚举需要外部命令 | 增加 process permission | 阶段 0 优先验证原生 QML；fallback 用安全 argv |
@@ -889,10 +763,6 @@ ln -sfn ~/repos/trellis-dms/TrellisDms   ~/.config/DankMaterialShell/plugins/Tre
 | 多显示器 widget 多实例 | 重复 watcher/scan | filesystem 逻辑只放 daemon |
 | DMS API 变化 | 插件加载失败 | requires_dms + 当前 source/skill 验证 |
 | 无 project 时 startupCheck 阻断 | 用户无法配置 | no-project 作为正常 empty state |
-| codeIsland-dms Linux daemon 协议仍偏 reference | P2 adapter 不稳定 | P2 可选、隔离 adapter、protocol version/feature detection |
-| 混用 macOS Code Island 代码/假设 | Fedora 实现走错方向 | 文档明确 macOS 非实现参考；review gate |
-| Agent hook merge/卸载出错 | 破坏用户配置 | P0/P1 不碰 hooks；P2 backup + idempotent merge + own-entry removal |
-| global+project hook 重复 | 同一事件重复上报 | P2 安装检查与去重 |
 | UI 自行设计偏离 DMS | 体验割裂 / 返工 | 阶段 2.5 UI/UX Gate + 用户验收 |
 | 状态只靠颜色 | 可访问性差 | icon/text/shape 辅助；遵守 UX spec |
 | 持续呼吸动画 | 分心/功耗 | 只对有真实语义状态使用；支持低动效策略 |
@@ -920,8 +790,6 @@ trellis-dms/
 │   │   ├── projection.js               # domain model → display model
 │   │   ├── discovery.js                # 若 QML/JS 方案适合则放项目发现
 │   │   ├── format.js
-│   │   └── activity/                    # P2
-│   │       └── codeIslandAdapter.js
 │   └── translations/
 │       └── zh_CN.json
 ├── tests/
@@ -941,7 +809,6 @@ trellis-dms/
 │   ├── dms-api.md
 │   ├── progress-semantics.md
 │   ├── path-safety.md
-│   └── codeisland-linux.md
 ├── docs/
 │   ├── ui-ux-spec.md
 │   ├── ui-state-matrix.md
@@ -956,11 +823,10 @@ trellis-dms/
 - `trellisParser.js`：只处理数据格式；不知道 DMS 视觉。
 - `trellisPaths.js`：所有磁盘路径安全集中处理，其他代码不得私自拼 pointer path。
 - `projection.js`：把完整 domain state 投影成 pill/popout 所需字段；UI 不重复业务规则。
-- `activity/`：P2 外部实时事件 provider，和 P0/P1 Trellis parser 解耦。
 - Markdown 正文不要长期存入全局 snapshot。
 - 若目录发现最终必须用 QML object/Proc 而不是 JS，保留同样的职责边界即可，不强求文件扩展名。
 
-建议项目自身使用 MIT（与 DMS / codeIsland-dms 生态兼容），但如果复制任何第三方 MIT 代码而不是独立实现，保留其版权/许可证声明。trellis-card 当前无明确 LICENSE，因此只参考行为与公开接口，不复制源码。
+建议项目自身使用 MIT；如果复制任何第三方 MIT 代码而不是独立实现，保留其版权/许可证声明。trellis-card 当前无明确 LICENSE，因此只参考行为与公开接口，不复制源码。
 
 ## 11. 附录：参考链接汇总
 
@@ -986,17 +852,6 @@ trellis-dms/
 - workflow runtime contract：https://github.com/mindfold-ai/Trellis/blob/main/.trellis/spec/cli/backend/workflow-state-contract.md
 - machine-readable CLI 需求历史（只作调查线索，不代表用户版本一定支持）：https://github.com/mindfold-ai/Trellis/issues/395
 
-**Linux / DMS 参考项目（优先）**
-
-- codeIsland-dms：https://github.com/payprays/codeIsland-dms
-- Linux skeleton README：https://github.com/payprays/codeIsland-dms/blob/main/linux-skeleton/README.md
-- 该项目用于参考 Linux/Wayland/niri 下的 QML、socket、adapter/hook 架构。
-
-**macOS 概念来源（非实现参考）**
-
-- 原始 Code Island：https://github.com/rifqiakrm/code-island
-- 这是 macOS 14+ / SwiftUI + AppKit 项目。不要从中推断 Fedora/Wayland/DMS 的运行时、窗口、daemon 或 hook 部署方式。
-
 **trellis-card**
 
 - https://github.com/czm15053/trellis-card
@@ -1009,7 +864,7 @@ trellis-dms/
 | 日期 | 变更 |
 |---|---|
 | 2026-09-17 | 初版 |
-| 2026-09-17 | 二次审查：纠正 macOS `code-island` 与 Linux `codeIsland-dms` 混用；以 Fedora 44 + niri + DMS 为平台边界 |
+| 2026-09-17 | 二次审查：明确 Fedora 44 + niri + DMS 的平台边界 |
 | 2026-09-17 | 增加 UI/UX Design Gate：`ui-ux-pro-max` + `taste` 统一设计后用户验收，才实现最终 QML |
 | 2026-09-17 | 状态模型拆分 stored/runtime/display；completed 移入 archive 语义；保留 custom/unknown status |
 | 2026-09-17 | 多 session 改为完整保留，primary task 仅为 UI 投影 |
@@ -1017,5 +872,5 @@ trellis-dms/
 | 2026-09-17 | 增加 `.trellis/.version`、安全 path resolver、size/count limits、last-good snapshot |
 | 2026-09-17 | progress 改为 nullable；禁止无权威来源时伪造百分比 |
 | 2026-09-17 | 无 Trellis project 改为正常 empty state，不再用 startupCheck 阻断插件启用 |
-| 2026-09-17 | P2 重构为 Activity Provider；Linux codeIsland daemon 仅作可选 adapter，hooks 延后 |
+| 2026-10-09 | 移除外部 Agent Runtime/provider 方向；插件保持 Trellis-only，相关历史材料仅保留在归档 |
 | 2026-09-17 | DMS 命名纠正：directory 推荐 PascalCase、plugin id camelCase，不要求相同 |

@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/recent-changes-contract.md","reason":"Keep future Agent Activity outside Recent Changes and Trellis task/completion semantics."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply canonical mapping, bounded metadata, argv-only process, and no network/hooks/socket boundaries."}
+{"file":".trellis/tasks/archive/2026-09/09-24-dms-v094-activity-eval/research/activity-provider-evaluation.md","reason":"Re-check dated Linux provider gaps without treating the old defer decision as current proof."}
+{"file":".trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/codeisland-linux.md","reason":"Compare current upstream protocol/source claims with earlier pinned Linux reference notes."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gate-removed/research/current-provider-baseline.md","reason":"Use the current planning baseline and local-shell scope limits."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-evidence-removed/research/activity-provider-evidence-2026-10.md","reason":"Refresh this draft into the final question-by-question evidence report and gate result."}

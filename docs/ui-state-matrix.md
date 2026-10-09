@@ -91,7 +91,7 @@ no progress, archive body, activity claim, project filter, or task action.
 Search matches project names and live task titles only. It does not search
 paths, IDs, comments, Markdown, warnings, or archive entries. The approved
 implementation contract is in
-`.trellis/tasks/09-24-dms-v093-launcher-registry/launcher-ui-gate.md`.
+`.trellis/tasks/archive/2026-09/09-24-dms-v093-launcher-registry/launcher-ui-gate.md`.
 
 ## Priority rules
 

@@ -10,13 +10,13 @@
 - `progress` 固定为 `number | null`。没有经版本验证的权威进度来源时，不显示或计算虚构百分比。
 - 采集只在 composite 的 daemon 中发生；bar widget、popout、desktop 等 surface 只消费同一份 snapshot。
 - 最终 UI 必须先通过 UI/UX Design Gate；未经 Gate 确认，不实现最终视觉或自行扩展交互。
-- `v0.9` 的 P2 增强可以按项跳过，不阻塞以 P0/P1 为核心的 `v1.0`；Agent activity provider 不是 `v1.0` 的硬依赖。
+- `v0.9` 的可选增强可以按项跳过，不阻塞以 P0/P1 为核心的 `v1.0`；外部 Agent runtime 不属于当前插件范围。
 
 ## 当前基线
 
-- 规格 Stage 0 的调研材料已经写入 `.trellis/tasks/09-17-dms-plugin-prereq-research/research/`。
+- 规格 Stage 0 的调研材料已经写入 `.trellis/tasks/archive/2026-09/09-17-dms-plugin-prereq-research/research/`。
 - 当前 release-candidate 基线：Fedora 44、Wayland、niri 26.04、DMS 1.6.2、Quickshell 0.3.1、Qt 6.11.2、Trellis 0.6.17；v0.8 目标版本由用户确认改为 DMS 1.6.2。
-- 已确认安全路径、session pointer、多 session、progress 语义和 Linux `codeIsland-dms` 参考边界。
+- 已确认安全路径、session pointer、多 session 和 progress 语义。
 - `v0` 的 1 个 task 与 `v0.1` 的 3 个 task 已完成并归档；v0.2 已完成静态 composite 骨架实现。
 - v0.2 目前有静态 composite 骨架；共享 Snapshot 生命周期、实时 DMS IPC、reload 和多屏/multi-bar 行为仍需在 DMS 运行环境中验收，静态实现不代表这些运行态检查通过。
 - v0.3 parser/resolver 与完整 session 保留有后续 fixture/path 测试证据；primary selection 由 v0.6 确定性矩阵覆盖。这些证据不替代实时 watcher 或 DMS 生命周期验收。
@@ -160,40 +160,39 @@
 - 依赖 v0/task 0.1；与 task 0.1.1 可并行。
 - 是 v0.2 骨架之外的 v0.3 parser、v0.4 watcher 和 v0.6 UI 状态映射的唯一数据依据。
 
-### task 0.1.3：安全路径与 P2 边界证据
+### task 0.1.3：安全路径与数据边界证据
 
 #### 任务目标
 
-冻结 task/session/archive/Markdown 的 safe resolver 规则，并明确 `codeIsland-dms` 仅是后续 Linux P2 activity provider 参考。
+冻结 task/session/archive/Markdown 的 safe resolver 规则和只读数据边界。
 
 #### 设计原则
 
 - 先 canonicalize，再做 containment 检查；不信任 runtime pointer 字符串。
 - 最小权限、最小数据、无副作用。
-- Linux 实现事实与 macOS 概念参考严格分离。
+- 外部 Agent runtime 不作为本插件的数据源或运行依赖。
 
 #### 要求实现
 
-- 形成 `research/path-safety.md` 和 `research/codeisland-linux.md`。
+- 形成 `research/path-safety.md`。
 - 覆盖绝对路径、`..`、symlink escape、stale/malformed pointer、Markdown 白名单和大小上限。
-- 定义未来统一的 `ActivityEvent`/`ActivitySnapshot` 接口方向。
+- 记录 Trellis-only 模式下的最小数据边界。
 
 #### 不要实现
 
-- 不安装 CodeIsland daemon，不安装或修改 Codex/Claude/OpenCode hooks。
-- 不把 macOS `rifqiakrm/code-island` 当作 Linux/DMS 技术实现来源。
-- 不让 P2 socket、网络或外部 daemon 成为 P0/P1 启动硬依赖。
+- 不安装或修改任何外部 Agent hooks、daemon 或 socket。
+- 不让外部 runtime、网络或额外 daemon 成为 P0/P1 启动硬依赖。
 
 #### 验收标准
 
 - traversal、external absolute path、symlink escape、stale pointer 和非白名单 Markdown 均被拒绝。
-- 研究文档写明 socket 不存在时必须降级到 Trellis-only。
-- 后续 parser/Markdown/activity task 都能引用同一 resolver 和 provider 边界。
+- 研究文档写明外部 runtime 不存在时插件仍保持 Trellis-only。
+- 后续 parser/Markdown task 都能引用同一 resolver 和只读边界。
 
 #### 实现边界、前后 task 依赖
 
 - 依赖 task 0.1.2 的路径与 session 事实；可与 task 0.1.1 并行。
-- 是 v0.3 resolver、v0.7 Markdown 和 v0.9 activity 评估的前置条件。
+- 是 v0.3 resolver 和 v0.7 Markdown 的前置条件。
 
 # v0.2（Composite 技术骨架）
 
@@ -225,7 +224,7 @@
 
 - 不实现最终 pill、popout、desktop、launcher 或 Markdown 视觉。
 - 不扫描 `$HOME`，不依赖 `fd`、shell 字符串或额外网络服务。
-- 不加入 P2 hooks、CodeIsland socket 或 trellis-card 依赖。
+- 不加入外部 hooks、socket 或 trellis-card 依赖。
 
 #### 验收标准
 
@@ -587,13 +586,13 @@
 
 - 定义 compact/normal/wide 的尺寸和 fallback。
 - 定义 loading、warning、error、empty 的视觉优先级和 focus/selection 行为。
-- 若保留 desktop 或 activity 预留，先写出对应状态而不承诺实现。
+- 若保留 desktop 预留，先写出对应状态而不承诺实现。
 
 #### 不要实现
 
 - 不硬编码产品主题色，不添加持续高频动画。
 - 不把 error/warning 抢占正常任务的主视觉。
-- 不在本 task 安装 P2 agent provider。
+- 不在本 task 接入外部 Agent runtime。
 
 #### 验收标准
 
@@ -628,7 +627,7 @@
 
 - 未获得确认时不写最终 pill/popout QML。
 - 不以“能运行”替代视觉、可访问性和状态覆盖验收。
-- 不在 Gate 中新增未规划的 desktop、launcher 或 Agent activity 功能。
+- 不在 Gate 中新增未规划的 desktop 或 launcher 功能。
 
 #### 验收标准
 
@@ -662,7 +661,7 @@
 #### 不要实现
 
 - 不在 widget 中读取文件、重写 parser 或写 Trellis 数据。
-- 不实现项目筛选、Markdown、archive 正文、task 操作或 Agent activity。
+- 不实现项目筛选、Markdown、archive 正文或 task 操作。
 - 不增加自定义主题、emoji 或装饰性动效。
 
 #### 验收标准
@@ -1066,7 +1065,7 @@
 
 - 不为 Hyprland/Sway 做首版专门验收。
 - 不把 AppImage/Tauri trellis-card 的 Fedora 黑屏问题当成 DMS 插件依赖或修复目标。
-- 不在 RC 中安装 Agent hooks 或强制 CodeIsland daemon。
+- 不在 RC 中安装外部 Agent hooks 或 daemon。
 
 #### 验收标准
 
@@ -1089,11 +1088,11 @@
 - 性能边界仍按源码与 fixture 验证：峰值内存、吞吐、同时存在的 process/reader 数和精确 refresh latency 没有独立测量；不要把资源上限写成实测吞吐结果。
 - v0.8 目标已由用户明确从 DMS 1.6.1 改为 1.6.2；manifest 的最低声明仍为 `>=1.6.1`，不据此单独声称在 1.6.1 上完成 live 验收。
 
-# v0.9（可选 P2 增强与独立 provider 评估）
+# v0.9（可选 P2 增强）
 
 ## 版本目标
 
-在 P0/P1 RC 稳定后，按项实现 Desktop、DMS locale 和 Launcher 本地 registry readiness；每项都必须独立设计、可关闭、可降级，不改变 Trellis-only 核心。Agent activity 本版只做可行性评估；Control Center 延期。
+在 P0/P1 RC 稳定后，按项实现 Desktop、DMS locale 和 Launcher 本地 registry readiness；每项都必须独立设计、可关闭、可降级，不改变 Trellis-only 核心。Control Center 延期；外部 Agent runtime 不在本版本范围内。
 
 ## 该版本细分 tasks
 
@@ -1202,47 +1201,11 @@
 - 依赖 v0.8 RC 和新增 surface 的 UI Gate；与 0.9.1/0.9.2 松耦合。
 - Control Center 和实际 registry 发布不在本版范围内；外部发布须单独确认，不作为 v1.0 本地稳定性的必要条件。
 
-### task 0.9.4：Agent Activity Provider 可行性评估（独立、可选）
-
-#### 任务目标
-
-为未来实时 Agent activity 定义 provider contract，评估 Linux `codeIsland-dms` socket 路线；不把它直接纳入 v1.0 P0/P1。
-
-#### 设计原则
-
-- activity 与 Trellis parser 解耦，通过统一 `ActivityEvent`/`ActivitySnapshot` 接口接入。
-- 默认只读、最小 metadata、fail-open；socket 不存在时 Trellis-only 正常工作。
-- 先验证部署、协议和 cwd/session→project/task 映射，再决定是否实现。
-
-#### 要求实现
-
-- 研究 `$XDG_RUNTIME_DIR/codeislandd.sock`、`snapshot.full/patch`、重连和 provider/session 字段。
-- 只保留 provider、sessionId、cwd/project、event/tool、timestamp、permission state 等显示所需最小字段。
-- 形成独立评估报告、隐私边界和后续 prototype 计划。
-
-#### 不要实现
-
-- 不把 macOS Code Island 当 Linux daemon 依据。
-- 不安装 hooks、修改用户 agent 配置、采集或持久化 prompt/assistant/tool I/O。
-- 不实现 interaction/permission 回写，不让 daemon 不可用阻塞原生 agent 或 Trellis-only。
-
-#### 验收标准
-
-- 能明确判断 Linux daemon 在目标环境是否存在、协议是否稳定、映射是否可靠。
-- activity provider 可禁用；没有 socket 时 P0/P1 snapshot、UI 和启动行为不变。
-- 若证据不足，输出“延期/不采用”的结论，而不是伪造实时活动。
-
-#### 实现边界、前后 task 依赖
-
-- 依赖 v0.8 RC、v0.1.3 P2 边界和新一轮 UI Gate；与 0.9.1～0.9.3 独立。
-- 该 task 的评估结果进入 post-v1 backlog；只有另行批准才进入后续版本，不阻塞 v1.0。
-
 ## v0.9 实施状态（2026-09-24）
 
 - [x] v0.9.1 Desktop 已实现：只消费共享 Snapshot，单列滚动展示所有 loaded projects 与 active task 摘要，最多展示 3 条 warning 详情并报告余量；默认尺寸 200×200、最小 180×160。`requires_dms` 的兼容下限提升至 `>=1.6.2`，权限集合不变。静态投影/manifest 检查通过；桌面摆放、resize、多屏和禁用后的真实 DMS 行为仍待目标 host 验证。
 - [x] v0.9.2 i18n 已实现：plugin-owned UI labels 使用 DMS `I18n.trFor`，随 DMS active locale 加载 `zh_CN` catalog；英文源文案提供 fallback。项目名、task title、路径、Markdown、ID 和未知状态保持原值。231 个 literal source 与 catalog 一一对应，所有 `%1`/`%2` 占位符匹配；真实 locale 切换与中英文布局仍待 DMS host 验证。
 - [x] v0.9.3 Launcher 与本地 registry readiness 已实现：`!trellis` 空查询列项目，非空查询只匹配项目名和 live task 标题，最多 20 个匹配并显示溢出提示；项目选择只更新 project filter，任务选择更新项目限定 pin 并请求现有 popout。Manifest 保留 `>=1.6.2` 和现有权限，并声明 `0.9.0` 包版本。安装、禁用和回滚说明已写入本地文档；未发布外部 registry。Launcher 搜索、State 保存、popout 和多 surface reload 仍待目标 DMS host 验证。
-- [x] v0.9.4 Agent Activity Provider 评估已完成并归档；由于 daemon 部署、协议兼容、reconnect 与 task mapping 证据不足，建议延期，不安装 daemon/hooks、不改 agent 配置、不采集 prompt 或工具 I/O。
 - [ ] v0.9 Desktop、locale 和 Launcher 的真实 DMS 1.6.2 运行态验证仍未完成；本地静态结果不代表 QML load、UI layout、locale reload、popout 或 State restart persistence 已通过。
 - [ ] Control Center 延期；外部 registry metadata review、截图准备和发布均待后续单独确认。
 
@@ -1280,7 +1243,7 @@
 
 #### 不要实现
 
-- 不在冻结期重做 UI、不引入强制 Agent activity、不改变 Trellis 数据。
+- 不在冻结期重做 UI、不引入外部 runtime activity、不改变 Trellis 数据。
 - 不为了“看起来完整”填入 fabricated progress 或隐藏 warning。
 - 不把未验证的 Hyprland/Sway、未知 DMS 版本写成首版承诺。
 
@@ -1314,7 +1277,7 @@
 - 分别验收保留的可选项：Desktop 的加载、摆放、resize 与禁用后核心不回归；zh_CN 的 locale 切换、重载、文案覆盖和英文 fallback；Launcher 的空/无匹配搜索、项目/任务选择、popout、State 持久化和多 surface reload。逐项记录证据等级与结果。
 - Desktop 的 host 检查还要覆盖实例显示偏好独立持久化、位置/尺寸分别重置、全局设置不被实例卡写入、挂载目录显式选择，以及存在 archive 目录时实时任务 warning 不误报；确认无效/越界 live-task 路径仍会被拒绝。
 - 单项失败时仅从候选包移除该项：Desktop 移除 `components.desktop` 与 `desktop-widget` capability；zh_CN 从候选包移除 `translations/zh_CN.json` 并保留英文源文案；Launcher 移除 `components.launcher`、根级 `trigger` 与 `launcher` capability。注明延期项并重跑 P0/P1 核心验收。
-- 检查 v1.0 默认不需要 trellis-card、CodeIsland daemon、Agent hooks、网络或 Trellis 写权限。
+- 检查 v1.0 默认不需要 trellis-card、外部 Agent hooks、网络或 Trellis 写权限。
 
 #### 不要实现
 
@@ -1332,7 +1295,7 @@
 #### 实现边界、前后 task 依赖
 
 - 依赖 task 1.0.1；失败时回退到对应 v0.x 修复，不在 v1.0 直接掩盖问题。
-- 通过后进入 task 1.0.3 发布交接；P2 provider 仍可独立延期。
+- 通过后进入 task 1.0.3 发布交接；未纳入的可选项不影响核心发布判断。
 
 ### task 1.0.3：发布交接、文档与后续路线
 
@@ -1350,7 +1313,7 @@
 
 - 更新 README/安装说明、设置说明、状态语义、progress 语义、隐私说明和故障排查。
 - 提供禁用/卸载、清理自身设置和回滚版本的操作说明。
-- 记录 v1.1+ 候选：desktop/i18n/launcher、CodeIsland adapter、hooks（若未来明确批准）。
+- 记录 v1.1+ 候选：desktop/i18n/launcher；外部 Agent runtime、hooks 和 daemon 不属于当前路线图。
 
 #### 不要实现
 
@@ -1388,7 +1351,7 @@
 
 > 项目：`dms-trellis-card-plugin`  
 > 承接版本：`v1.0 Stable / RC`  
-> 文档用途：在 v1.0 核心能力冻结后，继续规划可诊断性、导航效率、可选通知与实验性 Agent Activity 能力。  
+> 文档用途：在 v1.0 核心能力冻结后，继续规划可诊断性、导航效率与可选通知。
 > 总体原则：后续版本不得破坏 `read-only Trellis observer`、共享 Snapshot、无 Trellis 写操作、无强制 Agent hooks 的核心边界。
 
 ---
@@ -1397,11 +1360,11 @@
 
 - `v1.0` 冻结 P0/P1 稳定基线。
 - `v1.1+` 仅在保持只读 Trellis observer 和共享 Snapshot 架构的前提下增加可诊断性、导航效率和可选扩展。
-- 新增 surface / provider 仍必须先经过对应 UI / Product / Security Gate。
+- 新增 surface 仍必须先经过对应 UI / Product / Security Gate。
 - 新功能不得反向扩大已经冻结的 v1.0 core contract。
 - 每个版本继续按照 `planning → implementation → verification → archive` 的方式执行。
 - 未经真实 DMS host 验收的行为不得标记为已完成。
-- `Agent Activity` 不属于默认主线能力，除非后续证据足够充分。
+- 外部 Agent runtime 不属于默认主线能力或当前路线图。
 
 ---
 
@@ -1722,7 +1685,7 @@ Agent 此刻正在做什么？
 
 #### 设计原则
 
-- Recent Changes 是“观察到的数据变化”，不是 Agent Activity。
+- Recent Changes 是“观察到的数据变化”，不是外部 runtime activity。
 - 不从 mtime 猜测语义。
 - 不把 task 消失直接解释为“完成”。
 - 只有有明确 archive / status evidence 时才展示对应语义。
@@ -1758,7 +1721,7 @@ source_snapshot_generation
 - 使用有界 ring buffer。
 - 首版默认只保留 runtime recent history。
 - restart 后可清空，不要求持久化。
-- 显示标题 `Recent Trellis Changes`，而不是 `Agent Activity`。
+- 显示标题 `Recent Trellis Changes`，而不是外部 runtime activity。
 
 #### 不要实现
 
@@ -2098,169 +2061,9 @@ REJECT
 
 ---
 
-# v1.4（Agent Activity Provider Experimental Gate，可选）
+# v1.4（已取消外部 Agent Runtime 方向）
 
-> 本版本不是既定必做路线。  
-> 只有外部 provider 的协议、部署、隐私、任务映射和故障隔离证据发生实质变化时才启动。
-
-## 版本目标
-
-重新验证 Linux Agent Activity Provider 是否已经具备足够稳定的事实基础，使插件可以**可选地**展示真实 Agent runtime activity，同时保证：
-
-```text
-Agent Activity unavailable
-        ↓
-Trellis DMS core remains fully functional
-```
-
-任何 Agent activity 都必须是显式 opt-in、可关闭、非 P0 / P1 依赖。
-
-## 该版本细分 tasks
-
-### task 1.4.1：Activity Provider 证据刷新与 Go / No-Go Gate
-
-#### 任务目标
-
-重新调查：
-- Linux provider / daemon 是否真实存在并可部署
-- protocol 是否稳定
-- reconnect 语义
-- lifecycle
-- process ownership
-- task / project mapping
-- permission model
-- privacy model
-- agent support matrix
-
-#### 设计原则
-
-- 以当前真实源码、协议和运行结果为准。
-- 不因为 v0.9.4 曾经评估过就复用旧结论。
-- 不把 macOS implementation 当 Linux 事实。
-- Evidence 不够即 `NO-GO`。
-
-#### 验收标准
-
-必须明确输出：
-
-```text
-GO
-或
-NO-GO
-```
-
-只有 `GO` 才允许 task 1.4.2 开始。
-
----
-
-### task 1.4.2：Optional Activity Provider Contract 与隔离 Adapter
-
-#### 任务目标
-
-若 1.4.1 为 GO，为外部 runtime activity 建立独立 provider boundary。
-
-统一内部对象例如：
-
-```text
-ActivityEvent
-ActivitySnapshot
-```
-
-至少明确：
-
-```text
-provider
-agent
-project?
-task?
-runtime_state
-observed_at
-confidence/mapping_status
-```
-
-#### 设计原则
-
-- Trellis Snapshot 与 Activity Snapshot 严格分开。
-- 没有可靠 mapping 时显示 unmapped，而不是猜 task。
-- provider failure 不污染 Trellis health。
-- runtime activity 不写回 Trellis。
-
-#### 不要实现
-
-- 不把 Agent runtime state 当 task storedStatus。
-- 不自动修改 agent 配置。
-- 不持久化 prompt / assistant / tool payload。
-- 不捕获 credentials。
-- 不让 provider 成为插件启动依赖。
-
-#### 验收标准
-
-- provider 断开后 core UI 正常。
-- mapping failure 不错误关联 task。
-- provider disable 后行为等同 Trellis-only。
-- permission / privacy 文档完整。
-
----
-
-### task 1.4.3：Agent Activity UI Experimental Surface
-
-#### 任务目标
-
-如果 provider contract 和真实运行均通过，再增加独立、明确标识为 Activity 的 UI，而不污染 Trellis task 状态。
-
-可能显示：
-
-```text
-Codex
-● running
-Mapped task: xxx
-
-Claude
-○ waiting
-
-OpenCode
-? unmapped
-```
-
-#### 不要实现
-
-- 不显示 prompt 内容。
-- 不显示模型回复正文。
-- 不显示 tool I/O payload。
-- 不将 runtime activity 合并进 `progress`。
-- 不把 waiting 等价为 blocked。
-- 不将 disconnected 等价为 task stopped。
-
-#### 验收标准
-
-- UI 明确区分 Trellis State 与 Agent Activity。
-- provider offline 有单独状态。
-- unmapped agent 不强制关联 task。
-- Trellis-only 模式与 v1.3 行为完全一致。
-
----
-
-### task 1.4.4：Experimental Release Decision
-
-#### 任务目标
-
-根据隐私、安全、稳定性和实际价值决定 Agent Activity 是否：
-
-```text
-保持 experimental
-正式进入主线
-继续延期
-完全放弃
-```
-
-#### 验收标准
-
-- 有真实 host evidence。
-- 无 prompt / tool payload 泄漏。
-- 无强制 hooks。
-- provider 不影响 core startup。
-- Trellis-only regression 全部通过。
-- 如果仍存在协议或 mapping 不稳定，保持 experimental，不进入默认安装路径。
+原计划的外部 Agent Runtime / provider 评估、adapter、UI 和 release gate 已从产品路线图移除。当前插件保持 Trellis-only，只消费自身 Snapshot；不会新增外部 daemon、socket、hooks、permissions、manifest/settings surface 或 Agent Activity UI。此前产生的评估材料仅作为历史归档，不构成核心发布门槛。
 
 ---
 
@@ -2276,8 +2079,6 @@ Markdown 全文搜索
 网络 dashboard
 Trellis 写操作
 task start / finish / archive 操作
-Agent permission interaction
-prompt / tool 内容观察
 ```
 
 其中尤其继续保持以下边界：
@@ -2316,7 +2117,6 @@ read-only observer first
 | P2 | Health Notifications | v1.3 |
 | P2 | Task Change Notifications | v1.3 Gate |
 | P2 | Control Center | v1.3 Product Gate |
-| Experimental | Agent Activity Provider | v1.4+ |
 
 ---
 
@@ -2333,7 +2133,7 @@ read-only observer first
 ↓
 再评估主动通知
 ↓
-最后才考虑 Agent Runtime Activity
+保持 Trellis-only 核心边界
 ```
 
 不要反过来为了增加“酷”的功能，破坏当前已经比较清晰的产品定位。

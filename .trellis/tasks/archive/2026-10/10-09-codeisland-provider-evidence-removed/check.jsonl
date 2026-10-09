@@ -1,0 +1,4 @@
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-gate-removed/prd.md","reason":"Verify the child fulfills the parent v1.4 gate and conditional follow-up rule."}
+{"file":".trellis/spec/frontend/recent-changes-contract.md","reason":"Verify no activity evidence is represented as Trellis task status, progress, completion, or deletion."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify read-only, bounded, canonical-path, privacy, and failure-isolation constraints."}
+{"file":".trellis/tasks/archive/2026-10/10-09-codeisland-provider-evidence-removed/research/activity-provider-evidence-2026-10.md","reason":"Verify source/local/target provenance, all required evidence rows, and exactly one final GO or NO-GO."}
