@@ -49,7 +49,8 @@ const expectedQmlImports = {
     "lib/trellisWatch.js",
     "lib/trellisdiscovery.js",
     "lib/trellisprojection.js",
-    "lib/trellischanges.js"
+    "lib/trellischanges.js",
+    "lib/trellisnotifications.js"
   ],
   "TrellisDms/TrellisSettings.qml": [
     "lib/trellisdiscovery.js",
@@ -66,6 +67,7 @@ for (const [qmlRelativePath, expectedImports] of Object.entries(expectedQmlImpor
 
 assertExactCaseResource("TrellisDms/lib/trellisdiscovery.js");
 assertExactCaseResource("TrellisDms/lib/trellisprojection.js");
+assertExactCaseResource("TrellisDms/lib/trellisnotifications.js");
 
 const paths = loadQmlJs("TrellisDms/lib/trellisPaths.js");
 const parser = loadQmlJs("TrellisDms/lib/trellisParser.js");
@@ -73,6 +75,7 @@ const discoveryPolicy = loadQmlJs("TrellisDms/lib/trellisdiscovery.js");
 const projection = loadQmlJs("TrellisDms/lib/trellisprojection.js");
 const watch = loadQmlJs("TrellisDms/lib/trellisWatch.js");
 const changes = loadQmlJs("TrellisDms/lib/trellischanges.js");
+const notifications = loadQmlJs("TrellisDms/lib/trellisnotifications.js");
 
 assert.deepEqual(Array.from(paths.ancestorPaths(
   "/workspace/project/.trellis/tasks/live-task", 8
@@ -814,6 +817,17 @@ assert.match(daemonSource, /watchChanges\s*:\s*true/);
 assert.match(daemonSource, /blockWrites\s*:\s*true/);
 assert.match(daemonSource, /atomicWrites\s*:\s*true/);
 assert.match(daemonSource, /preload\s*:\s*true/);
+assert.match(daemonSource, /import "lib\/trellisnotifications\.js" as TrellisNotifications/);
+assert.match(daemonSource, /property var ownedNotificationProcesses: \[\]/);
+assert.match(daemonSource, /id: notificationProcessComponent[\s\S]*?Process\s*\{/);
+assert.match(daemonSource, /function _publishHealthNotifications\([\s\S]*?TrellisNotifications\.observe/);
+assert.match(daemonSource,
+  /command:\s*\["dms",\s*"notify",\s*summary,\s*body,\s*"--app",\s*"Trellis DMS",\s*"--icon",\s*"health",\s*"--timeout",\s*"5000"\]/);
+assert.match(daemonSource, /recentChangesVar\.set\(recent\);\s*root\._publishHealthNotifications\(recent\);/);
+const notificationAdapterSource = daemonSource.match(
+  /function _queueNotification\([\s\S]*?\n    }/)[0];
+assert.doesNotMatch(notificationAdapterSource, /project_id|task_id|session_key|Markdown|\.root/);
+assert.doesNotMatch(notificationAdapterSource, /\["(?:sh|bash)",\s*"-c"/);
 assert.match(daemonSource, /_destroyWatchers/);
 assert.match(daemonSource, /topologyTimer\.stop\(\)/);
 assert.match(daemonSource, /knownReloadTimer\.stop\(\)/);
@@ -1061,6 +1075,10 @@ assert.match(settingsSource, /loadValue\("displayMode",\s*null\)/);
 assert.match(settingsSource, /settingKey:\s*"showProgress"/);
 assert.match(settingsSource, /settingKey:\s*"showArchive"/);
 assert.match(settingsSource, /settingKey:\s*"versionWarning"/);
+assert.match(settingsSource, /settingKey:\s*"notificationsEnabled"/);
+assert.match(settingsSource, /label:\s*I18n\.trFor\("trellisDms",\s*"Enable Health notifications"\)/);
+assert.match(settingsSource, /settingKey:\s*"notificationsEnabled"[\s\S]*?defaultValue:\s*false/);
+assert.match(settingsSource, /savePluginSetting\("notificationsEnabled",\s*false\)/);
 assert.match(settingsSource, /defaultValue:\s*true/);
 for (const mode of ["auto", "task", "project", "counts", "icon", "full"])
   assert.match(settingsSource, new RegExp(`value:\\s*"${mode}"`));
@@ -1163,6 +1181,13 @@ for (const sourceString of ["Desktop widget view",
   "%1 healthy · %2 needs attention"])
   assert.ok(zhCatalog[sourceString] && zhCatalog[sourceString][sourceString],
     `Desktop instance Settings string must have a Chinese translation: ${sourceString}`);
+for (const sourceString of ["Enable Health notifications",
+  "Notify once when a project becomes degraded or recovers. Notifications are off by default and never include paths, task text, or session details.",
+  "Trellis project", "Trellis health degraded", "Trellis health recovered",
+  "%1 needs attention. Open Trellis DMS Health or Diagnostics for details.",
+  "%1 recovered. Open Trellis DMS Health or Diagnostics for details."])
+  assert.ok(zhCatalog[sourceString] && zhCatalog[sourceString][sourceString],
+    `Health notification string must have a Chinese translation: ${sourceString}`);
 assert.match(settingsSource, /settingKey:\s*"topologyInterval"/);
 assert.match(settingsSource, /TrellisWatch\.topologyIntervalDefaults\(\)\.minimum/);
 assert.match(settingsSource, /TrellisWatch\.topologyIntervalDefaults\(\)\.maximum/);
@@ -2973,6 +2998,69 @@ assert.deepEqual([...exercisedKinds].sort(), Array.from(changes.EVENT_KINDS).sor
 assert.equal(exercisedKinds.has("task_completed"), false);
 assert.equal(exercisedKinds.has("task_deleted"), false);
 
+const notificationLimits = notifications.limits();
+assert.equal(notificationLimits.scopes, 33);
+assert.equal(notificationLimits.cooldownMs, 5 * 60 * 1000);
+function healthEvent(eventType, projectId = "alpha", projectName = "Project Alpha") {
+  return { event_type: eventType, project_id: projectId, project_name: projectName };
+}
+const notificationInput = [healthEvent("health_degraded", "alpha", "Alpha\nProject")];
+const notificationInputBefore = JSON.stringify(notificationInput);
+let notificationResult = notifications.observe(notifications.createState(), [], true, 0);
+assert.deepEqual(Array.from(notificationResult.requests), [], "initial notification observation is quiet");
+const restartedNotification = notifications.observe(notifications.createState(),
+  notificationInput, true, 500);
+assert.deepEqual(Array.from(restartedNotification.requests), [],
+  "restart baseline does not replay an existing incident");
+notificationResult = notifications.observe(notificationResult.state,
+  notificationInput, true, 1000);
+assert.equal(notificationResult.requests.length, 1,
+  "a healthy-to-degraded transition sends one notification");
+assert.equal(notificationResult.requests[0].eventType, "health_degraded");
+assert.equal(notificationResult.requests[0].projectName, "Alpha Project");
+assert.equal(JSON.stringify(notificationInput), notificationInputBefore,
+  "notification observation must not mutate event inputs");
+const notificationAfterDegraded = notificationResult.state;
+notificationResult = notifications.observe(notificationAfterDegraded,
+  notificationInput, true, 2000);
+assert.deepEqual(Array.from(notificationResult.requests), [], "continuous degradation is deduplicated");
+notificationResult = notifications.observe(notificationResult.state,
+  [healthEvent("health_recovered")], true, 3000);
+assert.equal(notificationResult.requests.length, 1,
+  "a degraded-to-recovered transition sends one notification");
+notificationResult = notifications.observe(notificationResult.state,
+  [healthEvent("health_recovered")], true, 4000);
+assert.deepEqual(Array.from(notificationResult.requests), [], "continuous recovery is deduplicated");
+notificationResult = notifications.observe(notificationResult.state,
+  [healthEvent("health_degraded")], true, 5000);
+assert.deepEqual(Array.from(notificationResult.requests), [], "same-kind cooldown suppresses a repeat");
+assert.equal(notificationResult.state.scopes["project:alpha"].active, true,
+  "suppressed transitions still advance the active baseline");
+const reservedScopeState = notifications.observe(notifications.createState(), [], true, 0).state;
+const reservedScope = notifications.observe(reservedScopeState,
+  [healthEvent("health_degraded", "global")], true, 1000);
+assert.equal(reservedScope.state.scopes["project:global"].active, true,
+  "project IDs cannot collide with the global health scope");
+const prototypeScope = notifications.observe(reservedScope.state,
+  [healthEvent("health_degraded", "__proto__")], true, 1000);
+assert.equal(prototypeScope.state.scopes["project:__proto__"].active, true,
+  "prototype-like project IDs remain data-only scope keys");
+const disabledNotification = notifications.observe(notifications.createState(),
+  [healthEvent("health_degraded")], false, 0);
+const reenabledNotification = notifications.observe(disabledNotification.state,
+  [healthEvent("health_degraded")], true, notificationLimits.cooldownMs);
+assert.deepEqual(Array.from(reenabledNotification.requests), [],
+  "re-enabling notifications does not replay a disabled incident");
+const boundedNotificationState = notifications.createState();
+const boundedEvents = Array.from({ length: 80 }, (_, index) =>
+  healthEvent("health_degraded", `bounded-${index}`, `Project ${index}`));
+const boundedNotification = notifications.observe(boundedNotificationState,
+  boundedEvents, true, 1);
+assert.ok(Object.keys(boundedNotification.state.scopes).length <= notificationLimits.scopes,
+  "notification scope state remains bounded");
+assert.deepEqual(boundedNotificationState, notifications.createState(),
+  "notification observation returns cloned state without mutating input state");
+
 // Execute the daemon's actual publisher functions with the host transport
 // replaced by bounded in-memory globals. This catches integration omissions
 // that separately passing parser/comparator fixtures cannot detect.
@@ -2980,7 +3068,10 @@ const publicationRoot = {
   scanStartedAt: "", lastSuccessfulDiscoveryAt: "", snapshotIsCurrent: true,
   lastGoodFallbackActive: false, publicationGeneration: 0,
   observationEpoch: "publisher", changeTracker: changes.createTracker("publisher"),
-  observationPreferences: { pinnedTaskId: "", selectedProjectId: "" }, pluginId: "trellisDms"
+  observationPreferences: { pinnedTaskId: "", selectedProjectId: "" }, pluginId: "trellisDms",
+  pluginData: {}, notificationState: notifications.createState(),
+  notificationsEnabled: false,
+  _publishHealthNotifications: recent => { publicationGlobals.notifications = recent; }
 };
 const publicationGlobals = {};
 publicationRoot.pluginService = {
@@ -3995,6 +4086,7 @@ function coupleActionWidget(api, instance = "reload-action", notifyResponse = tr
 function destroyActionDaemon(api) {
   // Other generations/pools have separate coverage above; keep only the
   // action teardown real here, without requiring a scan/watcher host.
+  Object.assign(api.host, { _destroyNotificationProcesses() {} });
   Object.assign(api.sandbox, { _cancelDetailRead() {}, _cancelSearchRead() {}, _destroyOwned() {} });
   vm.runInNewContext(`function _testDaemonDestruction() {\n${destructionSource
     .slice("Component.onDestruction: {".length)}\n}`, api.sandbox);

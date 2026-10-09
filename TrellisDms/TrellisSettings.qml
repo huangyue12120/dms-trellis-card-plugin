@@ -193,6 +193,7 @@ PluginSettings {
             settingsSaved = root.savePluginSetting("showProgress", true) && settingsSaved;
             settingsSaved = root.savePluginSetting("showArchive", true) && settingsSaved;
             settingsSaved = root.savePluginSetting("versionWarning", true) && settingsSaved;
+            settingsSaved = root.savePluginSetting("notificationsEnabled", false) && settingsSaved;
             settingsSaved = root.savePluginSetting("scanRoots", []) && settingsSaved;
             settingsSaved = root.savePluginSetting("topologyInterval",
                 TrellisWatch.topologyIntervalDefaults().defaultValue) && settingsSaved;
@@ -610,6 +611,13 @@ PluginSettings {
                     label: I18n.trFor("trellisDms", "Show Trellis version warnings")
                     description: I18n.trFor("trellisDms", "Hide only compatibility warning presentation; the daemon keeps the version fact and diagnostics.")
                     defaultValue: true
+                }
+
+                ToggleSetting {
+                    settingKey: "notificationsEnabled"
+                    label: I18n.trFor("trellisDms", "Enable Health notifications")
+                    description: I18n.trFor("trellisDms", "Notify once when a project becomes degraded or recovers. Notifications are off by default and never include paths, task text, or session details.")
+                    defaultValue: false
                 }
 
                 StyledText {

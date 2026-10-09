@@ -9,6 +9,7 @@ import "lib/trellisWatch.js" as TrellisWatch
 import "lib/trellisdiscovery.js" as TrellisDiscovery
 import "lib/trellisprojection.js" as TrellisProjection
 import "lib/trellischanges.js" as TrellisChanges
+import "lib/trellisnotifications.js" as TrellisNotifications
 
 PluginComponent {
     id: root
@@ -42,6 +43,8 @@ PluginComponent {
     property string observationEpoch: new Date().toISOString() + "-" + Math.random().toString(36).slice(2)
     property double publicationGeneration: 0
     property var changeTracker: TrellisChanges.createTracker(observationEpoch)
+    property var notificationState: TrellisNotifications.createState()
+    property string notificationScopeKey: ""
     property var observationPreferences: null
     property var activeScan: null
     property var ownedProcesses: []
@@ -88,6 +91,10 @@ PluginComponent {
     property var pendingActionRequest: null
     property var ownedActionProcesses: []
     property var ownedActionReaders: []
+    property var ownedNotificationProcesses: []
+    property bool observedNotificationsEnabled: false
+    readonly property int maxNotificationProcesses: 33
+    readonly property bool notificationsEnabled: root._notificationsEnabled(root.pluginData)
 
     PluginGlobalVar {
         id: actionRequestVar
@@ -232,6 +239,29 @@ PluginComponent {
                     if (fn)
                         fn("", "file_load_failed:" + error);
                     fv.destroy();
+                });
+            }
+        }
+    }
+
+    Component {
+        id: notificationProcessComponent
+
+        Process {
+            id: notificationProcess
+            property var callback: null
+            property var ownerRoot: null
+            property string ownedList: ""
+
+            onExited: function (exitCode) {
+                var fn = callback;
+                callback = null;
+                if (ownerRoot)
+                    ownerRoot._untrack(ownedList, this);
+                Qt.callLater(function () {
+                    if (fn)
+                        fn(exitCode);
+                    notificationProcess.destroy();
                 });
             }
         }
@@ -411,6 +441,100 @@ PluginComponent {
         root.pendingKnownWarnings = [];
         root.knownReloadInFlight = false;
         _destroyWatchers();
+    }
+
+    function _destroyNotificationProcesses() {
+        var processes = root.ownedNotificationProcesses || [];
+        for (var i = 0; i < processes.length; i++) {
+            if (processes[i])
+                processes[i].destroy();
+        }
+        root.ownedNotificationProcesses = [];
+    }
+
+    function _notificationsEnabled(settings) {
+        return !!settings && settings.notificationsEnabled === true;
+    }
+
+    function _notificationText(value, fallback, maximum) {
+        var text = typeof value === "string" ? value : fallback;
+        text = (text || fallback || "").toString()
+            .replace(/[\u0000-\u001f\u007f]/g, " ").trim();
+        if (text.indexOf("/") !== -1 || text.indexOf("\\") !== -1
+                || text.indexOf("..") !== -1)
+            text = (fallback || "").toString();
+        if (text.charAt(0) === "-")
+            text = " " + text;
+        return text.slice(0, maximum);
+    }
+
+    function _queueNotification(request) {
+        if (!root.notificationsEnabled || !request
+                || (request.eventType !== "health_degraded"
+                    && request.eventType !== "health_recovered")
+                || (root.ownedNotificationProcesses || []).length
+                    >= root.maxNotificationProcesses)
+            return false;
+        var projectName = _notificationText(request.projectName,
+            I18n.trFor("trellisDms", "Trellis project"), 80);
+        var degraded = request.eventType === "health_degraded";
+        var summary = I18n.trFor("trellisDms", degraded
+            ? "Trellis health degraded" : "Trellis health recovered");
+        var body = I18n.trFor("trellisDms", degraded
+            ? "%1 needs attention. Open Trellis DMS Health or Diagnostics for details."
+            : "%1 recovered. Open Trellis DMS Health or Diagnostics for details.")
+            .arg(projectName).toString();
+        summary = _notificationText(summary, "Trellis Health", 120);
+        body = _notificationText(body, "Open Trellis DMS Health or Diagnostics for details.", 240);
+        var process = null;
+        try {
+            process = notificationProcessComponent.createObject(root, {
+                ownerRoot: root,
+                ownedList: "ownedNotificationProcesses",
+                command: ["dms", "notify", summary, body, "--app",
+                    "Trellis DMS", "--icon", "health", "--timeout", "5000"],
+                callback: function (exitCode) {
+                    if (exitCode !== 0)
+                        console.warn("Trellis DMS: Health notification failed");
+                }
+            });
+            if (!process)
+                return false;
+            root.ownedNotificationProcesses.push(process);
+            process.running = true;
+            return true;
+        } catch (error) {
+            if (process) {
+                root._untrack("ownedNotificationProcesses", process);
+                process.destroy();
+            }
+            console.warn("Trellis DMS: Health notification unavailable");
+            return false;
+        }
+    }
+
+    function _publishHealthNotifications(recent) {
+        try {
+            var currentEvents = [];
+            var events = recent && Array.isArray(recent.events) ? recent.events : [];
+            for (var i = 0; i < events.length; i++) {
+                if (events[i] && events[i].source_snapshot_generation
+                        === root.publicationGeneration)
+                    currentEvents.push(events[i]);
+            }
+            var result = TrellisNotifications.observe(root.notificationState,
+                currentEvents, root.notificationsEnabled, Date.now());
+            root.notificationState = result.state;
+            if (!root.notificationsEnabled) {
+                _destroyNotificationProcesses();
+                return;
+            }
+            var requests = result.requests || [];
+            for (var j = 0; j < requests.length; j++)
+                _queueNotification(requests[j]);
+        } catch (error) {
+            console.warn("Trellis DMS: Health notification observer failed");
+        }
     }
 
     function _cancelDetailRead(clearResponse) {
@@ -2656,6 +2780,7 @@ PluginComponent {
         if (root.pluginService)
             root.pluginService.setGlobalVar(root.pluginId, "snapshot", snapshot);
         recentChangesVar.set(recent);
+        root._publishHealthNotifications(recent);
         root.lastGoodSnapshot = snapshot;
         return snapshot;
     }
@@ -2914,6 +3039,11 @@ PluginComponent {
         if (!root.observedTopologySettings)
             return;
         var settings = root.pluginData || ({});
+        var notificationsNowEnabled = !!settings
+            && settings.notificationsEnabled === true;
+        if (root.observedNotificationsEnabled && !notificationsNowEnabled)
+            root._destroyNotificationProcesses();
+        root.observedNotificationsEnabled = notificationsNowEnabled;
         var changes = TrellisWatch.topologySettingsChanges(
             root.observedTopologySettings, settings,
             root.topologyIntervalDefault, root.maxScanRoots);
@@ -2941,12 +3071,20 @@ PluginComponent {
         var generation = root.scanGeneration;
         var settings = pluginData || {};
         root.observedTopologySettings = root._topologySettingsSnapshot(settings);
+        root.observedNotificationsEnabled = !!settings
+            && settings.notificationsEnabled === true;
         var intervalResult = TrellisWatch.normalizeTopologyInterval(settings.topologyInterval, root.topologyIntervalDefault);
         root.topologyIntervalSeconds = intervalResult.value;
         // An array-valued scanRoots setting is authoritative even when empty.
         // Only an absent/non-array key falls back to the v0.4 projectRoot.
         var rootInput = TrellisDiscovery.selectRootInput(settings, root.maxScanRoots);
         var normalized = TrellisPaths.normalizeRoots(rootInput.value);
+        var notificationScopeKey = JSON.stringify(normalized.roots || []);
+        if (root.notificationScopeKey !== notificationScopeKey) {
+            root.notificationScopeKey = notificationScopeKey;
+            root.notificationState = TrellisNotifications.createState();
+            root._destroyNotificationProcesses();
+        }
         TrellisChanges.resetScope(root.changeTracker, JSON.stringify(normalized.roots || []));
         if (rootInput.truncated > 0) {
             normalized.warnings.push(_warning("scan_root_limit", "trusted scan root cap reached", {
@@ -3027,6 +3165,7 @@ PluginComponent {
         _cancelDetailRead(false);
         _cancelSearchRead(true);
         _cancelAction(true);
+        root._destroyNotificationProcesses();
         _destroyOwned();
         root.changeTracker = TrellisChanges.createTracker(root.observationEpoch);
     }

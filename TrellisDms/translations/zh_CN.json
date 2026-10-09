@@ -1084,5 +1084,26 @@
     },
     "Task ID: %1": {
         "Task ID: %1": "任务 ID：%1"
+    },
+    "Enable Health notifications": {
+        "Enable Health notifications": "启用健康状态通知"
+    },
+    "Notify once when a project becomes degraded or recovers. Notifications are off by default and never include paths, task text, or session details.": {
+        "Notify once when a project becomes degraded or recovers. Notifications are off by default and never include paths, task text, or session details.": "项目状态变差或恢复时各通知一次。通知默认关闭，且不会包含路径、任务文本或会话详情。"
+    },
+    "Trellis project": {
+        "Trellis project": "Trellis 项目"
+    },
+    "Trellis health degraded": {
+        "Trellis health degraded": "Trellis 健康状态变差"
+    },
+    "Trellis health recovered": {
+        "Trellis health recovered": "Trellis 健康状态已恢复"
+    },
+    "%1 needs attention. Open Trellis DMS Health or Diagnostics for details.": {
+        "%1 needs attention. Open Trellis DMS Health or Diagnostics for details.": "%1 需要关注。请打开 Trellis DMS 的健康状态或诊断查看详情。"
+    },
+    "%1 recovered. Open Trellis DMS Health or Diagnostics for details.": {
+        "%1 recovered. Open Trellis DMS Health or Diagnostics for details.": "%1 已恢复。请打开 Trellis DMS 的健康状态或诊断查看详情。"
     }
 }
