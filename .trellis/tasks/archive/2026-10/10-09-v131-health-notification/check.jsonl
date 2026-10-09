@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/recent-changes-contract.md","reason":"Check initial/restart quietness, semantic transition filtering, bounded scope identity, and no inferred activity."}
+{"file":".trellis/spec/frontend/settings-state-contract.md","reason":"Check default-off settings, Restore Defaults, no scan-on-toggle, and no Trellis writes."}
+{"file":".trellis/tasks/archive/2026-10/10-09-v13-notifications-surface-gate/research/dms-notification-api.md","reason":"Check argv-only local notification execution, failure isolation, and unsupported click-action claims."}

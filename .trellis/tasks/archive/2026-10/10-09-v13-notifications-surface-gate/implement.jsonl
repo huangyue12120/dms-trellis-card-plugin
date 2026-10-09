@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/recent-changes-contract.md","reason":"Health notifications consume the daemon-owned semantic transition events and must preserve quiet baselines, bounded identities, and runtime-only history."}
+{"file":".trellis/spec/frontend/settings-state-contract.md","reason":"The opt-in notification setting must use shared PluginSettings data, defaults, and reset semantics without confusing it with per-placement state."}
+{"file":".trellis/spec/frontend/desktop-projection-contract.md","reason":"The Control Center gate must respect the existing Desktop Health projection and single-daemon/shared-Snapshot boundary."}
+{"file":".trellis/tasks/10-09-v13-notifications-surface-gate/research/dms-notification-api.md","reason":"Local DMS notification API evidence constrains the adapter, process permission, and unsupported click-action behavior."}
+{"file": ".trellis/tasks/10-09-v13-notifications-surface-gate/release-decision.md", "reason": "Freeze implemented Health notification, deferred gates, and host-gated candidate release status."}

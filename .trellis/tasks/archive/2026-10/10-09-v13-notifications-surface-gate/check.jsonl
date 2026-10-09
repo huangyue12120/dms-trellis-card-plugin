@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/recent-changes-contract.md","reason":"Verify transition consumption does not add task/activity noise, duplicate events, or persistence beyond the existing contract."}
+{"file":".trellis/spec/frontend/settings-state-contract.md","reason":"Verify notification settings are shared, default-off, resettable, and do not trigger a topology scan or Trellis write."}
+{"file":".trellis/spec/frontend/desktop-projection-contract.md","reason":"Verify the Control Center decision preserves current Desktop/Health projection ownership and does not add a surface."}
+{"file":".trellis/tasks/10-09-v13-notifications-surface-gate/research/dms-notification-api.md","reason":"Verify notification execution stays within inspected DMS API evidence and records host limitations honestly."}
+{"file": ".trellis/tasks/10-09-v13-notifications-surface-gate/check-evidence.md", "reason": "Record full-scope checks and explicit unsupported-host limits."}

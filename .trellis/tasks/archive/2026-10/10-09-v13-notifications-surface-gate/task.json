@@ -1,0 +1,30 @@
+{
+  "id": "v13-notifications-surface-gate",
+  "name": "v13-notifications-surface-gate",
+  "title": "v1.3 Notifications and Surface Product Gate",
+  "description": "Implement low-noise Health notifications, evaluate Task Change notifications, and decide the Control Center product gate for v1.3.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "huangyue12120",
+  "assignee": "huangyue12120",
+  "createdAt": "2026-10-09",
+  "completedAt": "2026-10-09",
+  "branch": "feat/v11-health-freshness",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-09-v131-health-notification",
+    "10-09-v132-task-change-gate",
+    "10-09-v133-control-center-gate"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
